@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+</head>
+<body>
 <title>Meridian · Console de bord</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -200,7 +208,704 @@ label.f input,label.f select,label.f textarea{display:block;width:100%;margin-to
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-/*__CORE__*/
+const MC = (() => {
+/* =====================================================================
+   MERIDIAN · moteur commun
+   Partagé à l'identique par le Worker (autorité) et la console (mode démo).
+   Aucune dépendance. Toutes les fonctions qui modifient l'état le font en
+   place et renvoient les commandes à transmettre au mod.
+   ===================================================================== */
+
+const PROTOCOL_VERSION = 1;
+const EJECT_COUNTDOWN_MS = 15000;
+const LOG_MAX = 400;
+
+const LEVELS = [
+  [0, "Non assigné"], [1, "Colon"], [2, "Travailleur"], [3, "Technicien · militaire"],
+  [4, "Officier"], [5, "Chef de service"], [6, "Second"], [7, "Capitaine"]
+];
+const GROUPS = ["Équipage", "Militaires", "Travailleurs", "Colons"];
+const TEAMS = ["jour", "nuit", "aucune"];
+
+/* Pages de la console. Un terminal (bloc en jeu) n'ouvre que ses pages. */
+const PAGES = {
+  overview: "Vue d’ensemble", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
+  doors: "Portes et accès", crew: "Équipage", procs: "Procédures", log: "Journal",
+  structure: "Structure", admin: "Ordinateur de bord"
+};
+
+/* action : [libellé, niveau minimum par défaut, page qui porte l'action] */
+const ACTIONS = {
+  "door.remote":    ["Ouvrir ou fermer une porte à distance", 3, "doors"],
+  "door.lock":      ["Verrouiller une porte", 3, "doors"],
+  "door.lockdown":  ["Sceller une porte (confinement)", 5, "doors"],
+  "access.edit":    ["Modifier les règles d’accès", 5, "doors"],
+  "valve.set":      ["Manœuvrer une vanne", 4, "atmos"],
+  "room.pressurize":["Pressuriser une pièce", 3, "atmos"],
+  "room.vent":      ["Vider l’air d’une pièce", 5, "atmos"],
+  "room.alarm":     ["Alarme de pièce", 2, "plan"],
+  "alarm.general":  ["Alerte générale", 5, "overview"],
+  "alarm.ack":      ["Acquitter une alarme", 3, "log"],
+  "proc.eject":     ["Code d’éjection de section", 4, "procs"],
+  "crew.vitals":    ["Voir la santé et la position", 3, "crew"],
+  "crew.assign":    ["Affecter le personnel", 5, "crew"],
+  "structure.edit": ["Nommer ponts, pièces et sections", 5, "structure"],
+  "perms.edit":     ["Changer les niveaux requis", 7, "structure"],
+  "announce":       ["Annonce générale", 6, "overview"]
+};
+const defaultPerms = () => Object.fromEntries(Object.entries(ACTIONS).map(([k, v]) => [k, v[1]]));
+
+/* Catalogue des avaries (poste admin uniquement). target : room | section | door | ship */
+const FAULTS = [
+  ["Énergie", [
+    ["power.surge", "Surcharge du réseau", "room", "La pièce perd l’alimentation, reroutage manuel"],
+    ["reactor.heat", "Réacteur en surchauffe", "ship", "Purge du refroidissement, puissance réduite"],
+    ["power.backup", "Batteries de secours vides", "ship", "L’éclairage de secours tombe"],
+    ["power.breaker", "Disjoncteur grillé", "room", "Pièce fabriquée à l’atelier requise"]]],
+  ["Coque et structure", [
+    ["hull.breach", "Brèche par micro-météorites", "room", "L’air fuit, colmatage ou scellement"],
+    ["ring.crack", "Fissure d’anneau", "section", "Vibrations, renfort en EVA"],
+    ["airlock.open", "Sas mal verrouillé", "door", "Alarme automatique, risque de décompression"],
+    ["dock.seal", "Joint d’amarrage défaillant", "room", "Une navette ne peut plus s’arrimer"]]],
+  ["Support vie", [
+    ["o2.drop", "Chute d’oxygène", "room", "CO₂ qui monte, cuves à réparer"],
+    ["water.recycler", "Recycleur d’eau en panne", "ship", "Rationnement immédiat"],
+    ["water.toxic", "Eau contaminée", "ship", "Malaises, intervention du médecin"],
+    ["fire", "Incendie", "room", "Isoler la pièce ou couper l’oxygène"],
+    ["coolant.leak", "Fuite de caloporteur", "room", "Zone gelée, accès limité"],
+    ["gravity.fault", "Gravité déréglée", "room", "Mauvais axe ou intensité"]]],
+  ["Propulsion et navigation", [
+    ["fuel.leak", "Fuite de carburant", "ship", "Le compteur baisse sans cause visible"],
+    ["jump.unstable", "Moteur de saut instable", "ship", "Calibrage avant le prochain saut"],
+    ["sensor.lie", "Capteur menteur", "room", "Valeurs fausses affichées sur la console"],
+    ["course.drift", "Dérive de cap", "ship", "Correction à anticiper"]]],
+  ["Informatique", [
+    ["perms.corrupt", "Permissions corrompues", "door", "Badges refusés sur cette porte"],
+    ["alarm.false", "Fausse alarme", "room", "Alarme sans cause réelle"],
+    ["computer.reboot", "Redémarrage de l’ordinateur", "ship", "Consoles hors ligne, mode manuel"]]],
+  ["Communications", [
+    ["comms.jam", "Brouillage", "ship", "Annonces et messages coupés"],
+    ["comms.shuttle", "Perte de liaison navette", "ship", "Équipage isolé en mission"]]],
+  ["Anneaux et rotation", [
+    ["ring.hull", "Module de coque endommagé", "room", "Kit de réparation fabriqué à l’atelier"],
+    ["ring.lock", "Verrouillage de rotation bloqué", "section", "EVA impossible"],
+    ["ring.rotor", "Rotor déréglé", "section", "Gravité instable sur un côté"]]],
+  ["Santé", [
+    ["bio.pathogen", "Pathogène à bord", "room", "Quarantaine"],
+    ["bio.food", "Intoxication alimentaire", "ship", "Cantine suspectée"],
+    ["bio.crops", "Contamination des serres", "room", "Récoltes perdues"]]]
+];
+const FAULT_INDEX = Object.fromEntries(FAULTS.flatMap(([cat, l]) => l.map(f => [f[0], { key: f[0], name: f[1], target: f[2], effect: f[3], cat }])));
+
+/* ------------------------------------------------------------------ */
+const uid = (p) => p + Math.random().toString(36).slice(2, 8);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const envDefault = () => ({ p: 101.3, o2: 20.9, co2: 0.04, t: 21, g: 1.0, power: true });
+
+function emptyShip(name = "Meridian") {
+  return {
+    v: PROTOCOL_VERSION,
+    ship: { name, demo: false, alert: null, lastStructure: null, modOnline: false },
+    decks: [], rooms: {}, doors: {}, valves: {}, sections: {}, terminals: {},
+    accessGroups: {}, people: {}, perms: defaultPerms(),
+    procs: [], faults: [], acks: [], log: [],
+    computer: { refuse: false, message: "" },
+    stocks: { fuel: 100, water: 100, food: 100, o2: 100, parts: 100 },
+    seq: 1
+  };
+}
+
+function log(state, who, text, kind = "info", now = Date.now()) {
+  state.log.unshift({ t: now, who, text, kind });
+  if (state.log.length > LOG_MAX) state.log.length = LOG_MAX;
+}
+
+/* ---------------------------- Permissions --------------------------- */
+function levelOf(p) { return p ? (p.admin ? 99 : (p.level | 0)) : -1; }
+
+function can(state, actor, action, term) {
+  if (!actor) return false;
+  if (actor.admin) return true;
+  if (state.computer.refuse) return false;
+  const meta = ACTIONS[action];
+  if (!meta) return false;
+  if (term && state.terminals[term] && !state.terminals[term].pages.includes(meta[2])) return false;
+  return levelOf(actor) >= (state.perms[action] ?? meta[1]);
+}
+
+function effectiveRule(state, door) {
+  if (door.rule) return door.rule;
+  if (door.group && state.accessGroups[door.group]) return state.accessGroups[door.group].rule || null;
+  return null;
+}
+
+function clauseMatch(c, p) {
+  switch (c.t) {
+    case "min": return levelOf(p) >= c.v;
+    case "lv": return (c.v || []).includes(p.level | 0);
+    case "p": return p.id === c.v;
+    case "role": return (p.role || "") === c.v;
+    case "job": return (p.job || "") === c.v;
+    case "grp": return (p.group || "") === c.v;
+    case "team": return (p.team || "") === c.v;
+    case "tag": return (p.tags || []).includes(c.v);
+    case "none": return false;
+    default: return false;
+  }
+}
+
+/* Peut-on ouvrir cette porte avec sa puce ? */
+function canOpenDoor(state, p, door) {
+  if (!p || !door) return { ok: false, why: "Inconnu" };
+  if (p.admin) return { ok: true, why: "Admin" };
+  if (p.vitals && p.vitals.alive === false) return { ok: false, why: "Puce inactive" };
+  if (door.broken) return { ok: false, why: "Lecteur hors service" };
+  if (door.state.lockdown) return { ok: false, why: "Porte scellée" };
+  if (door.state.locked) return { ok: false, why: "Verrouillée" };
+  if ((door.managers || []).includes(p.id)) return { ok: true, why: "Gestionnaire" };
+  if ((door.grants || []).includes(p.id)) return { ok: true, why: "Autorisation spéciale" };
+  const r = effectiveRule(state, door);
+  if (!r || !r.any || !r.any.length) return { ok: true, why: "Accès libre" };
+  return r.any.some(c => clauseMatch(c, p)) ? { ok: true, why: "Règle" } : { ok: false, why: "Accès refusé" };
+}
+
+function ruleText(state, rule) {
+  if (!rule || !rule.any || !rule.any.length) return "Accès libre";
+  return rule.any.map(c => {
+    switch (c.t) {
+      case "min": return "niv. " + c.v + " et plus";
+      case "lv": return "niv. " + (c.v || []).join(", ");
+      case "p": return state.people[c.v] ? state.people[c.v].name : "personne inconnue";
+      case "role": return "rôle « " + c.v + " »";
+      case "job": return "métier « " + c.v + " »";
+      case "grp": return c.v;
+      case "team": return "équipe de " + c.v;
+      case "tag": return "#" + c.v;
+      case "none": return "personne (gestionnaires seulement)";
+      default: return "?";
+    }
+  }).join(" · ou ");
+}
+
+/* Liste d'accès compilée, envoyée au mod pour un contrôle local instantané. */
+function compileAcl(state) {
+  const people = Object.values(state.people);
+  const doors = {};
+  for (const d of Object.values(state.doors)) {
+    const r = effectiveRule(state, d);
+    doors[d.id] = {
+      locked: !!d.state.locked, lockdown: !!d.state.lockdown, broken: !!d.broken,
+      public: !r || !r.any || !r.any.length,
+      allow: people.filter(p => !p.admin && canOpenDoor(state, p, d).ok).map(p => p.id)
+    };
+  }
+  return { type: "acl", admins: people.filter(p => p.admin).map(p => p.id), doors };
+}
+
+/* ------------------------------ Alertes ----------------------------- */
+function roomStatus(state, r) {
+  if (!r) return "ok";
+  const sec = r.section && state.sections[r.section];
+  if (sec && sec.state === "ejected") return "gone";
+  const e = r.env || {};
+  if (r.flags && r.flags.fire) return "fire";
+  if ((r.flags && r.flags.breach) || e.p < 60 || r.mode === "vent") return "vac";
+  if (r.alarm || e.o2 < 18 || e.co2 > 1 || e.t < 5 || e.t > 40 || e.power === false || (r.flags && r.flags.alarm)) return "warn";
+  return "ok";
+}
+
+function computeAlerts(state, withSilent = false) {
+  const out = [];
+  if (state.ship.alert) out.push({ key: "ship", lvl: state.ship.alert === "rouge" ? "crit" : "warn", text: "Alerte " + state.ship.alert + " générale", room: null });
+  for (const r of Object.values(state.rooms)) {
+    const st = roomStatus(state, r), e = r.env || {};
+    if (st === "gone") continue;
+    if (r.flags && r.flags.fire) out.push({ key: "fire:" + r.id, lvl: "crit", text: "Incendie", room: r.id });
+    if ((r.flags && r.flags.breach) || e.p < 60) out.push({ key: "vac:" + r.id, lvl: "crit", text: "Dépressurisation · " + Math.round(e.p) + " kPa", room: r.id });
+    if (r.mode === "vent") out.push({ key: "vent:" + r.id, lvl: "warn", text: "Vidage en cours", room: r.id });
+    if (e.o2 < 18) out.push({ key: "o2:" + r.id, lvl: e.o2 < 15 ? "crit" : "warn", text: "Oxygène bas · " + (+e.o2).toFixed(1) + " %", room: r.id });
+    if (e.t < 5) out.push({ key: "cold:" + r.id, lvl: "warn", text: "Température · " + Math.round(e.t) + " °C", room: r.id });
+    if (e.power === false) out.push({ key: "pwr:" + r.id, lvl: "warn", text: "Hors alimentation", room: r.id });
+    if (r.alarm) out.push({ key: "man:" + r.id, lvl: "warn", text: "Alarme manuelle", room: r.id });
+  }
+  for (const f of state.faults) if (f.active && (withSilent || !f.silent) && f.target && f.target.kind === "door")
+    out.push({ key: "f:" + f.id, lvl: "warn", text: FAULT_INDEX[f.key]?.name || f.key, room: null, door: f.target.id });
+  for (const p of Object.values(state.people)) if (p.vitals && p.vitals.alive === false && !p.vitals.reported)
+    out.push({ key: "dead:" + p.id, lvl: "crit", text: "Signal vital perdu · " + p.name, room: p.room || null });
+  out.forEach(a => a.ack = state.acks.includes(a.key));
+  return out;
+}
+
+/* ------------------------- Données du mod --------------------------- */
+/* structure : { decks:[{id,name,kind,order,y0,y1}], rooms:[{id,name,deck,kind,rects:[[x1,z1,x2,z2]],volume}],
+   doors:[{id,name,deck,x,z,rooms:[a,b],size,airtight}], valves:[{id,name,room,kind}],
+   sections:[{id,name,ejectable,rooms:[]}], terminals:[{id,name,room}] } */
+function mergeStructure(state, s, now = Date.now()) {
+  if (state.ship.demo) {
+    const keepPerms = state.perms, admins = Object.values(state.people).filter(p => p.admin && !p.demo);
+    const fresh = emptyShip(state.ship.name);
+    Object.assign(state, fresh);
+    state.perms = keepPerms;
+    for (const a of admins) state.people[a.id] = a;
+    log(state, "SYSTÈME", "Première structure reçue du mod : la démo est remplacée.", "sys", now);
+  }
+  const keep = (old, neu, fields) => { if (old) for (const f of fields) if (old[f] !== undefined) neu[f] = old[f]; return neu; };
+  const decks = [];
+  for (const d of s.decks || []) {
+    const old = state.decks.find(x => x.id === d.id);
+    const n = { id: d.id, name: d.name || ("Pont " + d.id), kind: d.kind || "hull", order: d.order ?? decks.length, y0: d.y0, y1: d.y1 };
+    if (old && old.named) { n.name = old.name; n.named = true; }
+    decks.push(n);
+  }
+  state.decks = decks.sort((a, b) => a.order - b.order);
+
+  const rooms = {};
+  for (const r of s.rooms || []) {
+    const old = state.rooms[r.id];
+    const n = { id: r.id, name: r.name || r.id, deck: r.deck, kind: r.kind || "room", rects: r.rects || [], volume: r.volume || 0,
+      env: old ? old.env : envDefault(), flags: old ? old.flags : {}, alarm: old ? old.alarm : false, mode: old ? old.mode : null, section: r.section || null };
+    if (old && old.named) { n.name = old.name; n.named = true; }
+    if (old && old.sectionSet) { n.section = old.section; n.sectionSet = true; }
+    rooms[r.id] = n;
+  }
+  state.rooms = rooms;
+
+  const doors = {};
+  for (const d of s.doors || []) {
+    const old = state.doors[d.id];
+    const n = { id: String(d.id), name: d.name || ("Porte " + d.id), deck: d.deck, x: d.x, z: d.z, rooms: d.rooms || [], size: d.size || "",
+      airtight: d.airtight !== false, state: old ? old.state : { open: false, locked: false, lockdown: false },
+      rule: null, group: null, managers: [], grants: [] };
+    keep(old, n, ["rule", "group", "managers", "grants", "broken"]);
+    if (old && old.named) { n.name = old.name; n.named = true; }
+    doors[n.id] = n;
+  }
+  state.doors = doors;
+
+  const valves = {};
+  for (const v of s.valves || []) {
+    const old = state.valves[v.id];
+    valves[v.id] = { id: v.id, name: (old && old.named) ? old.name : (v.name || v.id), named: !!(old && old.named), room: v.room, kind: v.kind || "gas", open: old ? old.open : !!v.open };
+  }
+  state.valves = valves;
+
+  for (const sec of s.sections || []) {
+    const old = state.sections[sec.id];
+    state.sections[sec.id] = { id: sec.id, name: (old && old.named) ? old.name : (sec.name || sec.id), named: !!(old && old.named),
+      ejectable: old ? old.ejectable : !!sec.ejectable, state: old ? old.state : "attached", fromMod: true };
+    for (const rid of sec.rooms || []) if (state.rooms[rid] && !state.rooms[rid].sectionSet) state.rooms[rid].section = sec.id;
+  }
+  for (const t of s.terminals || []) {
+    const old = state.terminals[t.id];
+    state.terminals[t.id] = { id: t.id, name: (old && old.named) ? old.name : (t.name || t.id), named: !!(old && old.named), room: t.room || null,
+      pages: old ? old.pages : Object.keys(PAGES).filter(k => k !== "admin") };
+  }
+  state.ship.lastStructure = now;
+  log(state, "SYSTÈME", `Structure synchronisée : ${state.decks.length} ponts, ${Object.keys(rooms).length} pièces, ${Object.keys(doors).length} portes.`, "sys", now);
+}
+
+/* Un joueur a saisi son nom à la connexion. */
+/* name : nom à bord choisi par le joueur. mcName : pseudo Minecraft, utilisé tant qu'aucun nom n'est choisi. */
+function registerPlayer(state, { uuid, name, mcName }, now = Date.now()) {
+  if (!uuid) return null;
+  let p = state.people[uuid];
+  if (!p) {
+    p = state.people[uuid] = { id: uuid, name: name || mcName || "Inconnu", mcName: mcName || "", level: 0, rank: "", job: "", role: "Non assigné", group: "", team: "aucune", tags: [], online: true, room: null, vitals: null, joined: now };
+    log(state, "SYSTÈME", `Nouvel arrivant : ${p.name}. Affectation en attente.`, "crew", now);
+  } else if (mcName && p.mcName !== mcName) p.mcName = mcName;
+  if (p && name && p.name !== name) {
+    log(state, "SYSTÈME", `${p.name} s’identifie désormais comme ${name}.`, "crew", now);
+    p.name = name;
+  }
+  return p;
+}
+
+/* telemetry : { rooms:{id:{p,o2,co2,t,g,power,fire,breach}}, doors:{id:{open}}, players:[{uuid,name,room,vitals}], stocks:{} , full:true } */
+function applyTelemetry(state, m, now = Date.now()) {
+  for (const [id, e] of Object.entries(m.rooms || {})) {
+    const r = state.rooms[id]; if (!r) continue;
+    const { fire, breach, ...env } = e;
+    Object.assign(r.env, env);
+    if (fire !== undefined) r.flags.fire = !!fire;
+    if (breach !== undefined) r.flags.breach = !!breach;
+    if (r.mode === "pressurize" && r.env.p >= 100) r.mode = null;
+    if (r.mode === "vent" && r.env.p <= 0.5) r.mode = null;
+  }
+  for (const [id, d] of Object.entries(m.doors || {})) if (state.doors[id]) Object.assign(state.doors[id].state, { open: !!d.open });
+  if (m.players) {
+    const seen = new Set();
+    for (const pl of m.players) {
+      const p = registerPlayer(state, pl, now); if (!p) continue;
+      seen.add(p.id);
+      const wasAlive = !p.vitals || p.vitals.alive !== false;
+      p.online = pl.online !== false; p.room = pl.room || null; p.vitals = Object.assign(p.vitals || {}, pl.vitals || {});
+      if (wasAlive && p.vitals.alive === false) log(state, "SYSTÈME", `Signal vital perdu : ${p.name}${p.room && state.rooms[p.room] ? " (" + state.rooms[p.room].name + ")" : ""}.`, "crit", now);
+      if (!wasAlive && p.vitals.alive !== false) { p.vitals.reported = false; log(state, "SYSTÈME", `${p.name} est de nouveau en vie.`, "crew", now); }
+    }
+    if (m.full) for (const p of Object.values(state.people)) if (!seen.has(p.id) && !p.demo) p.online = false;
+  }
+  if (m.stocks) Object.assign(state.stocks, m.stocks);
+}
+
+/* ------------------------------ Actions ----------------------------- */
+const ERR = (error) => ({ ok: false, error, cmds: [] });
+
+function apply(state, actor, a, ctx = {}) {
+  const now = ctx.now || Date.now(), term = ctx.term || null;
+  if (!actor) return ERR("Session inconnue.");
+  if (!a || !a.type) return ERR("Action vide.");
+  if (state.computer.refuse && !actor.admin) return ERR(state.computer.message || "ORDINATEUR : commande refusée.");
+  const who = actor.name, cmds = [];
+  const need = (perm) => { if (!can(state, actor, perm, term)) throw new Error("Niveau ou terminal insuffisant : " + ACTIONS[perm][0].toLowerCase() + "."); };
+  const room = (id) => { const r = state.rooms[id]; if (!r) throw new Error("Pièce inconnue."); if (roomStatus(state, r) === "gone") throw new Error("Pièce éjectée."); return r; };
+  const door = (id) => { const d = state.doors[id]; if (!d) throw new Error("Porte inconnue."); return d; };
+  const person = (id) => { const p = state.people[id]; if (!p) throw new Error("Personne inconnue."); return p; };
+  const L = (t, k) => log(state, who, t, k, now);
+  try {
+    switch (a.type) {
+      /* Portes */
+      case "door.open": {
+        const d = door(a.door); need("door.remote");
+        if (d.state.lockdown && !can(state, actor, "door.lockdown", term)) throw new Error("Porte scellée.");
+        d.state.open = !!a.open; cmds.push({ type: "door.set", door: d.id, open: d.state.open });
+        L(`${d.state.open ? "ouvre" : "ferme"} ${d.name}.`, "door"); break;
+      }
+      case "door.lock": {
+        const d = door(a.door);
+        if (!(d.managers || []).includes(actor.id)) need("door.lock");
+        d.state.locked = !!a.locked; if (a.locked) d.state.open = false;
+        cmds.push({ type: "door.set", door: d.id, locked: d.state.locked, open: d.state.open });
+        L(`${d.state.locked ? "verrouille" : "déverrouille"} ${d.name}.`, "door"); break;
+      }
+      case "door.lockdown": {
+        need("door.lockdown");
+        const ids = a.room ? Object.values(state.doors).filter(d => d.rooms.includes(a.room)).map(d => d.id) : [a.door];
+        for (const id of ids) { const d = door(id); d.state.lockdown = !!a.on; if (a.on) d.state.open = false; cmds.push({ type: "door.set", door: d.id, lockdown: d.state.lockdown, open: d.state.open }); }
+        L(`${a.on ? "scelle" : "lève le scellé de"} ${a.room ? "toutes les portes de " + state.rooms[a.room].name : state.doors[a.door].name}.`, "door"); break;
+      }
+      case "door.setRule": { const d = door(a.door); need("access.edit"); d.rule = sanitizeRule(a.rule); L(`règle de ${d.name} : ${ruleText(state, effectiveRule(state, d))}.`, "access"); break; }
+      case "door.setGroup": { const d = door(a.door); need("access.edit"); if (a.group && !state.accessGroups[a.group]) throw new Error("Groupe inconnu."); d.group = a.group || null; L(`${d.name} → groupe ${a.group ? state.accessGroups[a.group].name : "aucun"}.`, "access"); break; }
+      case "door.setManagers": { const d = door(a.door); need("access.edit"); d.managers = (a.managers || []).filter(id => state.people[id]); L(`gestionnaires de ${d.name} : ${d.managers.map(id => state.people[id].name).join(", ") || "aucun"}.`, "access"); break; }
+      case "door.grant": {
+        const d = door(a.door), p = person(a.person);
+        if (!(d.managers || []).includes(actor.id)) need("access.edit");
+        d.grants = (d.grants || []).filter(x => x !== p.id); if (a.on) d.grants.push(p.id);
+        L(`${a.on ? "autorise" : "retire l’autorisation de"} ${p.name} sur ${d.name}.`, "access"); break;
+      }
+      case "door.rename": { const d = door(a.door); need("structure.edit"); d.name = clean(a.name, 40) || d.name; d.named = true; break; }
+      case "group.save": {
+        need("access.edit");
+        const id = a.id && state.accessGroups[a.id] ? a.id : "g" + (state.seq++);
+        const g = state.accessGroups[id] = { id, name: clean(a.name, 40) || "Groupe " + id, rule: sanitizeRule(a.rule) };
+        const set = new Set((a.doors || []).map(String));
+        for (const d of Object.values(state.doors)) { if (set.has(d.id)) d.group = id; else if (d.group === id) d.group = null; }
+        L(`enregistre le groupe d’accès « ${g.name} » (${set.size} portes, ${ruleText(state, g.rule)}).`, "access"); break;
+      }
+      case "group.delete": {
+        need("access.edit"); const g = state.accessGroups[a.id]; if (!g) throw new Error("Groupe inconnu.");
+        for (const d of Object.values(state.doors)) if (d.group === a.id) d.group = null;
+        delete state.accessGroups[a.id]; L(`supprime le groupe « ${g.name} ».`, "access"); break;
+      }
+      /* Atmosphère */
+      case "valve.set": {
+        need("valve.set"); const v = state.valves[a.valve]; if (!v) throw new Error("Vanne inconnue."); room(v.room);
+        v.open = !!a.open; cmds.push({ type: "valve.set", valve: v.id, open: v.open });
+        L(`${v.open ? "ouvre" : "ferme"} la vanne ${v.name} (${state.rooms[v.room].name}).`, "atmos"); break;
+      }
+      case "room.pressurize": { need("room.pressurize"); const r = room(a.room); r.mode = "pressurize"; cmds.push({ type: "room.pressurize", room: r.id }); L(`lance la pressurisation de ${r.name}.`, "atmos"); break; }
+      case "room.vent": { need("room.vent"); const r = room(a.room); r.mode = "vent"; cmds.push({ type: "room.vent", room: r.id }); L(`lance le vidage de l’air de ${r.name}.`, "crit"); break; }
+      case "room.stop": { const r = room(a.room); need(r.mode === "vent" ? "room.vent" : "room.pressurize"); r.mode = null; cmds.push({ type: "room.stop", room: r.id }); L(`arrête le cycle d’air de ${r.name}.`, "atmos"); break; }
+      case "room.alarm": { need("room.alarm"); const r = room(a.room); r.alarm = !!a.on; cmds.push({ type: "alarm.set", room: r.id, on: r.alarm, level: "jaune" }); if (!a.on) state.acks = state.acks.filter(k => k !== "man:" + r.id); L(`${a.on ? "déclenche" : "coupe"} l’alarme de ${r.name}.`, "alarm"); break; }
+      case "room.rename": { need("structure.edit"); const r = state.rooms[a.room]; if (!r) throw new Error("Pièce inconnue."); r.name = clean(a.name, 40) || r.name; r.named = true; break; }
+      case "room.setSection": { need("structure.edit"); const r = state.rooms[a.room]; if (!r) throw new Error("Pièce inconnue."); if (a.section && !state.sections[a.section]) throw new Error("Section inconnue."); r.section = a.section || null; r.sectionSet = true; break; }
+      case "deck.rename": { need("structure.edit"); const d = state.decks.find(x => x.id === a.deck); if (!d) throw new Error("Pont inconnu."); d.name = clean(a.name, 40) || d.name; d.named = true; break; }
+      case "section.save": {
+        need("structure.edit");
+        const id = a.id && state.sections[a.id] ? a.id : "s" + (state.seq++);
+        const old = state.sections[id];
+        state.sections[id] = { id, name: clean(a.name, 40) || id, named: true, ejectable: !!a.ejectable, state: old ? old.state : "attached", fromMod: old ? old.fromMod : false };
+        if (a.rooms) for (const r of Object.values(state.rooms)) { if (a.rooms.includes(r.id)) { r.section = id; r.sectionSet = true; } else if (r.section === id) { r.section = null; r.sectionSet = true; } }
+        L(`enregistre la section « ${state.sections[id].name} »${a.ejectable ? " (éjectable)" : ""}.`, "struct"); break;
+      }
+      case "terminal.save": { need("structure.edit"); const t = state.terminals[a.id]; if (!t) throw new Error("Terminal inconnu."); if (a.name) { t.name = clean(a.name, 40); t.named = true; } if (a.pages) t.pages = a.pages.filter(p => PAGES[p] && p !== "admin"); L(`configure le terminal ${t.name}.`, "struct"); break; }
+      case "perms.set": {
+        need("perms.edit"); if (!ACTIONS[a.action]) throw new Error("Action inconnue.");
+        const v = Math.max(0, Math.min(7, a.level | 0));
+        if (!actor.admin && (v > levelOf(actor) || state.perms[a.action] > levelOf(actor))) throw new Error("Impossible de régler un niveau au-dessus du vôtre.");
+        state.perms[a.action] = v; L(`« ${ACTIONS[a.action][0]} » exige désormais le niveau ${v}.`, "struct"); break;
+      }
+      /* Alertes */
+      case "alarm.general": { need("alarm.general"); state.ship.alert = a.level || null; cmds.push({ type: "alarm.set", room: null, on: !!a.level, level: a.level || null }); L(a.level ? `déclare l’alerte ${a.level}.` : "lève l’alerte générale.", "alarm"); break; }
+      case "alarm.ack": { need("alarm.ack"); if (!state.acks.includes(a.key)) state.acks.push(a.key); if (a.key.startsWith("dead:") && state.people[a.key.slice(5)]) state.people[a.key.slice(5)].vitals.reported = true; L(`acquitte une alarme.`, "alarm"); break; }
+      case "announce": { need("announce"); const text = clean(a.text, 280); if (!text) throw new Error("Annonce vide."); cmds.push({ type: "announce", text, from: who }); L(`annonce : « ${text} »`, "announce"); break; }
+      /* Procédures */
+      case "proc.eject.start": {
+        need("proc.eject"); const s = state.sections[a.section];
+        if (!s) throw new Error("Section inconnue."); if (!s.ejectable) throw new Error("Cette section n’est pas éjectable."); if (s.state !== "attached") throw new Error("Section déjà éjectée.");
+        if (state.procs.some(p => p.target === s.id && (p.status === "wait" || p.status === "countdown"))) throw new Error("Une procédure est déjà en cours sur cette section.");
+        state.procs.unshift({ id: "pr" + (state.seq++), type: "eject", target: s.id, codes: [{ id: actor.id, name: who, t: now }], need: 2, status: "wait", createdAt: now, endsAt: null });
+        L(`saisit le code 1 pour l’éjection de ${s.name}.`, "crit"); break;
+      }
+      case "proc.confirm": {
+        need("proc.eject"); const p = state.procs.find(x => x.id === a.id); if (!p || p.status !== "wait") throw new Error("Procédure introuvable ou close.");
+        if (p.codes.some(c => c.id === actor.id)) throw new Error("Le second code doit venir d’une autre personne.");
+        p.codes.push({ id: actor.id, name: who, t: now });
+        if (p.codes.length >= p.need) { p.status = "countdown"; p.endsAt = now + EJECT_COUNTDOWN_MS; cmds.push({ type: "countdown", target: p.target, ms: EJECT_COUNTDOWN_MS }); }
+        L(`saisit le code ${p.codes.length} pour l’éjection de ${state.sections[p.target].name}.${p.status === "countdown" ? " Compte à rebours lancé." : ""}`, "crit"); break;
+      }
+      case "proc.cancel": {
+        const p = state.procs.find(x => x.id === a.id); if (!p || (p.status !== "wait" && p.status !== "countdown")) throw new Error("Procédure introuvable ou close.");
+        if (!p.codes.some(c => c.id === actor.id)) need("proc.eject");
+        p.status = "cancelled"; p.endsAt = null; cmds.push({ type: "countdown.cancel", target: p.target });
+        L(`annule l’éjection de ${state.sections[p.target].name}.`, "crit"); break;
+      }
+      /* Équipage */
+      case "crew.assign": {
+        need("crew.assign"); const p = person(a.person), f = a.fields || {};
+        if (!actor.admin && p.id !== actor.id && levelOf(p) >= levelOf(actor)) throw new Error("Vous ne pouvez pas modifier un supérieur ou un égal.");
+        if (f.level !== undefined) { const lv = Math.max(0, Math.min(7, f.level | 0)); if (!actor.admin && (lv >= levelOf(actor) || p.id === actor.id)) throw new Error("Niveau au-delà de vos droits."); p.level = lv; }
+        for (const k of ["rank", "job", "role", "group", "team"]) if (f[k] !== undefined) p[k] = clean(f[k], 40);
+        if (f.tags) p.tags = f.tags.map(t => clean(t, 20)).filter(Boolean);
+        if (f.name) p.name = clean(f.name, 32);
+        L(`affecte ${p.name} : niv. ${p.level}, ${p.job || p.role || "sans poste"}${p.team && p.team !== "aucune" ? ", équipe de " + p.team : ""}.`, "crew"); break;
+      }
+      case "crew.remove": { need("crew.assign"); const p = person(a.person); if (!actor.admin && levelOf(p) >= levelOf(actor)) throw new Error("Vous ne pouvez pas retirer un supérieur."); delete state.people[p.id]; for (const d of Object.values(state.doors)) { d.managers = d.managers.filter(x => x !== p.id); d.grants = d.grants.filter(x => x !== p.id); } L(`retire ${p.name} du registre.`, "crew"); break; }
+      /* Admin */
+      case "admin.fault": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const f = FAULT_INDEX[a.key]; if (!f) throw new Error("Avarie inconnue.");
+        const target = a.target || { kind: "ship" };
+        const fault = { id: "f" + (state.seq++), key: f.key, target, silent: !!a.silent, active: true, t: now };
+        state.faults.unshift(fault); faultEffect(state, fault, true);
+        cmds.push({ type: "fault", id: fault.id, key: f.key, target, on: true, silent: fault.silent });
+        log(state, "ORDINATEUR", `avarie « ${f.name} »${targetName(state, target)}${fault.silent ? " (silencieuse)" : ""}.`, "admin", now); break;
+      }
+      case "admin.clearFault": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const fault = state.faults.find(x => x.id === a.id); if (!fault) throw new Error("Avarie inconnue.");
+        fault.active = false; faultEffect(state, fault, false); cmds.push({ type: "fault", id: fault.id, key: fault.key, target: fault.target, on: false });
+        log(state, "ORDINATEUR", `avarie « ${FAULT_INDEX[fault.key]?.name} » résolue.`, "admin", now); break;
+      }
+      case "admin.computer": { if (!actor.admin) throw new Error("Réservé au poste admin."); state.computer.refuse = !!a.refuse; state.computer.message = clean(a.message, 140); log(state, "ORDINATEUR", a.refuse ? "refuse désormais les commandes de l’équipage." : "obéit de nouveau à l’équipage.", "admin", now); break; }
+      case "admin.setAdmin": { if (!actor.admin) throw new Error("Réservé au poste admin."); const p = person(a.person); p.admin = !!a.on; log(state, "ORDINATEUR", `${p.name} ${a.on ? "reçoit" : "perd"} l’accès admin.`, "admin", now); break; }
+      case "admin.env": { if (!actor.admin) throw new Error("Réservé au poste admin."); const r = room(a.room); cmds.push({ type: "env.set", room: r.id, env: a.env }); Object.assign(r.env, a.env); log(state, "ORDINATEUR", `force l’environnement de ${r.name}.`, "admin", now); break; }
+      case "admin.stocks": { if (!actor.admin) throw new Error("Réservé au poste admin."); for (const k of Object.keys(state.stocks)) if (a.stocks && a.stocks[k] !== undefined) state.stocks[k] = Math.max(0, Math.min(100, +a.stocks[k])); cmds.push({ type: "stocks.set", stocks: state.stocks }); break; }
+      default: return ERR("Action inconnue : " + a.type);
+    }
+  } catch (e) { return ERR(e.message); }
+  return { ok: true, cmds };
+}
+
+function faultEffect(state, f, on) {
+  const r = f.target && f.target.kind === "room" ? state.rooms[f.target.id] : null;
+  const d = f.target && f.target.kind === "door" ? state.doors[f.target.id] : null;
+  if (r) {
+    if (f.key === "fire") r.flags.fire = on;
+    if (f.key === "hull.breach" || f.key === "ring.hull") r.flags.breach = on;
+    if (f.key === "power.surge" || f.key === "power.breaker") r.env.power = !on;
+    if (f.key === "alarm.false" && !f.silent) r.flags.alarm = on;
+  }
+  if (d && (f.key === "perms.corrupt")) d.broken = on;
+  if (d && f.key === "airlock.open") { d.state.open = on; d.state.locked = false; }
+}
+function targetName(state, t) {
+  if (!t || t.kind === "ship") return " sur tout le vaisseau";
+  const o = t.kind === "room" ? state.rooms[t.id] : t.kind === "door" ? state.doors[t.id] : state.sections[t.id];
+  return o ? " · " + o.name : "";
+}
+function clean(s, n) { return String(s ?? "").replace(/[<>]/g, "").trim().slice(0, n); }
+function sanitizeRule(r) {
+  if (!r || !Array.isArray(r.any) || !r.any.length) return null;
+  const ok = ["min", "lv", "p", "role", "job", "grp", "team", "tag", "none"];
+  const any = r.any.filter(c => c && ok.includes(c.t)).slice(0, 20).map(c => ({ t: c.t, v: c.t === "lv" ? [].concat(c.v).map(x => x | 0) : c.t === "min" ? c.v | 0 : c.t === "none" ? null : clean(c.v, 64) }));
+  return any.length ? { any } : null;
+}
+
+/* Simulateur d'environnement : sert la démo et les tests sans mod.
+   En production, c'est le mod qui calcule la physique et envoie la télémétrie. */
+function simulate(S, dt, now = Date.now()) {
+  const valveOpen = (rid, kind) => { const v = Object.values(S.valves).filter(x => x.room === rid && x.kind === kind); return v.length ? v.some(x => x.open) : kind === "o2"; };
+  for (const r of Object.values(S.rooms)) {
+    const e = r.env, gone = roomStatus(S, r) === "gone";
+    if (gone) { e.p = 0; e.o2 = 0; e.t = -120; continue; }
+    const vent = r.mode === "vent" || valveOpen(r.id, "vent"), o2 = valveOpen(r.id, "o2");
+    if (vent) e.p = Math.max(0, e.p - 9 * dt);
+    else if (r.flags.breach) e.p = Math.max(0, e.p - 0.5 * dt);
+    else if (r.mode === "pressurize") e.p = Math.min(101.3, e.p + 7 * dt);
+    else if (o2 && e.p < 101.3) e.p = Math.min(101.3, e.p + 0.25 * dt);
+    if (r.flags.fire && e.p > 30) { e.o2 = Math.max(9, e.o2 - 0.04 * dt); e.t = Math.min(85, e.t + 0.3 * dt); e.co2 = Math.min(4, e.co2 + 0.01 * dt); }
+    else if (o2 && e.p > 40) { e.o2 += (20.9 - e.o2) * 0.03 * dt; e.co2 += (0.04 - e.co2) * 0.03 * dt; }
+    else e.o2 = Math.max(0, e.o2 - 0.03 * dt);
+    if (e.p < 2) e.o2 = 0;
+    const tt = (r.flags.breach || e.p < 20) ? -30 : r.flags.fire ? e.t : 21;
+    e.t += (tt - e.t) * 0.01 * dt;
+    if (r.mode === "pressurize" && e.p >= 101) r.mode = null;
+    if (r.mode === "vent" && e.p <= 0.5) r.mode = null;
+  }
+  for (const p of Object.values(S.people)) {
+    if (!p.vitals || p.vitals.alive === false || !p.room || !S.rooms[p.room]) continue;
+    const r = S.rooms[p.room], e = r.env, v = p.vitals, gone = roomStatus(S, r) === "gone";
+    const bad = gone || e.p < 45 || e.o2 < 13;
+    v.o2 = bad ? Math.max(0, v.o2 - 6 * dt) : Math.min(100, v.o2 + 4 * dt);
+    if (v.o2 <= 0 || r.flags.fire) v.hp = Math.max(0, v.hp - (gone ? 20 : 0.25) * dt);
+    if (v.hp <= 0) { v.alive = false; log(S, "SYSTÈME", `Signal vital perdu : ${p.name} (${r.name}).`, "crit", now); }
+  }
+}
+
+/* Horloge : comptes à rebours des procédures. */
+function tick(state, now = Date.now()) {
+  const cmds = [];
+  for (const p of state.procs) {
+    if (p.status === "countdown" && p.endsAt <= now) {
+      const s = state.sections[p.target];
+      p.status = "done"; s.state = "ejected";
+      const rooms = Object.values(state.rooms).filter(r => r.section === s.id);
+      const aboard = Object.values(state.people).filter(x => rooms.some(r => r.id === x.room));
+      cmds.push({ type: "section.eject", section: s.id, rooms: rooms.map(r => r.id) });
+      log(state, "ORDINATEUR", `Section ${s.name} éjectée${aboard.length ? " avec " + aboard.length + " personne(s) à bord" : ""}.`, "crit", now);
+    }
+  }
+  if (state.procs.length > 30) state.procs.length = 30;
+  return cmds;
+}
+const needsTick = (state) => state.procs.some(p => p.status === "countdown");
+
+/* Vue filtrée pour une session donnée. */
+function viewFor(state, actor, term) {
+  const v = clone(state);
+  const adm = !!(actor && actor.admin);
+  const perms = Object.fromEntries(Object.keys(ACTIONS).map(k => [k, can(state, actor, k, term)]));
+  const termPages = term && state.terminals[term] ? state.terminals[term].pages : Object.keys(PAGES);
+  let pages = Object.keys(PAGES).filter(p => adm || (termPages.includes(p) && p !== "admin"));
+  if (!adm && !perms["structure.edit"] && !perms["perms.edit"]) pages = pages.filter(p => p !== "structure");
+  v.alerts = computeAlerts(state, adm);
+  if (!adm) {
+    v.faults = []; v.computer = { refuse: state.computer.refuse, message: state.computer.refuse ? state.computer.message : "" };
+    for (const sf of state.faults) if (sf.active && sf.silent && sf.key === "sensor.lie" && sf.target.kind === "room" && v.rooms[sf.target.id]) Object.assign(v.rooms[sf.target.id].env, { p: 101.3, o2: 20.9, t: 21 });
+    if (!perms["crew.vitals"]) for (const p of Object.values(v.people)) { if (p.id !== (actor && actor.id)) { p.vitals = null; p.room = null; } }
+    for (const p of Object.values(v.people)) if (p.id !== (actor && actor.id)) delete p.joined;
+  }
+  v.me = actor ? {
+    id: actor.id, name: actor.name, level: actor.level | 0, admin: adm, role: actor.role, job: actor.job, rank: actor.rank, group: actor.group, team: actor.team,
+    perms, pages, term: term || null,
+    doors: Object.values(state.doors).filter(d => canOpenDoor(state, actor, d).ok).map(d => d.id),
+    manages: Object.values(state.doors).filter(d => (d.managers || []).includes(actor.id)).map(d => d.id)
+  } : null;
+  return v;
+}
+
+/* =========================== Démo Meridian =========================== */
+/* Vaisseau d'exemple tant que le mod n'a envoyé aucune structure. */
+function seedDemo(now = Date.now()) {
+  const s = emptyShip("Meridian"); s.ship.demo = true;
+  let door = 1; const D = (o) => { const id = String(door++); s.doors[id] = Object.assign({ id, name: "Porte " + id, state: { open: false, locked: false, lockdown: false }, rule: null, group: null, managers: [], grants: [], airtight: true }, o); return id; };
+  const R = (o) => { s.rooms[o.id] = Object.assign({ env: envDefault(), flags: {}, alarm: false, mode: null, section: null, kind: "room" }, o); };
+  const HULL = [
+    ["Commandement", [["Passerelle", "n", 3], ["Salle com et drones", "n", 2], ["Salle du Conseil", "n", 2], ["Quartiers du commandement", "s", 2], ["Salle de briefing", "s", 2], ["Bureau du capitaine", "s", 1], ["Ascenseurs avant", "s", 1]]],
+    ["Sécurité, justice et santé", [["Poste de sécurité", "n", 2], ["Armurerie", "n", 1], ["Cellules", "n", 2], ["Tribunal", "n", 2], ["Bureau RH", "s", 2], ["Intendance et archives", "s", 2], ["Infirmerie", "s", 3], ["Quarantaine", "s", 1]]],
+    ["Habitat et vie sociale", [["Cabine 301", "n", 1], ["Cabine 302", "n", 1], ["Cabine 303", "n", 1], ["Cabine 304", "n", 1], ["Cabine 305", "n", 1], ["Cabine 306", "n", 1], ["Dortoir colons", "n", 2], ["Bar", "s", 2], ["Lieu de culte", "s", 1], ["Marché et troc", "s", 2], ["Salle des factions", "s", 2], ["Scène", "s", 1]]],
+    ["Production", [["Serres hydroponiques", "n", 3], ["Cuisine", "n", 2], ["Cantine", "n", 2], ["Atelier de fabrication", "s", 3], ["Raffinerie", "s", 2], ["Stock atelier", "s", 1]]],
+    ["Logistique et navettes", [["Soute principale", "n", 3], ["Soute vivres", "n", 2], ["Soute carburant", "n", 2], ["Hangar des navettes", "s", 4], ["Baie des drones SOL", "s", 2], ["Sas d’évacuation", "s", 1]]],
+    ["Machines", [["Salle des machines", "n", 3], ["Réacteur", "n", 3], ["Équipe coque et avaries", "s", 2], ["Support vie et recyclage", "s", 3], ["Batteries", "s", 1]]]
+  ];
+  const LEN = 560;
+  HULL.forEach(([dname, list], di) => {
+    const did = "P" + (di + 1);
+    s.decks.push({ id: did, name: dname, kind: "hull", order: di, y0: 200 - di * 16, y1: 215 - di * 16 });
+    R({ id: did + "-cor", name: "Coursive pont " + (di + 1), deck: did, kind: "corridor", rects: [[0, 72, LEN, 88]] });
+    for (const side of ["n", "s"]) {
+      const items = list.filter(x => x[1] === side), tot = items.reduce((a, x) => a + x[2], 0);
+      let x = 0;
+      items.forEach((it, k) => {
+        const w = Math.round(LEN * it[2] / tot), x2 = k === items.length - 1 ? LEN : x + w, id = did + "-" + side + k;
+        R({ id, name: it[0], deck: did, rects: [side === "n" ? [x, 0, x2, 72] : [x, 88, x2, 160]] });
+        D({ deck: did, x: (x + x2) / 2, z: side === "n" ? 72 : 88, rooms: [id, did + "-cor"], size: it[0].startsWith("Cabine") ? "1×2" : "3×3", name: it[0] });
+        x = x2;
+      });
+    }
+  });
+  const RINGS = [["Alpha", "Anneau Alpha · habitat", ["Quartier résidentiel N", "Promenade", "Quartier résidentiel E", "Serre panoramique", "Cabines S1", "Cabines S2", "Salle commune", "Sas principal"]],
+    ["Beta", "Anneau Bêta · industrie", ["Couloirs de canalisation", "Station de pompage", "Recyclage de l’eau", "Recyclage de l’air", "Maintenance extérieure", "Atelier lourd", "Stock de pièces", "Sas de service"]],
+    ["Gamma", "Anneau Gamma · recherche", ["Laboratoire", "Analyse planétaire", "Archives scellées", "Cryogénie", "Observatoire du rotor", "Salle des capteurs", "Bureau scientifique", "Sas de recherche"]]];
+  const RECT = [[0, 0, 100, 24], [100, 0, 200, 24], [176, 24, 200, 100], [176, 100, 200, 176], [100, 176, 200, 200], [0, 176, 100, 200], [0, 100, 24, 176], [0, 24, 24, 100]];
+  const DOORS = [[100, 12], [188, 24], [188, 100], [188, 176], [100, 188], [12, 176], [12, 100], [12, 24]];
+  const SIDES = ["Nord", "Est", "Sud", "Ouest"];
+  RINGS.forEach(([rk, rname, rooms], ri) => {
+    const did = "R" + rk[0];
+    s.decks.push({ id: did, name: rname, kind: "ring", order: 6 + ri });
+    SIDES.forEach((sd, k) => { s.sections[did + "-" + k] = { id: did + "-" + k, name: rk + " " + sd, named: true, ejectable: true, state: "attached" }; });
+    rooms.forEach((n, k) => R({ id: did + "-" + k, name: n, deck: did, rects: [RECT[k]], section: did + "-" + Math.floor(k / 2) }));
+    rooms.forEach((n, k) => D({ deck: did, x: DOORS[k][0], z: DOORS[k][1], rooms: [did + "-" + k, did + "-" + ((k + 1) % 8)], size: "3×3", name: rk + " " + (k + 1) + "→" + ((k + 1) % 8 + 1) }));
+  });
+  for (const r of Object.values(s.rooms)) if (r.kind !== "corridor") {
+    s.valves["v-" + r.id + "-o2"] = { id: "v-" + r.id + "-o2", name: "Arrivée O₂", room: r.id, kind: "o2", open: true };
+    s.valves["v-" + r.id + "-vent"] = { id: "v-" + r.id + "-vent", name: "Purge extérieure", room: r.id, kind: "vent", open: false };
+  }
+  const byName = (n) => Object.values(s.rooms).find(r => r.name === n).id;
+  const doorOf = (n) => Object.values(s.doors).find(d => d.rooms[0] === byName(n)).id;
+  s.terminals = {
+    "T-PASS": { id: "T-PASS", name: "Console passerelle", room: byName("Passerelle"), pages: Object.keys(PAGES).filter(k => k !== "admin") },
+    "T-ING": { id: "T-ING", name: "Poste ingénierie", room: byName("Salle des machines"), pages: ["overview", "plan", "atmos", "procs", "log"] },
+    "T-RH": { id: "T-RH", name: "Bureau RH", room: byName("Bureau RH"), pages: ["overview", "doors", "crew", "log", "structure"] },
+    "T-CAB": { id: "T-CAB", name: "Borne publique pont 3", room: "P3-cor", pages: ["overview", "doors", "log"] }
+  };
+  const P = (id, name, level, job, group, team, extra = {}) => { s.people[id] = Object.assign({ id, name, level, rank: "", job, role: job, group, team, tags: [], online: true, demo: true, room: null, vitals: { alive: true, hp: 20, maxHp: 20, food: 18, o2: 100, temp: 37 } }, extra); };
+  P("p-vasseur", "Cdt Vasseur", 7, "Capitaine", "Équipage", "jour", { rank: "Commandant", room: byName("Passerelle") });
+  P("p-roux", "Ilyan Roux", 6, "Second", "Équipage", "nuit", { rank: "Lieutenant-commandant", room: byName("Quartiers du commandement") });
+  P("p-okafor", "Dr Okafor", 5, "Responsable RH et accès", "Équipage", "jour", { rank: "Lieutenant", room: byName("Bureau RH") });
+  P("p-fabre", "Lina Fabre", 5, "Chef de sécurité", "Équipage", "jour", { rank: "Lieutenant", room: byName("Poste de sécurité") });
+  P("p-moreau", "M. Moreau", 4, "Ingénieur énergie", "Équipage", "nuit", { rank: "Enseigne", room: byName("Salle des machines") });
+  P("p-lopes", "Ana Lopes", 3, "Pilote de navette", "Équipage", "jour", { room: byName("Hangar des navettes") });
+  P("p-haddad", "Noor Haddad", 3, "Standardiste", "Équipage", "nuit", { room: byName("Salle com et drones") });
+  P("p-ek", "Tomas Ek", 3, "Technicien coque", "Équipage", "jour", { room: s.rooms["RB-4"].id, vitals: { alive: true, hp: 9, maxHp: 20, food: 12, o2: 41, temp: 35.8 } });
+  P("p-brenner", "Sgt Brenner", 3, "Sergent de patrouille", "Militaires", "nuit", { tags: ["armurerie"], room: byName("Armurerie") });
+  P("p-sato", "Kenji Sato", 2, "Fermier hydroponique", "Travailleurs", "jour", { room: byName("Serres hydroponiques") });
+  P("p-mbaye", "Awa Mbaye", 2, "Cuisinière", "Travailleurs", "jour", { room: byName("Cuisine"), vitals: { alive: true, hp: 14, maxHp: 20, food: 16, o2: 100, temp: 38.1 } });
+  P("p-elit", "Elit Varga", 1, "Médecin assistant", "Colons", "aucune", { room: byName("Infirmerie") });
+  P("p-0417", "Colon 0417", 1, "Passager", "Colons", "aucune", { room: byName("Cabine 302") });
+  P("p-ivo", "Ivo Kral", 2, "Mineur d’astéroïdes", "Travailleurs", "nuit", { online: false, room: byName("Soute principale"), vitals: { alive: false, hp: 0, maxHp: 20, food: 0, o2: 0, temp: 22 } });
+  P("p-new", "Pyrrhus", 0, "", "", "aucune", { role: "Non assigné", room: "P3-cor" });
+  P("admin", "ORDINATEUR", 7, "Poste admin", "", "aucune", { admin: true, demo: false, vitals: null, room: null });
+
+  s.accessGroups = {
+    g1: { id: "g1", name: "Commandement", rule: { any: [{ t: "min", v: 4 }] } },
+    g2: { id: "g2", name: "Armurerie et cellules", rule: { any: [{ t: "lv", v: [3, 5, 6] }, { t: "grp", v: "Militaires" }] } },
+    g3: { id: "g3", name: "Machines", rule: { any: [{ t: "min", v: 3 }, { t: "grp", v: "Travailleurs" }] } }
+  };
+  for (const d of Object.values(s.doors)) {
+    if (d.deck === "P1" && d.rooms[0] !== "P1-cor") d.group = "g1";
+    if (d.deck === "P6") d.group = "g3";
+  }
+  s.doors[doorOf("Armurerie")].group = "g2"; s.doors[doorOf("Cellules")].group = "g2";
+  s.doors[doorOf("Quarantaine")].rule = { any: [{ t: "p", v: "p-elit" }, { t: "min", v: 5 }] };
+  s.doors[doorOf("Bureau du capitaine")].rule = { any: [{ t: "p", v: "p-vasseur" }] };
+  const cab = s.doors[doorOf("Cabine 302")]; cab.rule = { any: [{ t: "none" }] }; cab.managers = ["p-0417"]; cab.grants = ["p-elit"]; cab.state.locked = false;
+  s.doors[doorOf("Cabine 301")].rule = { any: [{ t: "none" }] }; s.doors[doorOf("Cabine 301")].managers = ["p-sato"];
+
+  s.rooms[byName("Cuisine")].flags.fire = true;
+  s.rooms["RB-4"].env = { p: 64, o2: 14.2, co2: 0.6, t: -4, g: 1, power: true };
+  s.rooms["RB-4"].flags.breach = true;
+  s.rooms[byName("Hangar des navettes")].env.t = 9;
+  s.faults = [
+    { id: "f1", key: "fire", target: { kind: "room", id: byName("Cuisine") }, silent: false, active: true, t: now - 180000 },
+    { id: "f2", key: "hull.breach", target: { kind: "room", id: "RB-4" }, silent: false, active: true, t: now - 420000 },
+    { id: "f3", key: "fuel.leak", target: { kind: "ship" }, silent: true, active: true, t: now - 900000 }
+  ];
+  s.stocks = { fuel: 81, water: 74, food: 68, o2: 88, parts: 42 };
+  s.seq = 10;
+  const L = (dt, who, t, k) => s.log.push({ t: now - dt, who, text: t, kind: k });
+  L(60000, "Lina Fabre", "scelle toutes les portes de Cuisine.", "door");
+  L(180000, "SYSTÈME", "Détecteur incendie : Cuisine, pont 4.", "crit");
+  L(300000, "Dr Okafor", "autorise Elit Varga sur Cabine 302.", "access");
+  L(420000, "SYSTÈME", "Chute de pression : Maintenance extérieure, anneau Bêta.", "crit");
+  L(600000, "Cdt Vasseur", "annonce : « Relève de nuit dans trente minutes. »", "announce");
+  L(900000, "SYSTÈME", "Mode démonstration : aucun mod connecté.", "sys");
+  for (const id of Object.values(s.doors).filter(d => d.rooms[0] === byName("Cuisine")).map(d => d.id)) s.doors[id].state.lockdown = true;
+  return s;
+}
+
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+})();
 </script>
 <script>
 "use strict";
@@ -212,6 +917,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const ss = { get(k) { try { return sessionStorage.getItem(k); } catch { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch {} } };
 
 let V = null, OFF = 0, LINK = "demo", DEMO = null, MODFEED = [];
+/* Adresse de l'ordinateur de bord (Worker). La console peut être hébergée ailleurs (GitHub Pages) : elle s'y connecte à distance. */
+const API = (Q.get("api") || (/workers\.dev$|^localhost|^127\.0\.0\.1/.test(location.hostname) ? location.origin : "https://rebirthproject.refugeemeraudien-direction.workers.dev")).replace(/\/+$/, "");
 const now = () => Date.now() + OFF;
 
 function makeDemo() {
@@ -232,8 +939,8 @@ function makeDemo() {
 function makeRemote(token) {
   const R = { token, ws: null, pend: new Map(), seq: 1, retry: 0 };
   const open = async () => {
-    try { const chk = await fetch("/api/state?t=" + encodeURIComponent(token)); if (chk.status === 401 || chk.status === 403) { const j = await chk.json().catch(() => ({})); try { sessionStorage.removeItem("meridian.t"); } catch {} document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">ACCÈS REFUSÉ</p><p class="mu">${esc(j.error || "Session invalide.")}</p></div></div>`; return; } } catch {}
-    const ws = R.ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws?t=" + encodeURIComponent(token));
+    try { const chk = await fetch(API + "/api/state?t=" + encodeURIComponent(token)); if (chk.status === 401 || chk.status === 403) { const j = await chk.json().catch(() => ({})); try { sessionStorage.removeItem("meridian.t"); } catch {} document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">ACCÈS REFUSÉ</p><p class="mu">${esc(j.error || "Session invalide.")}</p></div></div>`; return; } } catch {}
+    const ws = R.ws = new WebSocket(API.replace(/^http/, "ws") + "/api/ws?t=" + encodeURIComponent(token));
     ws.onopen = () => { R.retry = 0; LINK = "live"; renderChrome(); };
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
@@ -257,7 +964,7 @@ let T;
 async function boot() {
   if (Q.get("admin")) {
     try {
-      const r = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: Q.get("admin") }) }).then(r => r.json());
+      const r = await fetch(API + "/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: Q.get("admin") }) }).then(r => r.json());
       if (r.token) { ss.set("meridian.t", r.token); history.replaceState(null, "", location.pathname); } else toast(r.error || "Connexion admin refusée.", "err");
     } catch { toast("Serveur injoignable.", "err"); }
   }
@@ -819,3 +1526,6 @@ setInterval(() => {
 renderChrome();
 boot();
 </script>
+
+</body>
+</html>
