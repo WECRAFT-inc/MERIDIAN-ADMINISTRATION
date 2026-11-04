@@ -1,0 +1,821 @@
+<title>Meridian · Console de bord</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Console HUD : rail de navigation à gauche, bandeau d'état en haut, téléscripteur du journal en bas.
+   Thème unique sombre (console de vaisseau), choisi délibérément. */
+:root{
+  --bg:#03080c;--bg2:#06121a;--pn:#081720;--pn2:#0b1f2a;--ln:#14303b;--ln2:#22505e;
+  --cy:#62e6f2;--cy2:#2fb3c2;--cyd:#0d3c47;--tx:#d3ebef;--mu:#7f9fa9;--dim:#405c66;
+  --amb:#f5a83a;--red:#ff5266;--vio:#a88dff;--ok:#43d9a8;
+  --f-disp:"Chakra Petch","Arial Narrow",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:400 14px/1.45 var(--f-disp);overflow:hidden}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(1100px 600px at 55% -10%,rgba(47,179,194,.10),transparent 70%),
+  linear-gradient(rgba(98,230,242,.035) 1px,transparent 1px) 0 0/32px 32px,
+  linear-gradient(90deg,rgba(98,230,242,.035) 1px,transparent 1px) 0 0/32px 32px}
+.m{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.mu{color:var(--mu)}.dim{color:var(--dim)}.cy{color:var(--cy)}.amb{color:var(--amb)}.red{color:var(--red)}.vio{color:var(--vio)}.okc{color:var(--ok)}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+
+/* ---------- Coque de l'application ---------- */
+#app{position:relative;z-index:1;height:100%;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:200px 1fr}
+.top{grid-column:1/-1;min-width:0}
+header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding-block:10px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--ln);background:linear-gradient(180deg,rgba(8,23,32,.95),rgba(6,18,26,.85))}
+.brand{font-weight:700;font-size:26px;letter-spacing:.24em;line-height:1;color:var(--tx);text-shadow:0 0 18px rgba(98,230,242,.25)}
+.brand small{display:block;margin-top:5px;font-size:10.5px;font-weight:500;letter-spacing:.2em;color:var(--mu)}
+.hsep{width:1px;align-self:stretch;background:var(--ln)}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:4px 12px;font:600 12px/1.2 var(--f-disp);letter-spacing:.12em;text-transform:uppercase;border:1px solid currentColor;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+.chip i{width:7px;height:7px;background:currentColor;display:block}
+.chip.ok{color:var(--ok)}.chip.warn{color:var(--amb)}.chip.crit{color:var(--red);animation:blink 1.2s steps(2) infinite}.chip.off{color:var(--dim)}.chip.cy{color:var(--cy)}
+@keyframes blink{50%{background:rgba(255,82,102,.16)}}
+.clock{font:500 20px/1 var(--f-mono);letter-spacing:.06em}
+.clock small{display:block;font:500 10px var(--f-disp);letter-spacing:.18em;color:var(--mu);margin-top:4px}
+.sp{flex:1}
+.who{display:flex;align-items:center;gap:10px;text-align:right}
+.who b{display:block;font-weight:600;font-size:14px}
+.who span{font-size:11.5px;color:var(--mu);letter-spacing:.04em}
+.lvl{font:600 18px/1 var(--f-mono);color:var(--cy);border:1px solid var(--cy2);padding:6px 9px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.demo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;padding-block:6px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--ln);background:rgba(98,230,242,.04)}
+.demo b{color:var(--cy);letter-spacing:.14em;font-size:11px;font-weight:600;margin-right:6px}
+.demo select{min-height:30px;padding:4px 8px}
+select,input[type=text],input[type=number],input[type=search],textarea{background:var(--bg2);border:1px solid var(--ln2);padding:7px 9px;min-height:36px;border-radius:0;max-width:100%}
+select:hover,input:hover{border-color:var(--cy2)}
+
+nav{border-right:1px solid var(--ln);padding:14px 0;overflow:auto;background:rgba(6,18,26,.6)}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 18px;color:var(--mu);text-decoration:none;font-weight:500;letter-spacing:.06em;font-size:13.5px;border-left:2px solid transparent;cursor:pointer}
+nav a:hover{color:var(--tx);background:rgba(98,230,242,.04)}
+nav a[aria-current=page]{color:var(--cy);border-left-color:var(--cy);background:linear-gradient(90deg,rgba(98,230,242,.12),transparent)}
+nav a .n{font:500 10.5px var(--f-mono);color:var(--dim);width:18px}
+nav a .bad{margin-left:auto;font:600 11px var(--f-mono);background:var(--red);color:var(--bg);padding:1px 6px}
+nav .navsep{margin:14px 18px 6px;font-size:10px;letter-spacing:.2em;color:var(--dim)}
+
+main{overflow:auto;padding-block:16px 24px;padding-left:16px;padding-right:max(18px,env(safe-area-inset-right,0px));min-width:0}
+footer{grid-column:1/-1;border-top:1px solid var(--ln);background:rgba(6,18,26,.92);font:12px var(--f-mono);color:var(--mu);display:flex;overflow:hidden;white-space:nowrap;padding-bottom:env(safe-area-inset-bottom,0px)}
+footer .tl{padding:7px 14px;color:var(--cy);border-right:1px solid var(--ln);letter-spacing:.12em;flex:none}
+footer .tk{overflow:hidden;flex:1;position:relative}
+footer .tk div{display:inline-block;padding:7px 0;animation:tick 70s linear infinite}
+footer .tk span{margin-right:42px}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.banner{padding:8px 18px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;font-size:12.5px}
+.banner.red{background:rgba(255,82,102,.14);color:var(--red);border-bottom:1px solid var(--red)}
+.banner.amb{background:rgba(245,168,58,.12);color:var(--amb);border-bottom:1px solid rgba(245,168,58,.5)}
+
+/* ---------- Panneaux chanfreinés ---------- */
+.pn{--c:12px;position:relative;padding:1px;background:linear-gradient(160deg,var(--ln2),var(--ln) 40%,var(--ln) 70%,var(--ln2));clip-path:polygon(var(--c) 0,100% 0,100% calc(100% - var(--c)),calc(100% - var(--c)) 100%,0 100%,0 var(--c));min-width:0}
+.pn>.pi{height:100%;background:linear-gradient(180deg,rgba(98,230,242,.035),transparent 120px),var(--pn);clip-path:inherit;padding:14px 16px 16px;min-width:0}
+.ph{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--ln)}
+.ph h2{margin:0;font-size:12.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--cy)}
+.ph .code{margin-left:auto;font:500 10.5px var(--f-mono);color:var(--dim);letter-spacing:.08em}
+.grid{display:grid;gap:14px}
+.g-ov{grid-template-columns:minmax(240px,1fr) minmax(360px,1.7fr) minmax(260px,1fr)}
+.g-2{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr)}
+.g-2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (max-width:1180px){.g-ov{grid-template-columns:1fr 1fr}.g-ov>.center{grid-column:1/-1;order:-1}}
+@media (max-width:860px){#app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto}
+  nav{display:flex;overflow-x:auto;border-right:0;border-bottom:1px solid var(--ln);padding:0}
+  nav a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:10px 14px}
+  nav a[aria-current=page]{border-bottom-color:var(--cy)}
+  nav .navsep,nav a .n{display:none}
+  main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .g-ov,.g-2,.g-2b{grid-template-columns:1fr}
+  .brand{font-size:22px}.hsep{display:none}}
+
+/* ---------- Éléments ---------- */
+.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--ln);align-items:baseline}
+.kv:last-child{border-bottom:0}
+.kv>span:first-child{color:var(--mu);font-size:13px}
+.kv>b{font:500 14px var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.big{font:500 30px/1 var(--f-mono);letter-spacing:.02em}
+.big small{font-size:13px;color:var(--mu);margin-left:4px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tile{border:1px solid var(--ln);padding:10px 12px;background:rgba(3,8,12,.4)}
+.tile span{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mu);margin-bottom:6px}
+.bar{height:5px;background:var(--cyd);margin:5px 0 2px;position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--cy2)}
+.bar.seg{background:repeating-linear-gradient(90deg,var(--cyd) 0 6px,transparent 6px 8px);height:8px}
+.bar.seg i{background:repeating-linear-gradient(90deg,var(--cy) 0 6px,transparent 6px 8px)}
+.bar.warn i{background:var(--amb)}.bar.crit i{background:var(--red)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.b{--bc:var(--cy2);--bt:var(--cy);display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:6px 14px;background:rgba(98,230,242,.06);border:1px solid var(--bc);color:var(--bt);font-weight:600;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.b:hover:not(:disabled){background:rgba(98,230,242,.16)}
+.b.amb{--bc:var(--amb);--bt:var(--amb);background:rgba(245,168,58,.07)}.b.amb:hover:not(:disabled){background:rgba(245,168,58,.18)}
+.b.red{--bc:var(--red);--bt:var(--red);background:rgba(255,82,102,.08)}.b.red:hover:not(:disabled){background:rgba(255,82,102,.2)}
+.b.solid{background:var(--cy);color:var(--bg);border-color:var(--cy)}.b.solid:hover:not(:disabled){background:#8af0f8}
+.b.ghost{--bc:var(--ln2);--bt:var(--mu);background:transparent}
+.b.sm{min-height:28px;padding:3px 10px;font-size:11px}
+.b:disabled{--bc:var(--ln);--bt:var(--dim);cursor:not-allowed;background:transparent}
+.b .lk{font:500 10px var(--f-mono);letter-spacing:0;text-transform:none}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.tab{padding:6px 12px;border:1px solid var(--ln);background:transparent;cursor:pointer;font-size:12px;letter-spacing:.08em;color:var(--mu)}
+.tab[aria-pressed=true]{border-color:var(--cy);color:var(--cy);background:rgba(98,230,242,.1)}
+.tab .s{display:inline-block;width:7px;height:7px;margin-right:6px;vertical-align:1px}
+.st{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--f-disp);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.st::before{content:"";width:8px;height:8px;background:currentColor}
+.st.ok{color:var(--ok)}.st.warn{color:var(--amb)}.st.fire,.st.crit{color:var(--red)}.st.vac{color:var(--vio)}.st.gone{color:var(--dim)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-weight:500;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mu);padding:6px 8px;border-bottom:1px solid var(--ln2);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--ln);vertical-align:middle}
+td.m,th.r,td.r{text-align:right}
+.tbl td:first-child{min-width:150px}
+tr.sel td{background:rgba(98,230,242,.08)}
+tbody tr{cursor:pointer}tbody tr:hover td{background:rgba(98,230,242,.04)}
+.al{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--ln);cursor:pointer}
+.al:last-child{border-bottom:0}
+.al .dot{width:9px;height:9px;flex:none;margin-top:5px}
+.al b{font-weight:600;display:block}
+.al small{color:var(--mu);font:12px var(--f-mono)}
+.al.ack{opacity:.5}
+.empty{color:var(--dim);padding:10px 0;font-size:13px}
+.note{color:var(--mu);font-size:12.5px;margin:8px 0 0;max-width:70ch}
+.lbl{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mu);margin:14px 0 6px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.toolbar input[type=search]{flex:1;min-width:160px}
+.pill{display:inline-block;padding:1px 7px;border:1px solid var(--ln2);font:500 11px var(--f-mono);color:var(--mu);margin:2px 4px 2px 0}
+.pill.cy{border-color:var(--cy2);color:var(--cy)}.pill.amb{border-color:var(--amb);color:var(--amb)}.pill.red{border-color:var(--red);color:var(--red)}
+.svgw{width:100%;overflow:hidden}
+svg{display:block;width:100%;height:auto}
+svg .hit{cursor:pointer}
+svg .hit:hover{filter:brightness(1.45)}
+.spin{transform-origin:300px 300px;animation:spin 120s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cd{font:600 54px/1 var(--f-mono);color:var(--red);letter-spacing:.04em;text-shadow:0 0 20px rgba(255,82,102,.4)}
+.codes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.code{border:1px dashed var(--ln2);padding:10px;font:500 13px var(--f-mono)}
+.code.ok{border:1px solid var(--ok);color:var(--ok)}
+.gauge{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin-bottom:12px}
+.gauge div{border:1px solid var(--ln);padding:8px 10px;background:rgba(3,8,12,.35)}
+.gauge span{display:block;font-size:10px;letter-spacing:.16em;color:var(--mu);text-transform:uppercase}
+.gauge b{font:500 19px var(--f-mono)}
+.gauge b.warn{color:var(--amb)}.gauge b.crit{color:var(--red)}
+.vrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed var(--ln)}
+.sw{position:relative;width:46px;height:22px;border:1px solid var(--ln2);background:var(--bg2);cursor:pointer;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--dim);transition:left .15s}
+.sw[aria-checked=true]{border-color:var(--cy2)}.sw[aria-checked=true]::after{left:27px;background:var(--cy)}
+.sw:disabled{opacity:.4;cursor:not-allowed}
+.logl{display:grid;grid-template-columns:64px 130px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--ln);font-size:13px}
+.logl .t{font:12px var(--f-mono);color:var(--dim)}
+.logl .w{color:var(--cy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logl.crit .w,.logl.crit .x{color:var(--red)}.logl.admin .w{color:var(--vio)}.logl.sys .w{color:var(--mu)}
+@media(max-width:600px){.logl{grid-template-columns:54px 1fr}.logl .w{grid-column:2}.logl .x{grid-column:1/-1}}
+.hp{display:inline-block;width:60px;height:5px;background:var(--cyd);vertical-align:middle;position:relative}
+.hp i{position:absolute;inset:0 auto 0 0;background:var(--ok)}
+.hp.warn i{background:var(--amb)}.hp.crit i{background:var(--red)}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0;cursor:pointer}
+.chkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 14px;max-height:260px;overflow:auto;border:1px solid var(--ln);padding:8px}
+.clause{display:grid;grid-template-columns:150px 1fr auto;gap:8px;align-items:center;margin-bottom:6px}
+@media(max-width:520px){.clause{grid-template-columns:1fr}}
+.feed{font:12px var(--f-mono);max-height:220px;overflow:auto;color:var(--mu)}
+.feed div{padding:3px 0;border-bottom:1px solid var(--ln);white-space:pre-wrap;word-break:break-word}
+
+/* ---------- Fenêtre modale et notifications ---------- */
+#modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(2,6,9,.72);padding:16px}
+#modal .pn{width:min(640px,100%);max-height:calc(100% - 32px)}
+#modal .pi{max-height:calc(100vh - 34px);overflow:auto}
+#modal h3{margin:0 0 4px;font-size:18px;letter-spacing:.06em}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+label.f{display:block;margin-bottom:10px;font-size:12px;letter-spacing:.06em;color:var(--mu)}
+label.f input,label.f select,label.f textarea{display:block;width:100%;margin-top:4px;color:var(--tx)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media(max-width:520px){.f2{grid-template-columns:1fr}}
+#toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(46px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#toast div{padding:9px 14px;background:var(--pn2);border:1px solid var(--cy2);font-size:13px;max-width:min(420px,calc(100vw - 32px))}
+#toast div.err{border-color:var(--red);color:#ffc4cb}
+.gate{display:grid;place-items:center;height:100%;text-align:center;padding:20px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app"></div>
+<div id="modal" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*__CORE__*/
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   Transport : DÉMO (tout tourne dans la page) ou CONNECTÉ (Worker).
+   ===================================================================== */
+const Q = new URLSearchParams(location.search);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ss = { get(k) { try { return sessionStorage.getItem(k); } catch { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch {} } };
+
+let V = null, OFF = 0, LINK = "demo", DEMO = null, MODFEED = [];
+const now = () => Date.now() + OFF;
+
+function makeDemo() {
+  const S = MC.seedDemo();
+  const d = { S, actor: "p-vasseur", term: "" };
+  d.view = () => MC.viewFor(S, S.people[d.actor], d.term || null);
+  d.send = (a) => {
+    const r = MC.apply(S, S.people[d.actor], a, { now: Date.now(), term: d.term || null });
+    if (r.ok) r.cmds.forEach(c => MODFEED.unshift({ t: Date.now(), c }));
+    MODFEED.length = Math.min(MODFEED.length, 40);
+    update(d.view(), Date.now());
+    return Promise.resolve(r);
+  };
+  setInterval(() => { MC.simulate(S, 1); const cmds = MC.tick(S, Date.now()); cmds.forEach(c => MODFEED.unshift({ t: Date.now(), c })); update(d.view(), Date.now()); }, 1000);
+  return d;
+}
+
+function makeRemote(token) {
+  const R = { token, ws: null, pend: new Map(), seq: 1, retry: 0 };
+  const open = async () => {
+    try { const chk = await fetch("/api/state?t=" + encodeURIComponent(token)); if (chk.status === 401 || chk.status === 403) { const j = await chk.json().catch(() => ({})); try { sessionStorage.removeItem("meridian.t"); } catch {} document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">ACCÈS REFUSÉ</p><p class="mu">${esc(j.error || "Session invalide.")}</p></div></div>`; return; } } catch {}
+    const ws = R.ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws?t=" + encodeURIComponent(token));
+    ws.onopen = () => { R.retry = 0; LINK = "live"; renderChrome(); };
+    ws.onmessage = (ev) => {
+      const m = JSON.parse(ev.data);
+      if (m.type === "state") update(m.state, m.now);
+      if (m.type === "result" && R.pend.has(m.reqId)) { R.pend.get(m.reqId)(m); R.pend.delete(m.reqId); }
+    };
+    ws.onclose = (ev) => { LINK = "lost"; renderChrome(); if (ev.code === 1008) return; setTimeout(open, Math.min(15000, 800 * 2 ** R.retry++)); };
+  };
+  open();
+  setInterval(() => { if (R.ws && R.ws.readyState === 1) R.ws.send('{"type":"ping"}'); }, 25000);
+  R.as = (person) => { if (R.ws && R.ws.readyState === 1) R.ws.send(JSON.stringify({ type: "as", person: person || null })); };
+  R.send = (action) => new Promise(res => {
+    if (!R.ws || R.ws.readyState !== 1) return res({ ok: false, error: "Liaison perdue avec l’ordinateur de bord." });
+    const reqId = R.seq++; R.pend.set(reqId, res); R.ws.send(JSON.stringify({ type: "action", reqId, action }));
+    setTimeout(() => { if (R.pend.has(reqId)) { R.pend.delete(reqId); res({ ok: false, error: "Pas de réponse de l’ordinateur de bord." }); } }, 8000);
+  });
+  return R;
+}
+
+let T;
+async function boot() {
+  if (Q.get("admin")) {
+    try {
+      const r = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: Q.get("admin") }) }).then(r => r.json());
+      if (r.token) { ss.set("meridian.t", r.token); history.replaceState(null, "", location.pathname); } else toast(r.error || "Connexion admin refusée.", "err");
+    } catch { toast("Serveur injoignable.", "err"); }
+  }
+  const token = Q.get("t") || ss.get("meridian.t");
+  if (token && location.protocol.startsWith("http") && !/claude|claudeusercontent/.test(location.host)) { LINK = "lost"; T = makeRemote(token); renderChrome(); }
+  else { DEMO = T = makeDemo(); update(DEMO.view(), Date.now()); }
+}
+
+/* =====================================================================
+   État de l'interface
+   ===================================================================== */
+const ui = { page: "overview", deck: null, room: null, door: null, person: null, sec: null, crewF: "all", logF: "all", q: {}, atF: "all", draft: null };
+function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
+
+function act(action, ok) {
+  return T.send(action).then(r => { if (r.ok) { if (ok) toast(ok); } else toast(r.error, "err"); return r; });
+}
+function toast(msg, cls = "") {
+  const el = document.createElement("div"); el.className = cls; el.textContent = msg;
+  document.getElementById("toast").appendChild(el); setTimeout(() => el.remove(), cls === "err" ? 5200 : 3000);
+}
+
+/* Aides */
+const ST = { ok: "Normal", warn: "Alerte", fire: "Incendie", vac: "Dépressurisation", gone: "Éjectée" };
+const COL = { ok: "var(--cy2)", warn: "var(--amb)", fire: "var(--red)", vac: "var(--vio)", gone: "var(--dim)" };
+const RANK = { gone: 0, ok: 1, warn: 2, vac: 3, fire: 4 };
+const rs = (r) => MC.roomStatus(V, r);
+const deckStatus = (did) => Object.values(V.rooms).filter(r => r.deck === did).map(rs).reduce((a, s) => RANK[s] > RANK[a] ? s : a, "ok");
+const roomsOf = (did) => Object.values(V.rooms).filter(r => r.deck === did);
+const roomName = (id) => V.rooms[id] ? V.rooms[id].name : "—";
+const deckName = (id) => { const d = V.decks.find(x => x.id === id); return d ? d.name : id; };
+const fmtT = (t) => new Date(t + 0).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const n1 = (x) => (x == null || isNaN(x)) ? "—" : (+x).toFixed(1).replace(".", ",");
+const n0 = (x) => (x == null || isNaN(x)) ? "—" : String(Math.round(x));
+const perm = (k) => !!(V.me && V.me.perms[k]);
+const need = (k) => V.perms[k] ?? (MC.ACTIONS[k] || [0, 0])[1];
+const people = () => Object.values(V.people).filter(p => !p.admin);
+const occupants = (rid) => people().filter(p => p.room === rid);
+const enc = (o) => esc(JSON.stringify(o));
+
+function btn(label, action, o = {}) {
+  const lock = o.perm && !perm(o.perm);
+  const dis = lock || o.disabled;
+  const attrs = action ? ` data-cmd="${enc(action)}"` : "";
+  const fn = o.fn ? ` data-fn="${esc(o.fn)}" data-arg="${esc(o.arg ?? "")}"` : "";
+  const cf = o.confirm ? ` data-confirm="${esc(o.confirm)}"` : "";
+  return `<button class="b ${o.cls || ""}"${attrs}${fn}${cf}${dis ? " disabled" : ""}${o.title ? ` title="${esc(o.title)}"` : ""}>${esc(label)}${lock ? ` <span class="lk">niv. ${need(o.perm)}</span>` : ""}</button>`;
+}
+function sw(on, action, permKey) { const dis = permKey && !perm(permKey); return `<button class="sw" role="switch" aria-checked="${on}" data-cmd="${enc(action)}"${dis ? " disabled" : ""} aria-label="Basculer"></button>`; }
+const panel = (title, code, body, cls = "") => `<section class="pn ${cls}"><div class="pi"><div class="ph"><h2>${esc(title)}</h2><span class="code">${esc(code || "")}</span></div>${body}</div></section>`;
+const kv = (k, v, cls = "") => `<div class="kv"><span>${esc(k)}</span><b class="${cls}">${v}</b></div>`;
+const bar = (pct, cls = "", seg = false) => `<div class="bar ${seg ? "seg" : ""} ${cls}"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div>`;
+const hpCls = (v) => !v ? "" : v.alive === false ? "crit" : v.hp / (v.maxHp || 20) < .35 ? "crit" : v.hp / (v.maxHp || 20) < .7 ? "warn" : "";
+function vitalState(p) {
+  if (!p.vitals) return `<span class="dim">non suivi</span>`;
+  if (p.vitals.alive === false) return `<span class="st crit">Signal perdu</span>`;
+  const c = hpCls(p.vitals); return c === "crit" ? `<span class="st crit">Critique</span>` : c === "warn" ? `<span class="st warn">Blessé</span>` : `<span class="st ok">Stable</span>`;
+}
+
+/* =====================================================================
+   Rendu
+   ===================================================================== */
+const NAV = [["overview", "01"], ["plan", "02"], ["atmos", "03"], ["doors", "04"], ["crew", "05"], ["procs", "06"], ["log", "07"], ["structure", "08"], ["admin", "09"]];
+
+function renderChrome() {
+  const app = document.getElementById("app");
+  if (!V) { app.innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="mu m" style="margin-top:18px">${LINK === "lost" ? "CONNEXION À L’ORDINATEUR DE BORD…" : "INITIALISATION…"}</p></div></div>`; return; }
+  render();
+}
+
+function render() {
+  if (!V) return renderChrome();
+  const app = document.getElementById("app");
+  const snap = snapshotForm();
+  if (!V.me) { app.innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">IDENTITÉ INCONNUE DU REGISTRE</p><p class="mu">Reconnectez-vous depuis un terminal du vaisseau.</p></div></div>`; return; }
+  const alerts = V.alerts.filter(a => !a.ack);
+  const crit = alerts.some(a => a.lvl === "crit");
+  const shipChip = V.ship.alert === "rouge" ? `<span class="chip crit"><i></i>Alerte rouge</span>` : V.ship.alert ? `<span class="chip warn"><i></i>Alerte ${esc(V.ship.alert)}</span>` : crit ? `<span class="chip crit"><i></i>${alerts.filter(a => a.lvl === "crit").length} alarme(s) critique(s)</span>` : alerts.length ? `<span class="chip warn"><i></i>${alerts.length} alarme(s)</span>` : `<span class="chip ok"><i></i>Nominal</span>`;
+  const linkChip = LINK === "demo" ? `<span class="chip cy">Démo · sans mod</span>` : LINK === "lost" ? `<span class="chip crit">Liaison perdue</span>` : V.ship.modOnline ? `<span class="chip ok">Mod en ligne</span>` : `<span class="chip off">Mod hors ligne</span>`;
+  const term = V.me.term && V.terminals[V.me.term];
+  const d = new Date(now()), hh = d.getHours();
+  const demoBar = DEMO ? `<div class="demo"><b>MODE DÉMO</b><label class="mu" for="demo-who">Puce</label><select id="demo-who" data-fn="demoWho">${Object.values(DEMO.S.people).map(p => `<option value="${esc(p.id)}"${p.id === DEMO.actor ? " selected" : ""}>${esc(p.name)} · niv. ${p.admin ? "admin" : p.level}</option>`).join("")}</select><label class="mu" for="demo-term">Terminal</label><select id="demo-term" data-fn="demoTerm"><option value="">Aucun (toutes pages)</option>${Object.values(DEMO.S.terminals).map(t => `<option value="${esc(t.id)}"${t.id === DEMO.term ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select><span class="mu">Changez de puce pour tester les niveaux d’accès et les doubles codes.</span></div>` : "";
+  const soloBar = !DEMO && V.me.realAdmin ? `<div class="demo"><b>TEST SOLO</b><label class="mu" for="solo-as">Incarner</label><select id="solo-as" data-fn="soloAs"><option value="">Poste admin · toutes permissions</option>${(V.me.roster || []).map(([id, n, lv]) => `<option value="${esc(id)}"${V.me.as === id ? " selected" : ""}>${esc(n)} · niv. ${lv}</option>`).join("")}</select><span class="mu">${V.me.as ? "Vous voyez et agissez exactement comme cette personne." : "Choisissez une personne pour tester ses droits, ou saisir le second code d’une éjection."}</span></div>` : "";
+  const navItems = NAV.filter(([k]) => V.me.pages.includes(k)).map(([k, n]) => {
+    const badge = k === "log" && alerts.length ? `<span class="bad">${alerts.length}</span>` : k === "crew" && perm("crew.assign") && people().some(p => !p.level) ? `<span class="bad">${people().filter(p => !p.level).length}</span>` : "";
+    return `${k === "structure" ? '<div class="navsep">CONFIGURATION</div>' : ""}<a data-go="${k}" ${ui.page === k ? 'aria-current="page"' : ""} tabindex="0"><span class="n">${n}</span>${esc(MC.PAGES[k])}${badge}</a>`;
+  }).join("");
+  const banners = (V.computer && V.computer.refuse ? `<div class="banner red">Ordinateur de bord · ${esc(V.computer.message || "les commandes de l’équipage sont refusées")}</div>` : "") +
+    (V.ship.demo && LINK !== "demo" ? `<div class="banner amb">Vaisseau de démonstration · en attente de la structure envoyée par le mod</div>` : "");
+  const tick = V.log.slice(0, 14).map(l => `<span>${fmtT(l.t)} · ${esc(l.who)} : ${esc(l.text)}</span>`).join("");
+  app.innerHTML = `
+<div class="top"><header>
+  <div class="brand">MERIDIAN<small>CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : ""}</small></div>
+  <div class="hsep"></div>${shipChip}${linkChip}
+  <span class="sp"></span>
+  <div class="clock" data-clock>${fmtT(now())}<small>QUART DE ${hh >= 8 && hh < 20 ? "JOUR" : "NUIT"}</small></div>
+  <div class="hsep"></div>
+  <div class="who"><div><b>${esc(V.me.name)}</b><span>${esc(V.me.admin ? "Poste admin · toutes permissions" : (V.me.job || V.me.role || "Non assigné") + (V.me.group ? " · " + V.me.group : ""))}</span></div><div class="lvl" title="Niveau d’accès">${V.me.admin ? "A" : V.me.level}</div></div>
+</header>
+${demoBar}${soloBar}${banners}</div>
+<nav aria-label="Pages">${navItems}</nav>
+<main id="main">${PAGE[ui.page] ? PAGE[ui.page]() : ""}</main>
+<footer><span class="tl">JOURNAL &gt;&gt;</span><div class="tk"><div>${tick}${tick}</div></div></footer>`;
+  restoreForm(snap);
+}
+
+/* Conserver la saisie en cours quand l'état se rafraîchit. */
+function snapshotForm() {
+  const a = document.activeElement, o = { vals: {}, focus: a && a.id, sel: null, scroll: document.getElementById("main")?.scrollTop || 0 };
+  document.querySelectorAll("#main [id]").forEach(el => { if ("value" in el && el.tagName !== "BUTTON") o.vals[el.id] = el.type === "checkbox" ? el.checked : el.value; });
+  if (a && a.id && "selectionStart" in a) try { o.sel = [a.selectionStart, a.selectionEnd]; } catch {}
+  return o;
+}
+function restoreForm(o) {
+  for (const [id, v] of Object.entries(o.vals)) { const el = document.getElementById(id); if (!el) continue; if (el.type === "checkbox") el.checked = v; else el.value = v; }
+  const m = document.getElementById("main"); if (m) m.scrollTop = o.scroll;
+  if (o.focus) { const el = document.getElementById(o.focus); if (el) { el.focus(); if (o.sel) try { el.setSelectionRange(o.sel[0], o.sel[1]); } catch {} } }
+}
+
+/* ---------------------------- Schéma radial ---------------------------- */
+function arcPath(cx, cy, r1, r2, a0, a1) {
+  const p = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  const big = a1 - a0 > Math.PI ? 1 : 0;
+  const [x1, y1] = p(r2, a0), [x2, y2] = p(r2, a1), [x3, y3] = p(r1, a1), [x4, y4] = p(r1, a0);
+  return `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r2} ${r2} 0 ${big} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}L${x3.toFixed(1)} ${y3.toFixed(1)}A${r1} ${r1} 0 ${big} 0 ${x4.toFixed(1)} ${y4.toFixed(1)}Z`;
+}
+function schematic() {
+  const C = 300, rings = V.decks.filter(d => d.kind === "ring"), hulls = V.decks.filter(d => d.kind !== "ring");
+  let g = "";
+  // décor : graduations
+  let ticks = "";
+  for (let i = 0; i < 120; i++) { const a = i * Math.PI / 60, l = i % 10 === 0 ? 12 : i % 5 === 0 ? 7 : 3; ticks += `<line x1="${C + 288 * Math.cos(a)}" y1="${C + 288 * Math.sin(a)}" x2="${C + (288 - l) * Math.cos(a)}" y2="${C + (288 - l) * Math.sin(a)}" stroke="var(--ln2)" stroke-width="1"/>`; }
+  g += `<g class="spin">${ticks}<circle cx="${C}" cy="${C}" r="272" fill="none" stroke="var(--cyd)" stroke-dasharray="2 9"/></g>`;
+  g += `<line x1="${C}" y1="6" x2="${C}" y2="594" stroke="var(--ln)" stroke-dasharray="3 6"/><line x1="6" y1="${C}" x2="594" y2="${C}" stroke="var(--ln)" stroke-dasharray="3 6"/>`;
+  ["000", "090", "180", "270"].forEach((t, i) => { const a = -Math.PI / 2 + i * Math.PI / 2; g += `<text x="${C + 296 * Math.cos(a) + (i === 1 ? -4 : i === 3 ? 4 : 0)}" y="${C + 296 * Math.sin(a) + (i === 0 ? 10 : i === 2 ? -3 : 3)}" fill="var(--dim)" font-family="IBM Plex Mono,monospace" font-size="9" text-anchor="${i === 1 ? "end" : i === 3 ? "start" : "middle"}">${t}</text>`; });
+  // anneaux
+  rings.forEach((d, i) => {
+    const r1 = 150 + i * 40, r2 = r1 + 28, list = roomsOf(d.id), n = list.length || 1, gap = 0.035;
+    g += `<circle cx="${C}" cy="${C}" r="${r2 + 5}" fill="none" stroke="var(--ln)" stroke-width="1"/>`;
+    list.forEach((r, k) => {
+      const a0 = -Math.PI / 2 + k * 2 * Math.PI / n + gap, a1 = -Math.PI / 2 + (k + 1) * 2 * Math.PI / n - gap, s = rs(r), sel = ui.room === r.id;
+      g += `<path class="hit" data-room="${esc(r.id)}" data-deck="${esc(d.id)}" d="${arcPath(C, C, r1, r2, a0, a1)}" fill="${COL[s]}" fill-opacity="${s === "gone" ? .15 : s === "ok" ? .38 : .75}" stroke="${sel ? "#fff" : COL[s]}" stroke-width="${sel ? 2 : 1}"><title>${esc(r.name)} · ${ST[s]}</title></path>`;
+    });
+  });
+  // coeur : coupe des ponts
+  const hr = 122, bh = Math.min(26, 200 / Math.max(1, hulls.length));
+  g += `<circle cx="${C}" cy="${C}" r="${hr + 8}" fill="var(--bg)" stroke="var(--cy2)" stroke-width="1.5"/><circle cx="${C}" cy="${C}" r="${hr}" fill="var(--pn)" stroke="var(--ln2)"/>`;
+  g += `<clipPath id="core"><circle cx="${C}" cy="${C}" r="${hr - 4}"/></clipPath><g clip-path="url(#core)">`;
+  const y0 = C - hulls.length * bh / 2;
+  hulls.forEach((d, k) => {
+    const s = deckStatus(d.id), y = y0 + k * bh, sel = ui.deck === d.id && ui.page === "plan";
+    g += `<rect class="hit" data-deck="${esc(d.id)}" x="${C - 110}" y="${y + 1}" width="220" height="${bh - 3}" fill="${COL[s]}" fill-opacity="${s === "ok" ? .22 : .6}" stroke="${sel ? "#fff" : COL[s]}" stroke-opacity=".8"/>`;
+    g += `<text x="${C - 100}" y="${y + bh / 2 + 4}" fill="var(--tx)" font-size="11" font-weight="600" pointer-events="none" font-family="IBM Plex Mono,monospace">${esc(d.id)}</text><text x="${C - 72}" y="${y + bh / 2 + 4}" fill="var(--tx)" font-size="11" pointer-events="none">${esc(d.name.length > 26 ? d.name.slice(0, 25) + "…" : d.name)}</text>`;
+  });
+  g += `</g>`;
+  if (!V.decks.length) g += `<text x="${C}" y="${C}" fill="var(--mu)" text-anchor="middle" font-size="13">Aucune structure reçue</text>`;
+  return `<svg viewBox="0 0 600 600" role="img" aria-label="Schéma du vaisseau : ponts au centre, anneaux autour">${g}</svg>`;
+}
+
+/* ---------------------------- Plan d'un pont ---------------------------- */
+function deckPlan(did) {
+  const list = roomsOf(did), deck = V.decks.find(d => d.id === did);
+  if (!list.length) return `<p class="empty">Aucune pièce sur ce pont.</p>`;
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  list.forEach(r => r.rects.forEach(([a, b, c, d]) => { x0 = Math.min(x0, a, c); z0 = Math.min(z0, b, d); x1 = Math.max(x1, a, c); z1 = Math.max(z1, b, d); }));
+  const W = x1 - x0, H = z1 - z0, pad = Math.max(10, W * 0.04), fs = Math.max(4, Math.min(W, H * 3) / 70);
+  let g = "";
+  if (deck && deck.kind !== "ring") {
+    const m = pad * 0.5;
+    g += `<path d="M${x0 - m} ${z0 - m}L${x1 + m} ${z0 - m}L${x1 + pad * 1.8} ${(z0 + z1) / 2}L${x1 + m} ${z1 + m}L${x0 - m} ${z1 + m}L${x0 - m - pad * .4} ${z1 - H * .2}L${x0 - m - pad * .4} ${z0 + H * .2}Z" fill="rgba(98,230,242,.025)" stroke="var(--cy2)" stroke-width="${fs * .25}"/>`;
+  }
+  for (const r of list) {
+    const s = rs(r), sel = ui.room === r.id, cor = r.kind === "corridor";
+    for (const [a, b, c, d] of r.rects) g += `<rect class="hit" data-room="${esc(r.id)}" x="${Math.min(a, c)}" y="${Math.min(b, d)}" width="${Math.abs(c - a)}" height="${Math.abs(d - b)}" fill="${COL[s]}" fill-opacity="${cor ? .06 : s === "ok" ? .14 : s === "gone" ? .05 : .45}" stroke="${sel ? "#fff" : COL[s]}" stroke-opacity="${sel ? 1 : .7}" stroke-width="${(sel ? .5 : .25) * fs}"><title>${esc(r.name)} · ${ST[s]}</title></rect>`;
+    const big = r.rects.reduce((m, q) => (Math.abs(q[2] - q[0]) * Math.abs(q[3] - q[1]) > Math.abs(m[2] - m[0]) * Math.abs(m[3] - m[1]) ? q : m), r.rects[0]);
+    if (big && !cor) {
+      const w = Math.abs(big[2] - big[0]), h = Math.abs(big[3] - big[1]), cx = (big[0] + big[2]) / 2, cz = (big[1] + big[3]) / 2;
+      const vert = h > w * 1.6, max = Math.floor((vert ? h : w) / (fs * .58));
+      const label = r.name.length > max ? r.name.slice(0, Math.max(3, max - 1)) + "…" : r.name;
+      g += `<text x="${cx}" y="${cz}" fill="var(--tx)" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" pointer-events="none"${vert ? ` transform="rotate(-90 ${cx} ${cz})"` : ""}>${esc(label)}</text>`;
+      if (perm("crew.vitals")) { const o = occupants(r.id); o.slice(0, 6).forEach((p, i) => { const dead = p.vitals && p.vitals.alive === false; g += `<circle cx="${cx - (o.length - 1) * fs * .45 + i * fs * .9}" cy="${cz + fs * 1.3}" r="${fs * .28}" fill="${dead ? "var(--red)" : hpCls(p.vitals) ? "var(--amb)" : "var(--ok)"}" pointer-events="none"/>`; }); }
+    }
+  }
+  for (const d of Object.values(V.doors).filter(x => x.deck === did)) {
+    const c = d.state.lockdown ? "var(--red)" : d.state.locked ? "var(--amb)" : d.state.open ? "var(--cy)" : "var(--mu)", sz = fs * .9, sel = ui.door === d.id;
+    g += `<rect class="hit" data-door="${esc(d.id)}" x="${d.x - sz / 2}" y="${d.z - sz / 2}" width="${sz}" height="${sz}" fill="${d.state.open ? c : "var(--bg)"}" stroke="${sel ? "#fff" : c}" stroke-width="${fs * .18}"><title>Porte ${esc(d.id)} · ${esc(d.name)}</title></rect>`;
+    g += `<text x="${d.x}" y="${d.z - sz * .9}" fill="${c}" font-size="${fs * .62}" text-anchor="middle" font-family="IBM Plex Mono,monospace" pointer-events="none">${esc(d.id)}</text>`;
+  }
+  const extra = deck && deck.kind !== "ring" ? pad * 2.2 : pad;
+  return `<svg viewBox="${x0 - pad} ${z0 - pad} ${W + pad + extra} ${H + pad * 2}" role="img" aria-label="Plan de ${esc(deck ? deck.name : did)}">${g}</svg>`;
+}
+
+/* ---------------------------- Détails ---------------------------- */
+function envCls(k, v) {
+  if (v == null) return "";
+  if (k === "p") return v < 60 ? "crit" : v < 90 ? "warn" : "";
+  if (k === "o2") return v < 15 ? "crit" : v < 18 ? "warn" : "";
+  if (k === "co2") return v > 2 ? "crit" : v > 1 ? "warn" : "";
+  if (k === "t") return v < -5 || v > 50 ? "crit" : v < 5 || v > 35 ? "warn" : "";
+  if (k === "g") return v > 1.6 || v < .2 ? "warn" : "";
+  return "";
+}
+function roomPanel(rid) {
+  const r = V.rooms[rid];
+  if (!r) return panel("Pièce", "—", `<p class="empty">Sélectionnez une pièce sur le plan.</p>`);
+  const s = rs(r), e = r.env || {}, gone = s === "gone";
+  const doors = Object.values(V.doors).filter(d => d.rooms.includes(r.id));
+  const valves = Object.values(V.valves).filter(v => v.room === r.id);
+  const occ = occupants(r.id);
+  const sec = r.section && V.sections[r.section];
+  let b = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="st ${s}">${ST[s]}${r.mode ? " · " + (r.mode === "vent" ? "vidage" : "pressurisation") : ""}</span><span class="mu m" style="font-size:12px">${esc(deckName(r.deck))}${sec ? " · " + esc(sec.name) : ""}</span></div>`;
+  if (gone) return panel(r.name, r.id, b + `<p class="empty">Section éjectée. Plus aucune donnée.</p>`);
+  b += `<div class="gauge"><div><span>Pression</span><b class="${envCls("p", e.p)}">${n1(e.p)}</b> <small class="mu">kPa</small></div><div><span>Oxygène</span><b class="${envCls("o2", e.o2)}">${n1(e.o2)}</b> <small class="mu">%</small></div><div><span>CO₂</span><b class="${envCls("co2", e.co2)}">${(+e.co2 || 0).toFixed(2).replace(".", ",")}</b> <small class="mu">%</small></div><div><span>Temp.</span><b class="${envCls("t", e.t)}">${n0(e.t)}</b> <small class="mu">°C</small></div><div><span>Gravité</span><b class="${envCls("g", e.g)}">${n1(e.g)}</b> <small class="mu">g</small></div><div><span>Énergie</span><b class="${e.power === false ? "crit" : ""}">${e.power === false ? "COUPÉE" : "OK"}</b></div></div>`;
+  b += `<div class="btns">${btn("Pressuriser", { type: "room.pressurize", room: r.id }, { perm: "room.pressurize" })}${btn("Vider l’air", { type: "room.vent", room: r.id }, { perm: "room.vent", cls: "red", confirm: `Vider l’air de ${r.name} ? ${occ.length ? occ.length + " personne(s) présente(s)." : ""}` })}${r.mode ? btn("Arrêter le cycle", { type: "room.stop", room: r.id }, { perm: r.mode === "vent" ? "room.vent" : "room.pressurize", cls: "ghost" }) : ""}</div>`;
+  b += `<div class="btns" style="margin-top:8px">${btn(r.alarm ? "Couper l’alarme" : "Alarme de pièce", { type: "room.alarm", room: r.id, on: !r.alarm }, { perm: "room.alarm", cls: "amb" })}${btn("Sceller les portes", { type: "door.lockdown", room: r.id, on: true }, { perm: "door.lockdown", cls: "red", confirm: `Sceller toutes les portes de ${r.name} ?` })}${doors.some(d => d.state.lockdown) ? btn("Lever le scellé", { type: "door.lockdown", room: r.id, on: false }, { perm: "door.lockdown", cls: "ghost" }) : ""}</div>`;
+  b += `<div class="lbl">Vannes</div>` + (valves.length ? valves.map(v => `<div class="vrow"><span>${esc(v.name)} <span class="dim m" style="font-size:11px">${esc(v.kind)}</span></span>${sw(v.open, { type: "valve.set", valve: v.id, open: !v.open }, "valve.set")}</div>`).join("") : `<p class="empty">Aucune vanne reliée.</p>`);
+  b += `<div class="lbl">Portes</div>` + doors.map(d => `<div class="vrow"><a data-door="${esc(d.id)}" data-go="doors" style="cursor:pointer"><span class="m cy">${esc(d.id)}</span> ${esc(d.name)}</a><span class="row" style="gap:6px">${doorState(d)}</span></div>`).join("");
+  if (perm("crew.vitals")) b += `<div class="lbl">Présents · ${occ.length}</div>` + (occ.length ? occ.map(p => `<div class="vrow" data-person="${esc(p.id)}" data-go="crew" style="cursor:pointer"><span>${esc(p.name)} <span class="mu" style="font-size:12px">${esc(p.job || p.role || "")}</span></span>${vitalState(p)}</div>`).join("") : `<p class="empty">Personne.</p>`);
+  if (V.me.admin) b += `<div class="lbl">Poste admin</div><div class="btns">${btn("Incendie", { type: "admin.fault", key: "fire", target: { kind: "room", id: r.id } }, { cls: "red sm" })}${btn("Brèche", { type: "admin.fault", key: "hull.breach", target: { kind: "room", id: r.id } }, { cls: "red sm" })}${btn("Coupure", { type: "admin.fault", key: "power.surge", target: { kind: "room", id: r.id } }, { cls: "amb sm" })}${btn("Gravité 0 g", { type: "admin.env", room: r.id, env: { g: 0 } }, { cls: "amb sm" })}${btn("Rétablir", { type: "admin.env", room: r.id, env: { p: 101.3, o2: 20.9, co2: .04, t: 21, g: 1, power: true } }, { cls: "ghost sm" })}</div>`;
+  return panel(r.name, r.id, b);
+}
+function doorState(d) {
+  if (d.broken) return `<span class="pill red">lecteur HS</span>`;
+  if (d.state.lockdown) return `<span class="pill red">scellée</span>`;
+  if (d.state.locked) return `<span class="pill amb">verrouillée</span>`;
+  return d.state.open ? `<span class="pill cy">ouverte</span>` : `<span class="pill">fermée</span>`;
+}
+
+/* =====================================================================
+   Pages
+   ===================================================================== */
+const PAGE = {};
+
+PAGE.overview = () => {
+  const ppl = people(), alive = ppl.filter(p => p.vitals && p.vitals.alive !== false), lost = ppl.filter(p => p.vitals && p.vitals.alive === false);
+  const hurt = alive.filter(p => hpCls(p.vitals)), online = ppl.filter(p => p.online);
+  const rooms = Object.values(V.rooms).filter(r => rs(r) !== "gone" && r.kind !== "corridor");
+  const avgP = rooms.reduce((a, r) => a + (+r.env.p || 0), 0) / (rooms.length || 1), minO2 = rooms.reduce((a, r) => Math.min(a, +r.env.o2), 99);
+  const bad = rooms.filter(r => rs(r) !== "ok").length;
+  const alerts = V.alerts.filter(a => !a.ack);
+  const procs = V.procs.filter(p => p.status === "wait" || p.status === "countdown");
+  const lvl = V.ship.alert;
+  const left = `
+${panel("État du vaisseau", "SYS.STAT", `<div class="big ${lvl === "rouge" ? "red" : lvl ? "amb" : alerts.some(a => a.lvl === "crit") ? "red" : "okc"}" style="font-size:24px;letter-spacing:.12em">${lvl ? "ALERTE " + lvl.toUpperCase() : alerts.length ? "INCIDENTS EN COURS" : "NOMINAL"}</div>
+<p class="note">${alerts.length} alarme(s) active(s) · ${bad} pièce(s) hors norme sur ${rooms.length}</p>
+<div class="btns" style="margin-top:12px">${btn("Alerte jaune", { type: "alarm.general", level: "jaune" }, { perm: "alarm.general", cls: "amb sm" })}${btn("Alerte rouge", { type: "alarm.general", level: "rouge" }, { perm: "alarm.general", cls: "red sm", confirm: "Déclarer l’alerte rouge sur tout le vaisseau ?" })}${lvl ? btn("Lever l’alerte", { type: "alarm.general", level: null }, { perm: "alarm.general", cls: "ghost sm" }) : ""}</div>
+<div class="btns" style="margin-top:8px">${btn("Annonce générale", null, { perm: "announce", fn: "announce", cls: "sm" })}</div>`)}
+${panel("Atmosphère", "ENV.AVG", `<div class="tiles"><div class="tile"><span>Pression moy.</span><div class="big">${n1(avgP)}<small>kPa</small></div>${bar(avgP / 101.3 * 100, avgP < 90 ? "warn" : "", true)}</div><div class="tile"><span>O₂ minimum</span><div class="big ${minO2 < 15 ? "red" : minO2 < 18 ? "amb" : ""}">${n1(minO2)}<small>%</small></div>${bar(minO2 / 21 * 100, minO2 < 15 ? "crit" : minO2 < 18 ? "warn" : "", true)}</div></div>`)}
+${panel("Équipage", "BIO.SCAN", perm("crew.vitals") ? `<div class="tiles"><div class="tile"><span>En vie</span><div class="big okc">${alive.length}</div></div><div class="tile"><span>Blessés</span><div class="big ${hurt.length ? "amb" : ""}">${hurt.length}</div></div><div class="tile"><span>Signal perdu</span><div class="big ${lost.length ? "red" : ""}">${lost.length}</div></div><div class="tile"><span>En ligne</span><div class="big">${online.length}<small>/ ${ppl.length}</small></div></div></div>` : `<p class="empty">Données biométriques réservées (niv. ${need("crew.vitals")}).</p>`)}`;
+  const right = `
+${panel("Alarmes actives", "ALR." + String(alerts.length).padStart(2, "0"), alerts.length ? alerts.slice(0, 8).map(alertRow).join("") + (alerts.length > 8 ? `<p class="note">${alerts.length - 8} de plus dans le journal.</p>` : "") : `<p class="empty">Aucune alarme.</p>`)}
+${panel("Procédures", "PRC", procs.length ? procs.map(p => procMini(p)).join("") : `<p class="empty">Aucune procédure en cours.</p>`)}
+${panel("Réserves du bord", "STK", [["Carburant", "fuel"], ["Eau", "water"], ["Vivres", "food"], ["Oxygène en cuves", "o2"], ["Pièces de rechange", "parts"]].map(([l, k]) => { const v = +V.stocks[k] || 0; return `<div class="kv" style="border:0;padding:2px 0"><span>${l}</span><b>${n0(v)} %</b></div>${bar(v, v < 25 ? "crit" : v < 50 ? "warn" : "")}`; }).join(""))}`;
+  return `<div class="grid g-ov"><div class="stack">${left}</div><div class="center">${panel("Plan général · " + V.ship.name, "MAP.OV", `<div class="svgw">${schematic()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px">${Object.entries(ST).map(([k, l]) => `<span class="st ${k}">${l}</span>`).join("")}</div><p class="note" style="text-align:center;margin-inline:auto">Au centre, les ponts de la coque. Autour, de l’intérieur vers l’extérieur : ${V.decks.filter(d => d.kind === "ring").map(d => esc(d.name)).join(" · ") || "aucun anneau"}. Cliquez pour ouvrir un plan.</p>`)}</div><div class="stack">${right}</div></div>`;
+};
+function alertRow(a) {
+  const c = a.lvl === "crit" ? "var(--red)" : "var(--amb)";
+  return `<div class="al ${a.ack ? "ack" : ""}" ${a.room ? `data-room="${esc(a.room)}" data-go="plan"` : ""}><span class="dot" style="background:${c}"></span><div style="flex:1;min-width:0"><b>${esc(a.text)}</b><small>${a.room ? esc(roomName(a.room)) + " · " + esc(deckName(V.rooms[a.room]?.deck)) : a.door ? "Porte " + esc(a.door) : "Vaisseau"}</small></div>${!a.ack && perm("alarm.ack") ? `<button class="b sm ghost" data-cmd="${enc({ type: "alarm.ack", key: a.key })}">Acquitter</button>` : ""}</div>`;
+}
+function procMini(p) {
+  const s = V.sections[p.target];
+  return `<div class="al" data-go="procs"><span class="dot" style="background:var(--red)"></span><div><b>Éjection · ${esc(s ? s.name : p.target)}</b><small>${p.status === "countdown" ? `T-<span data-cd="${p.endsAt}">--</span> s` : `code ${p.codes.length}/${p.need} · en attente`}</small></div></div>`;
+}
+
+PAGE.plan = () => {
+  if (!V.decks.length) return panel("Plan", "MAP", `<p class="empty">Aucune structure reçue du mod.</p>`);
+  if (!ui.deck || !V.decks.find(d => d.id === ui.deck)) ui.deck = (ui.room && V.rooms[ui.room]) ? V.rooms[ui.room].deck : V.decks[0].id;
+  const tabs = V.decks.map(d => `<button class="tab" data-deck="${esc(d.id)}" aria-pressed="${d.id === ui.deck}"><span class="s" style="background:${COL[deckStatus(d.id)]}"></span>${esc(d.id)} · ${esc(d.name)}</button>`).join("");
+  const deck = V.decks.find(d => d.id === ui.deck);
+  const legend = `<div class="row mu" style="gap:14px;margin-top:10px;font-size:12px"><span class="st ok">Normal</span><span class="st warn">Alerte</span><span class="st fire">Incendie</span><span class="st vac">Dépressurisation</span><span class="mu">Carré : porte · <span class="cy">ouverte</span> · <span class="amb">verrouillée</span> · <span class="red">scellée</span></span></div>`;
+  return `<div class="tabs" role="group" aria-label="Ponts">${tabs}</div><div class="grid g-2">${panel(deck.name, deck.id + " · " + (deck.kind === "ring" ? "ANNEAU" : "PONT") + (deck.y0 != null ? ` · Y ${deck.y0}–${deck.y1}` : ""), `<div class="svgw">${deckPlan(ui.deck)}</div>${legend}`)}${ui.door && V.doors[ui.door] && V.doors[ui.door].deck === ui.deck && !ui.room ? doorPanel(ui.door) : roomPanel(ui.room && V.rooms[ui.room] && V.rooms[ui.room].deck === ui.deck ? ui.room : null)}</div>`;
+};
+
+PAGE.atmos = () => {
+  const list = Object.values(V.rooms).filter(r => r.kind !== "corridor" && (ui.atF === "all" || (ui.atF === "bad" ? rs(r) !== "ok" : r.deck === ui.atF)));
+  const filt = `<div class="toolbar"><label class="mu" for="at-f">Afficher</label><select id="at-f" data-fn="atF"><option value="all">Toutes les pièces</option><option value="bad"${ui.atF === "bad" ? " selected" : ""}>Hors norme seulement</option>${V.decks.map(d => `<option value="${esc(d.id)}"${ui.atF === d.id ? " selected" : ""}>${esc(d.id)} · ${esc(d.name)}</option>`).join("")}</select><span class="mu m" style="font-size:12px">${list.length} pièce(s)</span></div>`;
+  const rows = list.map(r => { const e = r.env, s = rs(r); return `<tr data-room="${esc(r.id)}" class="${ui.room === r.id ? "sel" : ""}"><td>${esc(r.name)}<div class="dim m" style="font-size:11px">${esc(r.deck)}</div></td><td><span class="st ${s}">${ST[s]}</span></td><td class="m r ${envCls("p", e.p)}">${s === "gone" ? "—" : n1(e.p)}</td><td class="m r ${envCls("o2", e.o2)}">${s === "gone" ? "—" : n1(e.o2)}</td><td class="m r ${envCls("t", e.t)}">${s === "gone" ? "—" : n0(e.t)}</td><td class="m r">${s === "gone" ? "—" : n1(e.g)}</td></tr>`; }).join("");
+  return `<div class="grid g-2">${panel("Atmosphère par pièce", "ENV.TBL", filt + `<div class="tbl"><table><thead><tr><th>Pièce</th><th>État</th><th class="r">kPa</th><th class="r">O₂ %</th><th class="r">°C</th><th class="r">g</th></tr></thead><tbody>${rows}</tbody></table></div>`)}${roomPanel(ui.room)}</div>`;
+};
+
+/* ---------------------------- Portes ---------------------------- */
+function doorPanel(did) {
+  const d = V.doors[did];
+  if (!d) return panel("Porte", "—", `<p class="empty">Sélectionnez une porte.</p>`);
+  const mine = V.me.doors.includes(d.id), manager = V.me.manages.includes(d.id);
+  const rule = MC.effectiveRule(V, d), group = d.group && V.accessGroups[d.group];
+  const who = people().filter(p => MC.canOpenDoor(V, p, d).ok);
+  let b = `<div class="row" style="justify-content:space-between;margin-bottom:10px">${doorState(d)}<span class="m ${mine ? "okc" : "red"}" style="font-size:12px">${mine ? "VOTRE PUCE : AUTORISÉE" : "VOTRE PUCE : REFUSÉE"}</span></div>`;
+  b += kv("Relie", d.rooms.map(id => esc(roomName(id))).join(" ↔ ") || "—") + kv("Pont", esc(deckName(d.deck))) + (d.size ? kv("Format", esc(d.size)) : "");
+  b += `<div class="btns" style="margin-top:12px">${btn(d.state.open ? "Fermer" : "Ouvrir", { type: "door.open", door: d.id, open: !d.state.open }, { perm: "door.remote" })}${(perm("door.lock") || manager) ? btn(d.state.locked ? "Déverrouiller" : "Verrouiller", { type: "door.lock", door: d.id, locked: !d.state.locked }, { cls: "amb" }) : btn("Verrouiller", null, { perm: "door.lock" })}${btn(d.state.lockdown ? "Lever le scellé" : "Sceller", { type: "door.lockdown", door: d.id, on: !d.state.lockdown }, { perm: "door.lockdown", cls: "red" })}</div>`;
+  b += `<div class="lbl">Règle d’accès</div><p style="margin:0">${esc(MC.ruleText(V, rule))}</p><p class="note">${d.rule ? "Règle propre à cette porte" : group ? "Héritée du groupe « " + esc(group.name) + " »" : "Aucune règle : porte libre"}</p>`;
+  if (perm("access.edit")) b += `<div class="btns" style="margin-top:8px">${btn("Modifier la règle", null, { fn: "editRule", arg: d.id, cls: "sm" })}${d.rule ? btn("Revenir au groupe", { type: "door.setRule", door: d.id, rule: null }, { cls: "ghost sm" }) : ""}</div><label class="f" style="margin-top:10px">Groupe d’autorisation<select id="door-grp-${esc(d.id)}" data-fn="setGroup" data-arg="${esc(d.id)}"><option value="">Aucun</option>${Object.values(V.accessGroups).map(g => `<option value="${esc(g.id)}"${d.group === g.id ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</select></label>`;
+  b += `<div class="lbl">Gestionnaires spéciaux</div>${(d.managers || []).length ? d.managers.map(id => `<span class="pill cy">${esc(V.people[id]?.name || id)}</span>`).join("") : `<span class="dim">Aucun</span>`}${perm("access.edit") ? ` ${btn("Choisir", null, { fn: "editManagers", arg: d.id, cls: "sm ghost" })}` : ""}<p class="note">Un gestionnaire peut verrouiller sa porte et autoriser d’autres personnes à l’ouvrir.</p>`;
+  b += `<div class="lbl">Autorisations spéciales</div>${(d.grants || []).length ? d.grants.map(id => `<span class="pill amb">${esc(V.people[id]?.name || id)}${(manager || perm("access.edit")) ? ` <a data-cmd="${enc({ type: "door.grant", door: d.id, person: id, on: false })}" style="cursor:pointer" title="Retirer">✕</a>` : ""}</span>`).join("") : `<span class="dim">Aucune</span>`}${(manager || perm("access.edit")) ? `<div class="row" style="margin-top:8px"><select id="grant-${esc(d.id)}" style="flex:1"><option value="">Autoriser une personne…</option>${people().filter(p => !(d.grants || []).includes(p.id)).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("")}</select>${btn("Autoriser", null, { fn: "grant", arg: d.id, cls: "sm" })}</div>` : ""}`;
+  b += `<div class="lbl">Peuvent ouvrir · ${who.length}</div><div>${who.slice(0, 40).map(p => `<span class="pill">${esc(p.name)}</span>`).join("") || `<span class="dim">Personne (hors admins)</span>`}</div>`;
+  if (perm("structure.edit")) b += `<div class="btns" style="margin-top:12px">${btn("Renommer", null, { fn: "rename", arg: "door:" + d.id, cls: "ghost sm" })}</div>`;
+  return panel("Porte " + d.id + " · " + d.name, "DOOR." + d.id, b);
+}
+PAGE.doors = () => {
+  const q = (ui.q.doors || "").toLowerCase().trim();
+  const nums = q.split(/[ ,;]+/).filter(x => /^\d+$/.test(x));
+  const list = Object.values(V.doors).filter(d => !q || (nums.length ? nums.includes(d.id) : (d.id + " " + d.name + " " + d.rooms.map(roomName).join(" ")).toLowerCase().includes(q)));
+  const rows = list.slice(0, 200).map(d => `<tr data-door="${esc(d.id)}" class="${ui.door === d.id ? "sel" : ""}"><td class="m cy">${esc(d.id)}</td><td>${esc(d.name)}<div class="dim" style="font-size:11.5px">${esc(deckName(d.deck))}</div></td><td>${doorState(d)}</td><td style="font-size:12.5px">${esc(MC.ruleText(V, MC.effectiveRule(V, d)))}</td><td class="m ${V.me.doors.includes(d.id) ? "okc" : "red"}">${V.me.doors.includes(d.id) ? "OK" : "NON"}</td></tr>`).join("");
+  const mine = V.me.manages.map(id => V.doors[id]).filter(Boolean);
+  const groups = Object.values(V.accessGroups);
+  const gBody = (groups.length ? groups.map(g => { const ds = Object.values(V.doors).filter(d => d.group === g.id); return `<div class="vrow"><div style="min-width:0"><b>${esc(g.name)}</b><div class="mu" style="font-size:12px">${esc(MC.ruleText(V, g.rule))}</div><div class="m dim" style="font-size:11.5px">portes ${ds.map(d => d.id).join(", ") || "—"}</div></div>${perm("access.edit") ? `<span class="row" style="gap:6px;flex:none">${btn("Modifier", null, { fn: "editGroup", arg: g.id, cls: "sm ghost" })}</span>` : ""}</div>`; }).join("") : `<p class="empty">Aucun groupe.</p>`) + (perm("access.edit") ? `<div class="btns" style="margin-top:10px">${btn("Nouveau groupe", null, { fn: "editGroup", arg: "", cls: "sm" })}</div>` : "");
+  return `<div class="grid g-2"><div class="stack">
+${mine.length ? panel("Portes dont vous êtes gestionnaire", "MY.DOORS", mine.map(d => `<div class="vrow" data-door="${esc(d.id)}" style="cursor:pointer"><span><span class="m cy">${esc(d.id)}</span> ${esc(d.name)}</span>${doorState(d)}</div>`).join("")) : ""}
+${panel("Portes du vaisseau", "DOOR." + Object.keys(V.doors).length, `<div class="toolbar"><input type="search" id="q-doors" data-fn="q" data-arg="doors" placeholder="Rechercher un nom, une pièce ou des numéros : 9, 7, 121" aria-label="Rechercher une porte"></div><div class="tbl"><table><thead><tr><th>N°</th><th>Porte</th><th>État</th><th>Qui peut ouvrir</th><th>Ma puce</th></tr></thead><tbody>${rows}</tbody></table></div>${list.length > 200 ? `<p class="note">200 premières sur ${list.length}. Affinez la recherche.</p>` : ""}`)}
+${panel("Groupes d’autorisation", "ACL.GRP", gBody + `<p class="note">Un groupe applique une même règle à plusieurs portes. Une règle posée sur une porte remplace celle de son groupe.</p>`)}
+</div>${doorPanel(ui.door)}</div>`;
+};
+
+/* ---------------------------- Équipage ---------------------------- */
+PAGE.crew = () => {
+  const vit = perm("crew.vitals");
+  const F = { all: () => true, on: p => p.online, new: p => !p.level, lost: p => p.vitals && p.vitals.alive === false, hurt: p => p.vitals && p.vitals.alive !== false && hpCls(p.vitals) };
+  const q = (ui.q.crew || "").toLowerCase();
+  const list = people().filter(F[ui.crewF]).filter(p => !q || (p.name + " " + p.job + " " + p.role + " " + p.group).toLowerCase().includes(q)).sort((a, b) => (b.level - a.level) || a.name.localeCompare(b.name));
+  const tabs = [["all", "Tous"], ["on", "En ligne"], ["new", "Non assignés"], ["hurt", "Blessés"], ["lost", "Signal perdu"]].filter(([k]) => vit || k === "all" || k === "on" || k === "new").map(([k, l]) => `<button class="tab" data-fn="crewF" data-arg="${k}" aria-pressed="${ui.crewF === k}">${l} · ${people().filter(F[k]).length}</button>`).join("");
+  const rows = list.map(p => `<tr data-person="${esc(p.id)}" class="${ui.person === p.id ? "sel" : ""}"><td><b style="font-weight:600">${esc(p.name)}</b>${!p.level ? ` <span class="pill amb">à affecter</span>` : ""}<div class="mu" style="font-size:12px">${esc([p.rank, p.job || p.role].filter(Boolean).join(" · ") || "—")}</div></td><td class="m">${p.level}</td><td>${esc(p.group || "—")}</td><td>${esc(p.team === "aucune" ? "—" : p.team)}</td>${vit ? `<td>${p.vitals ? `<span class="hp ${hpCls(p.vitals)}"><i style="width:${p.vitals.alive === false ? 0 : (p.vitals.hp / (p.vitals.maxHp || 20) * 100)}%"></i></span>` : "—"}</td><td>${vitalState(p)}</td><td style="font-size:12.5px">${esc(roomName(p.room))}</td>` : ""}<td>${p.online ? `<span class="st ok">En ligne</span>` : `<span class="st gone">Hors ligne</span>`}</td></tr>`).join("");
+  return `<div class="grid g-2">${panel("Registre du personnel", "CREW." + people().length, `<div class="tabs">${tabs}</div><div class="toolbar"><input type="search" id="q-crew" data-fn="q" data-arg="crew" placeholder="Rechercher un nom, un métier, un groupe" aria-label="Rechercher une personne"></div><div class="tbl"><table><thead><tr><th>Personne</th><th>Niv.</th><th>Groupe</th><th>Équipe</th>${vit ? "<th>Santé</th><th>État</th><th>Position</th>" : ""}<th>Liaison</th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="empty">Personne.</td></tr>`}</tbody></table></div><p class="note">Le mod demande son nom à chaque joueur à la première connexion. Il apparaît ici « à affecter » jusqu’à ce qu’un responsable lui donne son grade, son métier et son niveau.</p>`)}${personPanel(ui.person)}</div>`;
+};
+function personPanel(pid) {
+  const p = V.people[pid];
+  if (!p || p.admin) return panel("Fiche", "—", `<p class="empty">Sélectionnez une personne.</p>`);
+  const v = p.vitals, vit = perm("crew.vitals") || p.id === V.me.id;
+  let b = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="big" style="font-size:22px">${esc(p.name)}</span><span class="lvl">${p.level}</span></div>`;
+  b += kv("Grade", esc(p.rank || "—")) + kv("Métier", esc(p.job || "—")) + kv("Rôle à bord", esc(p.role || "—")) + kv("Groupe", esc(p.group || "—")) + kv("Équipe", esc(p.team || "—")) + ((p.tags || []).length ? kv("Étiquettes", p.tags.map(t => "#" + esc(t)).join(" ")) : "");
+  if (vit && v) {
+    const pct = v.alive === false ? 0 : v.hp / (v.maxHp || 20) * 100;
+    b += `<div class="lbl">Constantes</div><div class="gauge"><div><span>Santé</span><b class="${hpCls(v)}">${v.alive === false ? "0" : n0(v.hp)}</b><small class="mu"> / ${v.maxHp || 20}</small>${bar(pct, hpCls(v))}</div><div><span>Faim</span><b>${n0(v.food)}</b><small class="mu"> / 20</small>${bar((v.food || 0) / 20 * 100)}</div><div><span>Réserve O₂</span><b class="${v.o2 < 30 ? "crit" : v.o2 < 60 ? "warn" : ""}">${n0(v.o2)}</b><small class="mu"> %</small>${bar(v.o2 || 0, v.o2 < 30 ? "crit" : v.o2 < 60 ? "warn" : "")}</div><div><span>Temp. corps</span><b class="${v.temp < 35 || v.temp > 39 ? "warn" : ""}">${n1(v.temp)}</b><small class="mu"> °C</small></div></div>`;
+    b += kv("État", vitalState(p)) + kv("Position", p.room ? `<a data-room="${esc(p.room)}" data-go="plan" style="cursor:pointer" class="cy">${esc(roomName(p.room))}</a>` : "—");
+  } else if (!vit) b += `<p class="note">Constantes et position réservées (niv. ${need("crew.vitals")}).</p>`;
+  const nd = Object.values(V.doors).filter(d => MC.canOpenDoor(V, p, d).ok).length;
+  b += kv("Portes accessibles", `${nd} / ${Object.keys(V.doors).length}`);
+  b += `<div class="btns" style="margin-top:14px">${btn("Affecter", null, { perm: "crew.assign", fn: "assign", arg: p.id, cls: p.level ? "" : "solid" })}${btn("Retirer du registre", { type: "crew.remove", person: p.id }, { perm: "crew.assign", cls: "red sm", confirm: `Retirer ${p.name} du registre ? Ses autorisations seront supprimées.` })}${V.me.admin ? btn(p.admin ? "Retirer admin" : "Donner l’accès admin", { type: "admin.setAdmin", person: p.id, on: !p.admin }, { cls: "ghost sm" }) : ""}</div>`;
+  return panel("Fiche personnel", p.id.slice(0, 12).toUpperCase(), b);
+}
+
+/* ---------------------------- Procédures ---------------------------- */
+PAGE.procs = () => {
+  const active = V.procs.filter(p => p.status === "wait" || p.status === "countdown");
+  const secs = Object.values(V.sections);
+  const act1 = active.map(p => {
+    const s = V.sections[p.target], rooms = Object.values(V.rooms).filter(r => r.section === p.target), occ = people().filter(x => rooms.some(r => r.id === x.room));
+    const mine = p.codes.some(c => c.id === V.me.id);
+    return panel("Éjection · " + (s ? s.name : p.target), p.id.toUpperCase(), `${p.status === "countdown" ? `<div class="lbl">Compte à rebours</div><div class="cd">T-<span data-cd="${p.endsAt}">--</span></div>` : `<p class="amb" style="letter-spacing:.1em;font-weight:600">EN ATTENTE DU CODE ${p.codes.length + 1}</p>`}
+<div class="codes">${Array.from({ length: p.need }, (_, i) => p.codes[i] ? `<div class="code ok">CODE ${i + 1} · ${esc(p.codes[i].name)}<br><span style="font-size:11px">${fmtT(p.codes[i].t)} · validé</span></div>` : `<div class="code">CODE ${i + 1}<br><span class="dim" style="font-size:11px">niv. ${need("proc.eject")} requis, autre personne</span></div>`).join("")}</div>
+${kv("Pièces concernées", esc(rooms.map(r => r.name).join(", ") || "—"))}${perm("crew.vitals") ? kv("Personnes présentes", `<span class="${occ.length ? "red" : "okc"}">${occ.length}${occ.length ? " · " + esc(occ.map(x => x.name).join(", ")) : ""}</span>`) : ""}
+<div class="btns" style="margin-top:12px">${p.status === "wait" ? btn("Saisir mon code", { type: "proc.confirm", id: p.id }, { perm: "proc.eject", cls: "red", disabled: mine, title: mine ? "Votre code est déjà saisi" : "", confirm: `Valider votre code pour éjecter ${s ? s.name : ""} ?` }) : ""}${btn("Annuler la procédure", { type: "proc.cancel", id: p.id }, { cls: "amb" })}</div>
+${DEMO && p.status === "wait" ? `<p class="note">Démo : changez de puce en haut de page pour saisir le second code.</p>` : ""}`);
+  }).join("");
+  const rows = secs.map(s => { const rooms = Object.values(V.rooms).filter(r => r.section === s.id), occ = people().filter(x => rooms.some(r => r.id === x.room)), busy = active.some(p => p.target === s.id); return `<tr data-fn="sec" data-arg="${esc(s.id)}"><td>${esc(s.name)}</td><td>${s.state === "ejected" ? `<span class="st gone">Éjectée</span>` : `<span class="st ok">Arrimée</span>`}</td><td class="m">${rooms.length}</td><td class="m ${occ.length ? "amb" : ""}">${perm("crew.vitals") ? occ.length : "—"}</td><td>${s.ejectable && s.state !== "ejected" ? btn("Code 1", { type: "proc.eject.start", section: s.id }, { perm: "proc.eject", cls: "red sm", disabled: busy, confirm: `Lancer l’éjection de ${s.name} ? Un second officier devra confirmer, puis un compte à rebours de ${MC.EJECT_COUNTDOWN_MS / 1000} s démarrera.` }) : `<span class="dim">${s.ejectable ? "—" : "non éjectable"}</span>`}</td></tr>`; }).join("");
+  return `<div class="grid g-2"><div class="stack">${panel("Sections du vaisseau", "SEC." + secs.length, `<div class="tbl"><table><thead><tr><th>Section</th><th>État</th><th>Pièces</th><th>Présents</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="empty">Aucune section définie.</td></tr>`}</tbody></table></div><p class="note">Éjecter une section exige deux codes de deux personnes différentes de niveau ${need("proc.eject")} ou plus, puis un compte à rebours de ${MC.EJECT_COUNTDOWN_MS / 1000} s annulable.</p>`)}</div><div class="stack">${act1 || panel("Procédure en cours", "PRC", `<p class="empty">Aucune procédure en cours.</p>`)}</div></div>`;
+};
+
+/* ---------------------------- Journal ---------------------------- */
+PAGE.log = () => {
+  const kinds = { all: "Tout", crit: "Critique", door: "Portes", access: "Accès", badge: "Badges", atmos: "Atmosphère", crew: "Équipage", alarm: "Alarmes", announce: "Annonces", struct: "Structure", sys: "Système", admin: "Ordinateur" };
+  const q = (ui.q.log || "").toLowerCase();
+  const list = V.log.filter(l => (ui.logF === "all" || l.kind === ui.logF) && (!q || (l.who + " " + l.text).toLowerCase().includes(q))).slice(0, 250);
+  return `<div class="grid g-2">${panel("Journal de bord", "LOG." + V.log.length, `<div class="toolbar"><select id="log-f" data-fn="logF" aria-label="Type">${Object.entries(kinds).map(([k, l]) => `<option value="${k}"${ui.logF === k ? " selected" : ""}>${l}</option>`).join("")}</select><input type="search" id="q-log" data-fn="q" data-arg="log" placeholder="Rechercher dans le journal" aria-label="Rechercher"></div>${list.map(l => `<div class="logl ${esc(l.kind)}"><span class="t">${fmtT(l.t)}</span><span class="w">${esc(l.who)}</span><span class="x">${esc(l.text)}</span></div>`).join("") || `<p class="empty">Rien.</p>`}`)}${panel("Alarmes", "ALR", V.alerts.length ? V.alerts.map(alertRow).join("") : `<p class="empty">Aucune alarme.</p>`)}</div>`;
+};
+
+/* ---------------------------- Structure ---------------------------- */
+PAGE.structure = () => {
+  const se = perm("structure.edit"), pe = perm("perms.edit");
+  const decks = V.decks.map(d => `<div class="vrow"><span><span class="m cy">${esc(d.id)}</span> ${esc(d.name)} <span class="dim" style="font-size:12px">${d.kind === "ring" ? "anneau" : "pont"} · ${roomsOf(d.id).length} pièces</span></span>${se ? btn("Renommer", null, { fn: "rename", arg: "deck:" + d.id, cls: "sm ghost" }) : ""}</div>`).join("") || `<p class="empty">Aucun pont.</p>`;
+  const rq = (ui.q.rooms || "").toLowerCase();
+  const rooms = Object.values(V.rooms).filter(r => !rq || (r.name + " " + r.id).toLowerCase().includes(rq)).slice(0, 80).map(r => `<div class="vrow"><span><span class="m dim" style="font-size:11.5px">${esc(r.id)}</span> ${esc(r.name)}${r.section && V.sections[r.section] ? ` <span class="pill">${esc(V.sections[r.section].name)}</span>` : ""}</span>${se ? btn("Renommer", null, { fn: "rename", arg: "room:" + r.id, cls: "sm ghost" }) : ""}</div>`).join("");
+  const secs = Object.values(V.sections).map(s => `<div class="vrow"><span>${esc(s.name)} ${s.ejectable ? `<span class="pill red">éjectable</span>` : ""}<span class="dim m" style="font-size:11.5px"> ${Object.values(V.rooms).filter(r => r.section === s.id).length} pièces</span></span>${se ? btn("Modifier", null, { fn: "editSection", arg: s.id, cls: "sm ghost" }) : ""}</div>`).join("") || `<p class="empty">Aucune section.</p>`;
+  const terms = Object.values(V.terminals).map(t => `<div class="vrow"><span style="min-width:0"><span class="m cy">${esc(t.id)}</span> ${esc(t.name)}<div class="dim" style="font-size:11.5px">${t.pages.map(p => MC.PAGES[p]).join(" · ")}</div></span>${se ? btn("Pages", null, { fn: "editTerm", arg: t.id, cls: "sm ghost" }) : ""}</div>`).join("") || `<p class="empty">Aucun terminal posé.</p>`;
+  const permRows = Object.entries(MC.ACTIONS).map(([k, m]) => `<tr><td>${esc(m[0])}<div class="dim" style="font-size:11px">${esc(MC.PAGES[m[2]])}</div></td><td class="r">${pe ? `<select id="perm-${k}" data-fn="perm" data-arg="${k}" aria-label="Niveau">${MC.LEVELS.map(([lv, n]) => `<option value="${lv}"${V.perms[k] === lv ? " selected" : ""}>${lv} · ${esc(n)}</option>`).join("")}</select>` : `<span class="m">${V.perms[k]}</span>`}</td></tr>`).join("");
+  return `<div class="grid g-2b"><div class="stack">
+${panel("Synchronisation avec le mod", "SYNC", kv("Liaison", LINK === "demo" ? "démo locale" : V.ship.modOnline ? `<span class="okc">en ligne</span>` : `<span class="red">hors ligne</span>`) + kv("Dernière structure", V.ship.lastStructure ? fmtT(V.ship.lastStructure) : "jamais") + kv("Ponts · pièces · portes", `${V.decks.length} · ${Object.keys(V.rooms).length} · ${Object.keys(V.doors).length}`) + `<p class="note">La forme du vaisseau vient du mod : il détecte les compartiments scellés, les ponts et les portes, puis les envoie ici. Les noms donnés sur cette page sont conservés à chaque nouvelle synchronisation.</p>`)}
+${panel("Ponts et anneaux", "DECK", decks)}
+${panel("Sections", "SEC", secs + (se ? `<div class="btns" style="margin-top:10px">${btn("Nouvelle section", null, { fn: "editSection", arg: "", cls: "sm" })}</div>` : ""))}
+${panel("Terminaux", "TERM", terms + `<p class="note">Chaque bloc console posé dans le vaisseau n’ouvre que les pages cochées ici.</p>`)}
+</div><div class="stack">
+${panel("Niveaux requis", "PERM", `<div class="tbl"><table><thead><tr><th>Action</th><th class="r">Niveau minimum</th></tr></thead><tbody>${permRows}</tbody></table></div>`)}
+${panel("Pièces", "ROOM." + Object.keys(V.rooms).length, `<div class="toolbar"><input type="search" id="q-rooms" data-fn="q" data-arg="rooms" placeholder="Rechercher une pièce" aria-label="Rechercher une pièce"></div>${rooms}`)}
+</div></div>`;
+};
+
+/* ---------------------------- Ordinateur de bord ---------------------------- */
+PAGE.admin = () => {
+  if (!V.me.admin) return panel("Ordinateur de bord", "ADM", `<p class="empty">Réservé au poste admin.</p>`);
+  const targets = (kind) => kind === "room" ? Object.values(V.rooms).filter(r => r.kind !== "corridor" && rs(r) !== "gone").map(r => [r.id, r.deck + " · " + r.name]) : kind === "door" ? Object.values(V.doors).map(d => [d.id, "Porte " + d.id + " · " + d.name]) : kind === "section" ? Object.values(V.sections).map(s => [s.id, s.name]) : [];
+  const cats = MC.FAULTS.map(([cat, list]) => `<div class="lbl">${esc(cat)}</div>` + list.map(([k, name, tk, eff]) => {
+    const opts = targets(tk);
+    const defSel = tk === "room" ? ui.room : tk === "door" ? ui.door : "";
+    return `<div class="vrow" style="flex-wrap:wrap"><div style="flex:1 1 220px;min-width:0"><b style="font-weight:600">${esc(name)}</b><div class="mu" style="font-size:12px">${esc(eff)}</div></div><div class="row" style="gap:6px;flex:1 1 260px;justify-content:flex-end">${opts.length ? `<select id="ft-${k}" aria-label="Cible" style="flex:1;min-width:0">${opts.map(([id, l]) => `<option value="${esc(id)}"${id === defSel ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>` : `<span class="dim" style="font-size:12px">tout le vaisseau</span>`}<label class="chk"><input type="checkbox" id="fs-${k}"> silencieuse</label>${btn("Déclencher", null, { fn: "fault", arg: k + "|" + tk, cls: "red sm" })}</div></div>`;
+  }).join("")).join("");
+  const active = V.faults.filter(f => f.active);
+  const fl = active.map(f => `<div class="vrow"><span><b style="font-weight:600">${esc(MC.FAULT_INDEX[f.key]?.name || f.key)}</b> ${f.silent ? `<span class="pill vio" style="color:var(--vio);border-color:var(--vio)">silencieuse</span>` : ""}<div class="mu m" style="font-size:11.5px">${fmtT(f.t)} · ${f.target.kind === "ship" ? "vaisseau" : esc(f.target.kind === "room" ? roomName(f.target.id) : f.target.kind === "door" ? "porte " + f.target.id : V.sections[f.target.id]?.name || f.target.id)}</div></span>${btn("Résoudre", { type: "admin.clearFault", id: f.id }, { cls: "sm ghost" })}</div>`).join("") || `<p class="empty">Aucune avarie active.</p>`;
+  const stocks = [["fuel", "Carburant"], ["water", "Eau"], ["food", "Vivres"], ["o2", "Oxygène"], ["parts", "Pièces"]].map(([k, l]) => `<label class="f">${l} · <span class="m">${n0(V.stocks[k])} %</span><input type="range" id="stk-${k}" min="0" max="100" value="${n0(V.stocks[k])}" data-fn="stock" data-arg="${k}"></label>`).join("");
+  return `<div class="grid g-2"><div class="stack">${panel("Avaries déclenchables", "FLT.CAT", cats + `<p class="note">Une avarie silencieuse n’apparaît pas aux joueurs : le mod reçoit l’ordre mais aucune alarme n’est levée.</p>`)}</div><div class="stack">
+${panel("Avaries actives", "FLT." + active.length, fl)}
+${panel("Comportement de l’ordinateur", "AI.CORE", `<div class="vrow"><span>Refuser les commandes de l’équipage</span><button class="sw" role="switch" aria-checked="${V.computer.refuse}" data-fn="aiToggle" aria-label="Refuser les commandes"></button></div><label class="f" style="margin-top:10px">Message affiché aux joueurs<input type="text" id="ai-msg" maxlength="140" placeholder="ORDINATEUR : la survie de la mission prime."></label><p class="note">Toutes les actions non admin sont alors rejetées avec ce message.</p>`)}
+${panel("Réserves", "STK.SET", stocks)}
+${!DEMO ? panel("Tests sans mod", "SIM", `<div class="vrow"><span>Simuler l’environnement<div class="mu" style="font-size:12px">Pression, oxygène et constantes évoluent comme si le mod tournait. S’arrête tout seul dès que le mod se connecte.</div></span><button class="sw" role="switch" aria-checked="${!!V.ship.sim}" data-cmd="${enc({ type: "admin.sim", on: !V.ship.sim })}" aria-label="Simulateur"></button></div><div class="btns" style="margin-top:10px">${btn("Recharger le vaisseau de démo", { type: "admin.resetDemo" }, { cls: "red sm", confirm: "Remplacer tout l’état actuel par le vaisseau de démonstration ? Le registre et les règles seront perdus." })}</div><p class="note">La bande « Test solo » en haut de page permet d’incarner n’importe quel membre d’équipage.</p>`) : ""}
+${DEMO ? panel("Commandes envoyées au mod", "MOD.OUT", `<div class="feed">${MODFEED.map(x => `<div>${fmtT(x.t)} ${esc(JSON.stringify(x.c))}</div>`).join("") || `<div>Aucune commande pour l’instant. Manœuvrez une porte ou une vanne.</div>`}</div><p class="note">En production, ces messages partent par WebSocket vers le serveur Minecraft.</p>`) : ""}
+</div></div>`;
+};
+
+/* =====================================================================
+   Fenêtres modales
+   ===================================================================== */
+const modal = { onOk: null, draw: null };
+function openModal(draw, onOk) {
+  modal.draw = draw; modal.onOk = onOk; drawModal();
+  const el = document.getElementById("modal"); el.hidden = false;
+  setTimeout(() => { const f = el.querySelector("input,select,textarea,button"); if (f) f.focus(); }, 0);
+}
+function drawModal() { const el = document.getElementById("modal"); el.innerHTML = `<div class="pn" role="dialog" aria-modal="true"><div class="pi">${modal.draw()}</div></div>`; }
+function closeModal() { const el = document.getElementById("modal"); el.hidden = true; el.innerHTML = ""; modal.onOk = null; }
+const mfoot = (ok = "Enregistrer", cls = "solid") => `<div class="mfoot"><button class="b ghost" data-m="cancel">Annuler</button><button class="b ${cls}" data-m="ok">${esc(ok)}</button></div>`;
+const val = (id) => (document.getElementById(id) || {}).value;
+
+function confirmModal(text, then) { openModal(() => `<h3>Confirmation</h3><p>${esc(text)}</p>${mfoot("Confirmer", "red")}`, () => { then(); return true; }); }
+
+const CLAUSES = { min: "Niveau minimum", lv: "Niveaux précis", p: "Personne", role: "Rôle à bord", job: "Métier", grp: "Groupe", team: "Équipe", tag: "Étiquette", none: "Personne (gestionnaires seulement)" };
+function ruleEditorHtml() {
+  const r = ui.draft.rule;
+  const rows = r.any.map((c, i) => {
+    let input = "";
+    if (c.t === "min") input = `<select id="cl-${i}" data-cl="${i}">${MC.LEVELS.map(([l, n]) => `<option value="${l}"${c.v == l ? " selected" : ""}>${l} · ${esc(n)}</option>`).join("")}</select>`;
+    else if (c.t === "lv") input = `<input type="text" id="cl-${i}" data-cl="${i}" value="${esc((c.v || []).join(", "))}" placeholder="3, 5, 6">`;
+    else if (c.t === "p") input = `<select id="cl-${i}" data-cl="${i}"><option value="">Choisir…</option>${people().map(p => `<option value="${esc(p.id)}"${c.v === p.id ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>`;
+    else if (c.t === "grp") input = `<select id="cl-${i}" data-cl="${i}">${MC.GROUPS.map(g => `<option${c.v === g ? " selected" : ""}>${g}</option>`).join("")}</select>`;
+    else if (c.t === "team") input = `<select id="cl-${i}" data-cl="${i}">${["jour", "nuit"].map(g => `<option${c.v === g ? " selected" : ""}>${g}</option>`).join("")}</select>`;
+    else if (c.t === "none") input = `<span class="mu" style="font-size:12px">Seuls les gestionnaires et les autorisations spéciales ouvrent</span>`;
+    else input = `<input type="text" id="cl-${i}" data-cl="${i}" value="${esc(c.v || "")}" list="dl-${c.t}">`;
+    return `<div class="clause"><span class="cy" style="font-size:12.5px">${i ? "ou " : ""}${esc(CLAUSES[c.t])}</span>${input}<button class="b sm ghost" data-rm="${i}" aria-label="Retirer">✕</button></div>`;
+  }).join("");
+  const dl = (t, arr) => `<datalist id="dl-${t}">${[...new Set(arr.filter(Boolean))].map(x => `<option value="${esc(x)}">`).join("")}</datalist>`;
+  return `<div class="lbl" style="margin-top:6px">Peut ouvrir si l’une de ces conditions est vraie</div>${rows || `<p class="empty">Aucune condition : porte libre.</p>`}
+<div class="row" style="margin-top:8px"><select id="cl-add" aria-label="Type de condition">${Object.entries(CLAUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select><button class="b sm" data-add="1">Ajouter</button></div>
+<p class="note">Aperçu : ${esc(MC.ruleText(V, ui.draft.rule.any.length ? ui.draft.rule : null))}</p>${dl("role", people().map(p => p.role))}${dl("job", people().map(p => p.job))}${dl("tag", people().flatMap(p => p.tags || []))}`;
+}
+function readClauses() {
+  ui.draft.rule.any.forEach((c, i) => {
+    const el = document.getElementById("cl-" + i); if (!el) return;
+    if (c.t === "min") c.v = +el.value; else if (c.t === "lv") c.v = el.value.split(/[ ,;]+/).filter(Boolean).map(Number).filter(n => !isNaN(n)); else if (c.t !== "none") c.v = el.value;
+  });
+}
+const cloneRule = (r) => ({ any: r && r.any ? JSON.parse(JSON.stringify(r.any)) : [] });
+
+const FN = {
+  demoWho(el) { DEMO.actor = el.value; update(DEMO.view(), Date.now()); },
+  soloAs(el) { T.as(el.value); },
+  demoTerm(el) { DEMO.term = el.value; update(DEMO.view(), Date.now()); },
+  atF(el) { ui.atF = el.value; render(); },
+  logF(el) { ui.logF = el.value; render(); },
+  crewF(el) { ui.crewF = el.dataset.arg; render(); },
+  q(el) { ui.q[el.dataset.arg] = el.value; render(); },
+  sec(el) { ui.sec = el.dataset.arg; },
+  aiToggle() { act({ type: "admin.computer", refuse: !V.computer.refuse, message: val("ai-msg") || V.computer.message || "ORDINATEUR : commande refusée." }, V.computer.refuse ? "L’ordinateur obéit de nouveau." : "L’ordinateur refuse les commandes."); },
+  setGroup(el) { act({ type: "door.setGroup", door: el.dataset.arg, group: el.value || null }, "Groupe mis à jour."); },
+  perm(el) { act({ type: "perms.set", action: el.dataset.arg, level: +el.value }, "Niveau mis à jour."); },
+  stock(el) { act({ type: "admin.stocks", stocks: { [el.dataset.arg]: +el.value } }); },
+  grant(el) { const v = val("grant-" + el.dataset.arg); if (!v) return toast("Choisissez une personne.", "err"); act({ type: "door.grant", door: el.dataset.arg, person: v, on: true }, "Autorisation accordée."); },
+  fault(el) { const [k, tk] = el.dataset.arg.split("|"); const tgt = tk === "ship" ? { kind: "ship" } : { kind: tk, id: val("ft-" + k) }; act({ type: "admin.fault", key: k, target: tgt, silent: !!(document.getElementById("fs-" + k) || {}).checked }, "Avarie déclenchée."); },
+  announce() {
+    openModal(() => `<h3>Annonce générale</h3><p class="mu">Diffusée sur les haut-parleurs du vaisseau.</p><label class="f">Message<textarea id="an-t" rows="3" maxlength="280"></textarea></label>${mfoot("Diffuser")}`,
+      () => { const t = val("an-t"); if (!t.trim()) { toast("Le message est vide.", "err"); return false; } act({ type: "announce", text: t }, "Annonce diffusée."); return true; });
+  },
+  rename(el) {
+    const [kind, id] = el.dataset.arg.split(/:(.+)/);
+    const cur = kind === "deck" ? deckName(id) : kind === "room" ? roomName(id) : V.doors[id].name;
+    openModal(() => `<h3>Renommer</h3><label class="f">Nom<input type="text" id="rn" maxlength="40" value="${esc(cur)}"></label>${mfoot()}`,
+      () => { const n = val("rn"); act(kind === "deck" ? { type: "deck.rename", deck: id, name: n } : kind === "room" ? { type: "room.rename", room: id, name: n } : { type: "door.rename", door: id, name: n }, "Renommé."); return true; });
+  },
+  editRule(el) {
+    const d = V.doors[el.dataset.arg]; ui.draft = { rule: cloneRule(MC.effectiveRule(V, d)) };
+    openModal(() => `<h3>Règle de la porte ${esc(d.id)}</h3><p class="mu">${esc(d.name)}</p>${ruleEditorHtml()}${mfoot()}`,
+      () => { readClauses(); act({ type: "door.setRule", door: d.id, rule: ui.draft.rule.any.length ? ui.draft.rule : { any: [] } }, "Règle enregistrée."); return true; });
+  },
+  editGroup(el) {
+    const g = V.accessGroups[el.dataset.arg];
+    ui.draft = { rule: cloneRule(g && g.rule), name: g ? g.name : "", doors: g ? Object.values(V.doors).filter(d => d.group === g.id).map(d => d.id).join(", ") : "" };
+    openModal(() => `<h3>${g ? "Modifier le groupe" : "Nouveau groupe d’autorisation"}</h3><label class="f">Nom du groupe<input type="text" id="g-n" maxlength="40" value="${esc(ui.draft.name)}"></label><label class="f">Numéros des portes, séparés par des virgules<input type="text" id="g-d" value="${esc(ui.draft.doors)}" placeholder="9, 7, 121"></label>${ruleEditorHtml()}<div class="mfoot">${g ? `<button class="b red sm" data-m="del" style="margin-right:auto">Supprimer</button>` : ""}<button class="b ghost" data-m="cancel">Annuler</button><button class="b solid" data-m="ok">Enregistrer</button></div>`,
+      (m) => {
+        if (m === "del") { act({ type: "group.delete", id: g.id }, "Groupe supprimé."); return true; }
+        readClauses(); const ids = val("g-d").split(/[ ,;]+/).filter(Boolean); const unknown = ids.filter(id => !V.doors[id]);
+        if (unknown.length) { toast("Portes inconnues : " + unknown.join(", "), "err"); return false; }
+        act({ type: "group.save", id: g ? g.id : null, name: val("g-n"), doors: ids, rule: ui.draft.rule }, "Groupe enregistré."); return true;
+      });
+  },
+  editManagers(el) {
+    const d = V.doors[el.dataset.arg], cur = new Set(d.managers || []);
+    openModal(() => `<h3>Gestionnaires de la porte ${esc(d.id)}</h3><p class="mu">${esc(d.name)} · ils peuvent verrouiller la porte et autoriser d’autres personnes.</p><div class="chkgrid">${people().map(p => `<label class="chk"><input type="checkbox" data-mg="${esc(p.id)}"${cur.has(p.id) ? " checked" : ""}> ${esc(p.name)}</label>`).join("")}</div>${mfoot()}`,
+      () => { act({ type: "door.setManagers", door: d.id, managers: [...document.querySelectorAll("[data-mg]:checked")].map(x => x.dataset.mg) }, "Gestionnaires enregistrés."); return true; });
+  },
+  assign(el) {
+    const p = V.people[el.dataset.arg], max = V.me.admin ? 7 : Math.max(0, V.me.level - 1);
+    openModal(() => `<h3>Affecter ${esc(p.name)}</h3><div class="f2"><label class="f">Nom à bord<input type="text" id="as-name" maxlength="32" value="${esc(p.name)}"></label><label class="f">Niveau d’accès<select id="as-lv">${MC.LEVELS.filter(([l]) => l <= max || l === p.level).map(([l, n]) => `<option value="${l}"${p.level === l ? " selected" : ""}>${l} · ${esc(n)}</option>`).join("")}</select></label><label class="f">Grade<input type="text" id="as-rank" maxlength="40" value="${esc(p.rank)}" placeholder="Lieutenant"></label><label class="f">Métier<input type="text" id="as-job" maxlength="40" value="${esc(p.job)}" placeholder="Technicien coque"></label><label class="f">Rôle à bord<input type="text" id="as-role" maxlength="40" value="${esc(p.role)}"></label><label class="f">Groupe<select id="as-grp"><option value="">—</option>${MC.GROUPS.map(g => `<option${p.group === g ? " selected" : ""}>${g}</option>`).join("")}</select></label><label class="f">Équipe<select id="as-team">${MC.TEAMS.map(t => `<option${p.team === t ? " selected" : ""}>${t}</option>`).join("")}</select></label><label class="f">Étiquettes<input type="text" id="as-tags" value="${esc((p.tags || []).join(", "))}" placeholder="armurerie, eva"></label></div><p class="note">Vous ne pouvez pas donner un niveau égal ou supérieur au vôtre.</p>${mfoot()}`,
+      () => { act({ type: "crew.assign", person: p.id, fields: { name: val("as-name"), level: +val("as-lv"), rank: val("as-rank"), job: val("as-job"), role: val("as-role"), group: val("as-grp"), team: val("as-team"), tags: val("as-tags").split(",").map(s => s.trim()).filter(Boolean) } }, "Affectation enregistrée."); return true; });
+  },
+  editSection(el) {
+    const s = V.sections[el.dataset.arg];
+    openModal(() => `<h3>${s ? "Modifier la section" : "Nouvelle section"}</h3><label class="f">Nom<input type="text" id="se-n" maxlength="40" value="${esc(s ? s.name : "")}"></label><label class="chk"><input type="checkbox" id="se-e"${s && s.ejectable ? " checked" : ""}> Section éjectable</label><div class="lbl">Pièces</div><div class="chkgrid">${V.decks.map(d => `<div style="grid-column:1/-1" class="cy m">${esc(d.id)} · ${esc(d.name)}</div>` + roomsOf(d.id).map(r => `<label class="chk"><input type="checkbox" data-sr="${esc(r.id)}"${s && r.section === s.id ? " checked" : ""}> ${esc(r.name)}</label>`).join("")).join("")}</div>${mfoot()}`,
+      () => { act({ type: "section.save", id: s ? s.id : null, name: val("se-n"), ejectable: document.getElementById("se-e").checked, rooms: [...document.querySelectorAll("[data-sr]:checked")].map(x => x.dataset.sr) }, "Section enregistrée."); return true; });
+  },
+  editTerm(el) {
+    const t = V.terminals[el.dataset.arg];
+    openModal(() => `<h3>Terminal ${esc(t.id)}</h3><label class="f">Nom<input type="text" id="te-n" maxlength="40" value="${esc(t.name)}"></label><div class="lbl">Pages ouvertes depuis ce bloc</div>${Object.entries(MC.PAGES).filter(([k]) => k !== "admin").map(([k, l]) => `<label class="chk"><input type="checkbox" data-tp="${k}"${t.pages.includes(k) ? " checked" : ""}> ${esc(l)}</label>`).join("")}${mfoot()}`,
+      () => { act({ type: "terminal.save", id: t.id, name: val("te-n"), pages: [...document.querySelectorAll("[data-tp]:checked")].map(x => x.dataset.tp) }, "Terminal enregistré."); return true; });
+  }
+};
+
+/* =====================================================================
+   Événements
+   ===================================================================== */
+document.addEventListener("click", (e) => {
+  const m = e.target.closest("#modal [data-m]");
+  if (m) { if (m.dataset.m === "cancel") return closeModal(); const ok = modal.onOk && modal.onOk(m.dataset.m); if (ok !== false) closeModal(); return; }
+  const add = e.target.closest("#modal [data-add]");
+  if (add) { readClauses(); const t = val("cl-add"); ui.draft.rule.any.push({ t, v: t === "min" ? 3 : t === "lv" ? [] : t === "grp" ? MC.GROUPS[0] : t === "team" ? "jour" : "" }); drawModal(); return; }
+  const rm = e.target.closest("#modal [data-rm]");
+  if (rm) { readClauses(); ui.draft.rule.any.splice(+rm.dataset.rm, 1); drawModal(); return; }
+  if (e.target.id === "modal") return closeModal();
+  const el = e.target.closest("[data-cmd],[data-fn],[data-go],[data-room],[data-door],[data-person],[data-deck]");
+  if (!el || el.disabled) return;
+  if (el.tagName === "SELECT" || el.tagName === "INPUT") return;
+  if (el.dataset.cmd) {
+    const a = JSON.parse(el.dataset.cmd);
+    if (el.dataset.confirm) return confirmModal(el.dataset.confirm, () => act(a, "Ordre transmis."));
+    return act(a);
+  }
+  if (el.dataset.fn && FN[el.dataset.fn]) { FN[el.dataset.fn](el); if (el.dataset.fn !== "sec") return; }
+  if (el.dataset.room) { ui.room = el.dataset.room; ui.door = null; if (V.rooms[ui.room]) ui.deck = V.rooms[ui.room].deck; }
+  else if (el.dataset.door) { ui.door = el.dataset.door; if (ui.page === "plan") ui.room = null; }
+  else if (el.dataset.deck) { if (ui.deck !== el.dataset.deck) { ui.room = null; ui.door = null; } ui.deck = el.dataset.deck; if (ui.page !== "plan") ui.page = "plan"; }
+  if (el.dataset.person) ui.person = el.dataset.person;
+  if (el.dataset.go) ui.page = el.dataset.go;
+  else if (el.dataset.room && ui.page === "overview") ui.page = "plan";
+  render();
+});
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.closest("#modal")) return;
+  if (el.dataset.fn && FN[el.dataset.fn] && (el.tagName === "SELECT" || el.type === "range")) FN[el.dataset.fn](el);
+});
+let qTimer = null;
+document.addEventListener("input", (e) => { const el = e.target; if (el.dataset.fn === "q") { clearTimeout(qTimer); qTimer = setTimeout(() => FN.q(el), 180); } });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !document.getElementById("modal").hidden) closeModal();
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("nav a,tbody tr,svg .hit,.al,[data-go]:not(button)")) { e.preventDefault(); e.target.click(); }
+});
+
+/* Horloge et comptes à rebours, sans redessiner la page. */
+setInterval(() => {
+  const c = document.querySelector("[data-clock]"); if (c && c.firstChild) c.firstChild.nodeValue = fmtT(now());
+  document.querySelectorAll("[data-cd]").forEach(el => { el.textContent = String(Math.max(0, Math.ceil((+el.dataset.cd - now()) / 1000))).padStart(2, "0"); });
+}, 250);
+
+renderChrome();
+boot();
+</script>
