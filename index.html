@@ -187,6 +187,25 @@ svg .hit:hover{filter:brightness(1.45)}
 .feed div{padding:3px 0;border-bottom:1px solid var(--ln);white-space:pre-wrap;word-break:break-word}
 
 /* ---------- Fenêtre modale et notifications ---------- */
+/* Écrans en jeu (kiosque) */
+body.kiosk #app{display:block}
+body.kiosk::after{display:none}
+.kio{position:fixed;inset:0;overflow:hidden;display:flex;flex-direction:column}
+.kio .khead{display:flex;align-items:center;gap:14px;padding:1.6vh 2.4vw;border-bottom:1px solid var(--ln);font-family:var(--f-mono);letter-spacing:.14em;font-size:max(11px,1.7vh);color:var(--mu)}
+.kio .khead b{color:var(--cy);font-family:var(--f-disp);letter-spacing:.32em;font-size:max(13px,2.4vh)}
+.kio .kbody{flex:1;min-height:0;overflow:hidden;padding:2vh 2vw;pointer-events:none}
+.kio .kbody main{padding:0;overflow:visible;height:auto}
+.kio .ktext{flex:1;display:grid;place-items:center;text-align:center;padding:4vh 4vw;white-space:pre-line;font-weight:500;letter-spacing:.04em;line-height:1.25}
+.kio iframe{flex:1;border:0;width:100%;height:100%;background:#fff}
+.kstat{flex:1;display:grid;place-items:center;text-align:center;gap:2vh;padding:3vh}
+.kstat .big{font-size:8vh;letter-spacing:.3em;color:var(--cy);font-weight:300}
+.kstat .clk{font-family:var(--f-mono);font-size:11vh;letter-spacing:.08em}
+.kstat .sub{font-size:2.6vh;letter-spacing:.18em;color:var(--mu)}
+.kstat .row{justify-content:center;gap:1.2vw}
+body.glass,html.glass{background:transparent!important}
+body.glass .kio{background:transparent}
+body.glass .pn,body.glass .pn .pi{background:rgba(3,14,20,.42)!important}
+body.glass .kio .khead{border-color:rgba(98,230,242,.25)}
 #modal[hidden]{display:none}
 #modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(2,6,9,.72);padding:16px}
 #modal .pn{width:min(640px,100%);max-height:calc(100% - 32px)}
@@ -319,6 +338,7 @@ function emptyShip(name = "Meridian") {
     computer: { refuse: false, message: "" },
     stocks: { fuel: 100, water: 100, food: 100, o2: 100, parts: 100 },
     nav: navEmpty(),
+    screens: screensEmpty(),
     seq: 1
   };
 }
@@ -377,6 +397,58 @@ function cleanPlanet(p, old) {
     out.env = { g: Math.max(0, Math.min(12, num(p.env.g, 1))), t: num(p.env.t, 15), atm };
   }
   return out;
+}
+
+/* =========================== Écrans ===========================
+   Les écrans (bloc, écran plat, écran transparent) sont déclarés par le mod.
+   Contenu affiché, du plus prioritaire au moins prioritaire :
+   1. relais en jeu (ordinateur : recopie ou écran précis), sauf mode « par défaut » ;
+   2. réglage admin de l'écran ; 3. réglage admin de son groupe ; 4. écran d'état. */
+const SCREEN_TYPES = { screen: "Écran", flatscreen: "Écran plat", transparent: "Écran transparent" };
+const SCREEN_MODES = { status: "État du vaisseau", page: "Page Meridian", text: "Texte", url: "Adresse web" };
+function screensEmpty() { return { list: {}, meta: {}, cfg: {}, groups: {} }; }
+function cleanScreenCfg(c) {
+  c = c || {};
+  const mode = SCREEN_MODES[c.mode] ? c.mode : "status";
+  const out = { mode };
+  if (mode === "page") { out.page = PAGES[c.page] && !ADMIN_PAGES.includes(c.page) ? c.page : "overview"; out.level = Math.max(0, Math.min(7, c.level | 0)); if (c.uuid) out.uuid = clean(c.uuid, 64); }
+  if (mode === "text") { out.text = clean(c.text, 600); out.size = Math.max(1, Math.min(5, (c.size | 0) || 3)); out.color = /^#[0-9a-f]{6}$/i.test(c.color || "") ? c.color : "#62e6f2"; }
+  if (mode === "url") { const u = String(c.url || "").trim().slice(0, 500); out.url = /^https:\/\//i.test(u) ? u : ""; }
+  return out;
+}
+/* Message « screens » du mod : liste complète des écrans posés. */
+function applyScreens(S, m, now = Date.now()) {
+  const sc = S.screens || (S.screens = screensEmpty());
+  if (!Array.isArray(m.list)) return;
+  const list = {};
+  for (const x of m.list.slice(0, 500)) {
+    if (!x || !x.id) continue;
+    const id = clean(x.id, 24);
+    list[id] = { id, type: SCREEN_TYPES[x.type] ? x.type : "screen", dim: clean(x.dim, 80), x: +x.x || 0, y: +x.y || 0, z: +x.z || 0, w: Math.max(1, x.w | 0), h: Math.max(1, x.h | 0),
+      relay: x.relay ? clean(x.relay, 24) : null, override: x.override && x.override.mode && x.override.mode !== "default" ? cleanScreenCfg(x.override) : null, seen: now };
+  }
+  sc.list = list;
+}
+function screenEffective(S, id) {
+  const sc = S.screens || screensEmpty(), s = sc.list[id], meta = sc.meta[id] || {};
+  if (s && s.override) return Object.assign({}, s.override, { src: "relay" });
+  if (sc.cfg[id]) return Object.assign({}, sc.cfg[id], { src: "screen" });
+  if (meta.group && sc.groups[meta.group]) return Object.assign({}, sc.groups[meta.group], { src: "group" });
+  return { mode: "status", src: "default" };
+}
+/* Vue d'un écran : lecture seule, au niveau d'accès choisi (ou de la personne suivie en recopie). */
+function displayView(S, id) {
+  const cfg = screenEffective(S, id);
+  let level = cfg.level | 0;
+  if (cfg.uuid && S.people[cfg.uuid]) level = S.people[cfg.uuid].level | 0;
+  const viewer = { id: "display", name: "ÉCRAN", level, role: "Écran", job: "", group: "", team: "aucune", tags: [], admin: false };
+  const v = viewFor(S, viewer, null);
+  for (const p of Object.values(v.people)) { p.vitals = null; p.room = null; }
+  if (cfg.mode === "page" && !v.me.pages.includes(cfg.page)) Object.assign(cfg, { mode: "status", denied: true });
+  const sc = S.screens || screensEmpty();
+  v.display = { id, cfg, screen: sc.list[id] || null, name: (sc.meta[id] || {}).name || id };
+  v.me.perms = Object.fromEntries(Object.keys(v.me.perms).map(k => [k, false]));
+  return v;
 }
 /* Simulation du saut en démo / sans mod. */
 function navSimulate(S, now) {
@@ -793,6 +865,24 @@ function apply(state, actor, a, ctx = {}) {
         state.nav.fuelMode = mode; if (mode === "manual") state.nav.fuel = value;
         cmds.push({ type: "nav.fuel", mode, value }); log(state, "ORDINATEUR", mode === "manual" ? `fixe le carburant à ${value} g.` : "calcule le carburant sur les cuves.", "admin", now); break;
       }
+      case "admin.screen.set": case "admin.screen.reset": case "admin.screen.meta": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const sc = state.screens || (state.screens = screensEmpty());
+        const ids = (Array.isArray(a.ids) ? a.ids : []).map(x => clean(x, 24)).filter(Boolean).slice(0, 500);
+        const grp = a.group ? clean(a.group, 40) : null;
+        if (a.type === "admin.screen.set") {
+          const cfg = cleanScreenCfg(a.cfg);
+          if (grp && !ids.length) sc.groups[grp] = cfg; else for (const id of ids) sc.cfg[id] = cfg;
+          L(`règle ${grp && !ids.length ? "le groupe d’écrans « " + grp + " »" : ids.length + " écran(s)"} : ${SCREEN_MODES[cfg.mode].toLowerCase()}${cfg.page ? " · " + PAGES[cfg.page] : ""}.`, "admin");
+        } else if (a.type === "admin.screen.reset") {
+          if (a.all) { sc.cfg = {}; sc.groups = {}; L("remet tous les écrans par défaut.", "admin"); }
+          else if (grp && !ids.length) { delete sc.groups[grp]; for (const [id, m] of Object.entries(sc.meta)) if (m.group === grp) delete sc.cfg[id]; L(`remet le groupe d’écrans « ${grp} » par défaut.`, "admin"); }
+          else { for (const id of ids) delete sc.cfg[id]; L(`remet ${ids.length} écran(s) par défaut.`, "admin"); }
+        } else {
+          for (const id of ids) { const m = sc.meta[id] || (sc.meta[id] = {}); if (a.name !== undefined) m.name = clean(a.name, 40); if (a.group !== undefined) m.group = grp || ""; }
+        }
+        break;
+      }
       case "admin.nav.system.save": case "admin.nav.system.delete": case "admin.nav.planet.save": case "admin.nav.planet.delete":
       case "admin.nav.field.save": case "admin.nav.field.delete": case "admin.nav.rules": case "admin.nav.catalog": case "admin.nav.reset": {
         if (!actor.admin) throw new Error("Réservé au poste admin.");
@@ -1051,6 +1141,11 @@ function seedDemo(now = Date.now()) {
     { id: "f3", key: "fuel.leak", target: { kind: "ship" }, silent: true, active: true, t: now - 900000 }
   ];
   s.stocks = { fuel: 81, water: 74, food: 68, o2: 88, parts: 42 };
+  s.screens = screensEmpty();
+  [["SCR-4A1C", "screen", 4, 2, 120, 66, -8], ["SCR-7B20", "flatscreen", 2, 1, 132, 66, -4], ["SCR-90D3", "transparent", 3, 2, 104, 67, 2], ["SCR-B2E8", "flatscreen", 1, 1, 60, 66, 0]].forEach(([id, type, w, h, x, y, z]) => { s.screens.list[id] = { id, type, dim: "minecraft:overworld", x, y, z, w, h, relay: null, override: null, seen: now }; });
+  s.screens.meta = { "SCR-4A1C": { name: "Passerelle · grand écran", group: "Passerelle" }, "SCR-7B20": { name: "Passerelle · console", group: "Passerelle" }, "SCR-90D3": { name: "Hublot navigation", group: "" }, "SCR-B2E8": { name: "Cantine", group: "Habitat" } };
+  s.screens.groups = { Passerelle: { mode: "page", page: "starmap", level: 1 } };
+  s.screens.cfg = { "SCR-B2E8": { mode: "text", text: "Repas servi de 12 h à 14 h.\nPensez à badger.", size: 3, color: "#62e6f2" } };
   s.nav = navEmpty(); s.nav.system = "rex_magna_1"; s.nav.fuel = 14.5; s.nav.tanks = 3;
   s.nav.comlinks = [
     { id: "COM-1A2F", name: "Navette Hirondelle", dim: "minecraft:overworld", x: 640, y: 120, z: -310, seen: now, shuttle: true },
@@ -1067,7 +1162,7 @@ function seedDemo(now = Date.now()) {
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSystem, navDistance, navReach, applyNav, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
 </script>
 <script>
@@ -1083,11 +1178,14 @@ let V = null, OFF = 0, LINK = "demo", DEMO = null, MODFEED = [];
 /* Adresse de l'ordinateur de bord (Worker). La console peut être hébergée ailleurs (GitHub Pages) : elle s'y connecte à distance. */
 const API = (Q.get("api") || (/workers\.dev$|^localhost|^127\.0\.0\.1/.test(location.hostname) ? location.origin : "https://rebirthproject.refugeemeraudien-direction.workers.dev")).replace(/\/+$/, "");
 const now = () => Date.now() + OFF;
+/* Écran en jeu : ?screen=ID (lecture seule). Le fond devient transparent pour les écrans transparents. */
+const SCREEN = (Q.get("screen") || "").slice(0, 24);
+const SCREEN_Q = SCREEN ? "&screen=" + encodeURIComponent(SCREEN) : "";
 
 function makeDemo() {
   const S = MC.seedDemo();
   const d = { S, actor: "p-vasseur", term: "" };
-  d.view = () => MC.viewFor(S, S.people[d.actor], d.term || null);
+  d.view = () => SCREEN ? MC.displayView(S, SCREEN) : MC.viewFor(S, S.people[d.actor], d.term || null);
   d.send = (a) => {
     const r = MC.apply(S, S.people[d.actor], a, { now: Date.now(), term: d.term || null });
     if (r.ok) r.cmds.forEach(c => MODFEED.unshift({ t: Date.now(), c }));
@@ -1102,8 +1200,8 @@ function makeDemo() {
 function makeRemote(token) {
   const R = { token, ws: null, pend: new Map(), seq: 1, retry: 0 };
   const open = async () => {
-    try { const chk = await fetch(API + "/api/state?t=" + encodeURIComponent(token)); if (chk.status === 401 || chk.status === 403) { const j = await chk.json().catch(() => ({})); try { sessionStorage.removeItem("meridian.t"); } catch {} document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">ACCÈS REFUSÉ</p><p class="mu">${esc(j.error || "Session invalide.")}</p></div></div>`; return; } } catch {}
-    const ws = R.ws = new WebSocket(API.replace(/^http/, "ws") + "/api/ws?t=" + encodeURIComponent(token));
+    try { const chk = await fetch(API + "/api/state?t=" + encodeURIComponent(token) + SCREEN_Q); if (chk.status === 401 || chk.status === 403) { const j = await chk.json().catch(() => ({})); try { sessionStorage.removeItem("meridian.t"); } catch {} document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">ACCÈS REFUSÉ</p><p class="mu">${esc(j.error || "Session invalide.")}</p></div></div>`; return; } } catch {}
+    const ws = R.ws = new WebSocket(API.replace(/^http/, "ws") + "/api/ws?t=" + encodeURIComponent(token) + SCREEN_Q);
     ws.onopen = () => { R.retry = 0; LINK = "live"; renderChrome(); };
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
@@ -1140,6 +1238,10 @@ async function boot() {
    État de l'interface
    ===================================================================== */
 const ui = { page: "overview", deck: null, room: null, door: null, person: null, sec: null, crewF: "all", logF: "all", q: {}, atF: "all", draft: null, planet: null, field: null, comlink: null, system: null };
+/* Page affichée dans l'adresse (#page) : l'ordinateur en jeu la lit pour la recopie sur les écrans. */
+{ const h = location.hash.replace(/^#/, ""); if (h && MC.PAGES[h]) ui.page = h; }
+let lastHash = "";
+function syncHash() { if (SCREEN || ui.page === lastHash) return; lastHash = ui.page; try { history.replaceState(null, "", location.pathname + location.search + "#" + ui.page); } catch {} }
 function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
 
 function act(action, ok) {
@@ -1200,6 +1302,8 @@ function renderChrome() {
 
 function render() {
   if (!V) return renderChrome();
+  if (V.display) return renderDisplay();
+  syncHash();
   const app = document.getElementById("app");
   const snap = snapshotForm();
   if (!V.me) { app.innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">IDENTITÉ INCONNUE DU REGISTRE</p><p class="mu">Reconnectez-vous depuis un terminal du vaisseau.</p></div></div>`; return; }
@@ -1792,7 +1896,6 @@ PAGE.galaxy = () => {
   return `${jumpBanner()}<div class="grid g-2b"><div class="stack">${panel("Carte interstellaire", "NAV.GAL", `<div class="svgw">${galaxyMap()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st" style="color:var(--cy)">Vaisseau</span><span class="st ok">Atteignable</span><span class="st gone">Hors de portée</span></div><p class="note" style="text-align:center;margin-inline:auto">Cercle pointillé : saut maximal. Disque vert : portée avec l’antimatière à bord. Les systèmes très lointains sont indiqués au bord de la carte avec leur distance.</p>`)}</div><div class="stack">${side}</div></div>`;
 };
 
-PAGE.screens = PAGE.screens || (() => panel("Écrans", "SCR", `<p class="empty">Aucun écran enregistré.</p>`));
 
 Object.assign(FN, {
   selPlanet(el) { ui.planet = el.dataset.arg; ui.field = null; ui.comlink = null; render(); },
@@ -1845,6 +1948,83 @@ function readInfos() {
 }
 
 /* =====================================================================
+   Écrans en jeu : rendu kiosque et page d'administration
+   ===================================================================== */
+function renderDisplay() {
+  const D = V.display, c = D.cfg || { mode: "status" }, glass = !!(D.screen && D.screen.type === "transparent");
+  document.body.classList.add("kiosk"); document.body.classList.toggle("glass", glass); document.documentElement.classList.toggle("glass", glass);
+  const app = document.getElementById("app");
+  const alerts = (V.alerts || []).filter(a => !a.ack), crit = alerts.filter(a => a.lvl === "crit");
+  const n = V.nav, sys = n && MC.navSystem(n.catalog, n.system);
+  const head = `<div class="khead"><b>MERIDIAN</b><span>${esc(V.ship.name.toUpperCase())}</span><span class="sp" style="flex:1"></span><span data-clock>${fmtT(now())}</span></div>`;
+  let body;
+  if (c.mode === "text") body = `<div class="ktext" style="color:${esc(c.color || "var(--cy)")};font-size:${(c.size || 3) * 2.6}vh">${esc(c.text || "")}</div>`;
+  else if (c.mode === "url") body = c.url ? `<iframe src="${esc(c.url)}" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>` : `<div class="ktext mu">Adresse non définie</div>`;
+  else if (c.mode === "page" && PAGE[c.page]) {
+    const keep = ui.page; ui.page = c.page;
+    let inner = ""; try { inner = PAGE[c.page](); } catch (e) { inner = `<p class="empty">${esc(e.message)}</p>`; }
+    ui.page = keep;
+    body = `${head.replace('<span class="sp"', `<span>· ${esc(MC.PAGES[c.page].toUpperCase())}</span><span class="sp"`)}<div class="kbody"><main>${inner}</main></div>`;
+  } else {
+    const jump = n && n.jump ? (() => { const to = MC.navSystem(n.catalog, n.jump.to), end = n.jump.startAt + MC.JUMP_INTRO_MS + n.jump.seconds * 1000; return `<span class="chip warn">HYPERESPACE → ${esc(to ? to.name : n.jump.to)} · <span data-cd="${end}">${Math.max(0, Math.ceil((end - now()) / 1000))}</span> s</span>`; })() : "";
+    body = `<div class="kstat"><div><div class="big">${esc(V.ship.name.toUpperCase())}</div><div class="sub">${sys ? "SYSTÈME " + esc(sys.name.toUpperCase()) : ""}</div></div><div class="clk" data-clock>${fmtT(now())}</div><div class="row">${V.ship.alert ? `<span class="chip crit">ALERTE ${esc(V.ship.alert.toUpperCase())}</span>` : crit.length ? `<span class="chip crit">${crit.length} ALARME(S) CRITIQUE(S)</span>` : alerts.length ? `<span class="chip warn">${alerts.length} ALARME(S)</span>` : `<span class="chip ok">NOMINAL</span>`}${jump}</div>${c.denied ? `<div class="sub" style="font-size:1.8vh">Page non autorisée à ce niveau d’accès</div>` : ""}</div>`;
+  }
+  app.innerHTML = `<div class="kio">${c.mode === "page" ? body : (c.mode === "status" ? "" : head) + body}</div>`;
+}
+
+const scrEff = (id) => MC.screenEffective(V, id);
+const scrMeta = (id) => (V.screens.meta || {})[id] || {};
+const scrDesc = (c) => c.mode === "page" ? `${MC.PAGES[c.page] || c.page}${c.uuid ? " · recopie" : c.level ? " · niv. " + c.level : ""}` : c.mode === "text" ? "« " + String(c.text || "").split("\n")[0].slice(0, 40) + " »" : c.mode === "url" ? (c.url || "—") : "État du vaisseau";
+const SRC = { relay: ["Relais en jeu", "amb"], screen: ["Réglage de l’écran", "cy"], group: ["Groupe", "ok"], default: ["Par défaut", "dim"] };
+PAGE.screens = () => {
+  if (!V.screens) return panel("Écrans", "SCR", `<p class="empty">Réservé au poste admin.</p>`);
+  const sc = V.screens, list = Object.values(sc.list || {}).sort((a, b) => a.id.localeCompare(b.id));
+  ui.scrSel = (ui.scrSel || []).filter(id => sc.list[id]);
+  const groups = [...new Set(Object.values(sc.meta || {}).map(m => m.group).filter(Boolean).concat(Object.keys(sc.groups || {})))].sort();
+  const q = (ui.q.scr || "").toLowerCase();
+  const rows = list.filter(s => !q || (s.id + " " + (scrMeta(s.id).name || "") + " " + (scrMeta(s.id).group || "")).toLowerCase().includes(q)).map(s => {
+    const m = scrMeta(s.id), e = scrEff(s.id), [srcL, srcC] = SRC[e.src] || SRC.default, on = ui.scrSel.includes(s.id);
+    return `<tr${on ? ' class="sel"' : ""}><td><input type="checkbox" data-fn="scrPick" data-arg="${esc(s.id)}"${on ? " checked" : ""} aria-label="Sélectionner ${esc(s.id)}"></td><td class="m cy">${esc(s.id)}</td><td>${esc(m.name || "—")}<div class="mu" style="font-size:12px">${esc(MC.SCREEN_TYPES[s.type])} · ${s.w}×${s.h}</div></td><td>${m.group ? `<span class="pill">${esc(m.group)}</span>` : `<span class="dim">—</span>`}</td><td>${esc(MC.SCREEN_MODES[e.mode])}<div class="mu" style="font-size:12px">${esc(scrDesc(e))}</div></td><td><span class="${srcC}" style="font-size:12px">${srcL}</span></td><td style="text-align:right">${btn("Nommer", null, { fn: "scrMeta", arg: s.id, cls: "sm ghost" })}</td></tr>`;
+  }).join("");
+  const sel = ui.scrSel.length;
+  const tools = `<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><input type="search" data-fn="q" data-arg="scr" placeholder="Rechercher un écran (identifiant, nom, groupe)" value="${esc(ui.q.scr || "")}" style="flex:1 1 220px"><span class="mu" style="font-size:12px">${sel} sélectionné(s)</span>${btn("Tout sélectionner", null, { fn: "scrAll", cls: "sm ghost" })}${btn("Régler la sélection", null, { fn: "scrSet", arg: "", cls: "sm", disabled: !sel })}${btn("Remettre par défaut", null, { fn: "scrReset", cls: "sm ghost", disabled: !sel })}</div>`;
+  const table = list.length ? `<div class="tw"><table><thead><tr><th></th><th>ID</th><th>Nom</th><th>Groupe</th><th>Affiche</th><th>Source</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="empty">Aucun écran posé. Les blocs « écran », « écran plat » et « écran transparent » apparaissent ici dès que le mod est connecté.</p>`;
+  const gp = groups.map(g => { const c = (sc.groups || {})[g], nb = list.filter(s => scrMeta(s.id).group === g).length; return `<div class="vrow"><div style="min-width:0"><b style="font-weight:600">${esc(g)}</b> <span class="mu" style="font-size:12px">${nb} écran(s)</span><div class="mu" style="font-size:12px">${c ? esc(MC.SCREEN_MODES[c.mode] + " · " + scrDesc(c)) : "aucun réglage de groupe"}</div></div><span class="row" style="gap:6px">${btn("Régler", null, { fn: "scrSet", arg: "g:" + g, cls: "sm" })}${c ? btn("Défaut", { type: "admin.screen.reset", group: g }, { cls: "sm ghost", confirm: `Remettre le groupe ${g} par défaut ?` }) : ""}</span></div>`; }).join("") || `<p class="empty">Donnez un groupe aux écrans avec « Nommer » pour les régler ensemble.</p>`;
+  const help = `<p class="note" style="margin-top:0">Ordre de priorité : <b class="amb">relais en jeu</b> (ordinateur en recopie ou écran précis), puis <b class="cy">réglage de l’écran</b>, puis <b class="okc">groupe</b>, puis l’écran d’état par défaut.</p><p class="note">Un relais en mode « par défaut » laisse s’afficher votre réglage.</p><div class="btns">${btn("Tout remettre par défaut", { type: "admin.screen.reset", all: true }, { cls: "sm red", confirm: "Effacer les réglages de tous les écrans et de tous les groupes ?" })}</div>`;
+  return `<div class="grid g-2b"><div class="stack">${panel("Écrans du vaisseau", "SCR." + list.length, tools + table)}</div><div class="stack">${panel("Groupes", "GRP." + groups.length, gp)}${panel("Fonctionnement", "AIDE", help)}</div></div>`;
+};
+Object.assign(FN, {
+  scrPick(el) { const id = el.dataset.arg, s = ui.scrSel || (ui.scrSel = []); const i = s.indexOf(id); if (i < 0) s.push(id); else s.splice(i, 1); render(); },
+  scrAll() { const all = Object.keys(V.screens.list || {}); ui.scrSel = (ui.scrSel || []).length === all.length ? [] : all; render(); },
+  scrReset() { act({ type: "admin.screen.reset", ids: ui.scrSel }, "Écrans remis par défaut."); },
+  scrMeta(el) {
+    const id = el.dataset.arg, m = scrMeta(id), groups = [...new Set(Object.values(V.screens.meta || {}).map(x => x.group).filter(Boolean))];
+    openModal(() => `<h3>Écran ${esc(id)}</h3><label class="f">Nom<input type="text" id="sm-n" maxlength="40" value="${esc(m.name || "")}" placeholder="Passerelle · grand écran"></label><label class="f">Groupe<input type="text" id="sm-g" maxlength="40" list="sm-gl" value="${esc(m.group || "")}" placeholder="aucun"><datalist id="sm-gl">${groups.map(g => `<option value="${esc(g)}">`).join("")}</datalist></label>${mfoot()}`,
+      () => { act({ type: "admin.screen.meta", ids: [id], name: val("sm-n"), group: val("sm-g") }, "Écran enregistré."); return true; });
+  },
+  scrSet(el) {
+    const arg = el.dataset.arg || "", group = arg.startsWith("g:") ? arg.slice(2) : null, ids = group ? [] : ui.scrSel.slice();
+    const cur = group ? (V.screens.groups || {})[group] : ids.length === 1 ? (V.screens.cfg || {})[ids[0]] : null;
+    ui.draft = { scr: Object.assign({ mode: "status", page: "overview", level: 1, text: "", size: 3, color: "#62e6f2", url: "" }, cur || {}) };
+    const pages = Object.keys(MC.PAGES).filter(p => !MC.ADMIN_PAGES.includes(p));
+    openModal(() => { const d = ui.draft.scr; return `<h3>${group ? "Groupe « " + esc(group) + " »" : ids.length + " écran(s)"}</h3><label class="f">Affichage<select id="ss-m" data-fn="scrMode">${Object.entries(MC.SCREEN_MODES).map(([k, v]) => `<option value="${k}"${d.mode === k ? " selected" : ""}>${v}</option>`).join("")}</select></label>` +
+      (d.mode === "page" ? `<div class="f2"><label class="f">Page<select id="ss-p">${pages.map(p => `<option value="${p}"${d.page === p ? " selected" : ""}>${esc(MC.PAGES[p])}</option>`).join("")}</select></label><label class="f">Niveau d’accès affiché<input type="number" id="ss-l" min="0" max="7" value="${d.level | 0}"></label></div><p class="note">L’écran montre la page telle qu’une personne de ce niveau la voit, en lecture seule.</p>` : "") +
+      (d.mode === "text" ? `<label class="f">Texte<textarea id="ss-t" rows="4" maxlength="600">${esc(d.text)}</textarea></label><div class="f2"><label class="f">Taille (1 à 5)<input type="number" id="ss-s" min="1" max="5" value="${d.size || 3}"></label><label class="f">Couleur<input type="color" id="ss-c" value="${esc(d.color || "#62e6f2")}"></label></div>` : "") +
+      (d.mode === "url" ? `<label class="f">Adresse (https)<input type="url" id="ss-u" value="${esc(d.url || "")}" placeholder="https://…"></label><p class="note">Certains sites refusent d’être affichés dans un autre site.</p>` : "") + mfoot(); },
+      () => { readScr(); act({ type: "admin.screen.set", ids, group, cfg: ui.draft.scr }, "Écrans réglés."); return true; });
+  },
+  scrMode(el) { readScr(); ui.draft.scr.mode = el.value; drawModal(); }
+});
+function readScr() {
+  const d = ui.draft && ui.draft.scr; if (!d) return;
+  const g = (id) => document.getElementById(id);
+  if (g("ss-m")) d.mode = g("ss-m").value;
+  if (g("ss-p")) { d.page = g("ss-p").value; d.level = +g("ss-l").value || 0; }
+  if (g("ss-t")) { d.text = g("ss-t").value; d.size = +g("ss-s").value || 3; d.color = g("ss-c").value; }
+  if (g("ss-u")) d.url = g("ss-u").value;
+}
+
+/* =====================================================================
    Événements
    ===================================================================== */
 document.addEventListener("click", (e) => {
@@ -1874,8 +2054,8 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("change", (e) => {
   const el = e.target;
-  if (el.closest("#modal")) return;
-  if (el.dataset.fn && FN[el.dataset.fn] && (el.tagName === "SELECT" || el.type === "range")) FN[el.dataset.fn](el);
+  if (el.closest("#modal") && el.dataset.fn !== "scrMode") return;
+  if (el.dataset.fn && FN[el.dataset.fn] && (el.tagName === "SELECT" || el.type === "range" || el.type === "checkbox")) FN[el.dataset.fn](el);
 });
 let qTimer = null;
 document.addEventListener("input", (e) => { const el = e.target; if (el.dataset.fn === "q") { clearTimeout(qTimer); qTimer = setTimeout(() => FN.q(el), 180); } });
