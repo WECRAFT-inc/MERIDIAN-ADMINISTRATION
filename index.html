@@ -1206,6 +1206,7 @@ function makeRemote(token) {
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "state") update(m.state, m.now);
+      if (m.type === "hull") { setHull(m.hull); if (V) render(); }
       if (m.type === "result" && R.pend.has(m.reqId)) { R.pend.get(m.reqId)(m); R.pend.delete(m.reqId); }
     };
     ws.onclose = (ev) => { LINK = "lost"; renderChrome(); if (ev.code === 1008) return; setTimeout(open, Math.min(15000, 800 * 2 ** R.retry++)); };
@@ -1231,7 +1232,7 @@ async function boot() {
   }
   const token = Q.get("t") || ss.get("meridian.t");
   if (token && location.protocol.startsWith("http") && !/claude|claudeusercontent/.test(location.host)) { LINK = "lost"; T = makeRemote(token); renderChrome(); }
-  else { DEMO = T = makeDemo(); update(DEMO.view(), Date.now()); }
+  else { DEMO = T = makeDemo(); update(DEMO.view(), Date.now()); if (!SCREEN && Q.get("hull") !== "0") { setHull(demoHull()); render(); } }
 }
 
 /* =====================================================================
@@ -1351,6 +1352,137 @@ function restoreForm(o) {
   if (o.focus) { const el = document.getElementById(o.focus); if (el) { el.focus(); if (o.sel) try { el.setSelectionRange(o.sel[0], o.sel[1]); } catch {} } }
 }
 
+/* ---------------------------- Forme réelle (scan de coque) ----------------------------
+   Le mod envoie une vue de dessus, une vue de profil et une silhouette par pont, en codage par plages.
+   Le grand axe du vaisseau est toujours affiché à l'horizontale. */
+let HULL = null;
+function unrle(b64, n) {
+  const bin = atob(b64 || ""), out = new Uint8Array(n);
+  let o = 0;
+  for (let i = 0; i + 1 < bin.length && o < n; i += 2) { const run = bin.charCodeAt(i), v = bin.charCodeAt(i + 1); out.fill(v, o, Math.min(n, o + run)); o += run; }
+  return out;
+}
+function hexRgb(h) { const n = parseInt(String(h).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function setHull(h) {
+  if (!h || !h.w || !h.d) { HULL = null; return; }
+  const n = h.w * h.d, L = h.axis === "x" ? h.w : h.d;
+  HULL = Object.assign({}, h, {
+    rot: h.axis === "z", pal: (h.palette || []).map(hexRgb),
+    tc: unrle(h.top.col, n), ty: unrle(h.top.y, n), sc: unrle(h.side.col, L * h.h), sd: unrle(h.side.depth, L * h.h),
+    dk: (h.decks || []).map(d => ({ y0: d.y0, y1: d.y1, occ: d.occ, m: null })), url: {}
+  });
+}
+/* Passage monde → plan (u à droite, v vers le bas). Vaisseau orienté nord-sud : quart de tour. */
+const hullP = (x, z) => HULL && HULL.rot ? [z, -x] : [x, z];
+const HULL_TF = () => HULL && HULL.rot ? ` transform="matrix(0 -1 1 0 0 0)"` : "";
+function hullCanvas(w, h, px) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"), im = g.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const p = px(x, y); if (!p) continue; const k = (y * w + x) * 4; im.data[k] = p[0]; im.data[k + 1] = p[1]; im.data[k + 2] = p[2]; im.data[k + 3] = p[3] ?? 255; }
+  g.putImageData(im, 0, 0);
+  return c.toDataURL();
+}
+function hullTopUrl() {
+  const H = HULL; if (H.url.top) return H.url.top;
+  return H.url.top = hullCanvas(H.w, H.d, (x, z) => {
+    const i = x + z * H.w, c = H.tc[i]; if (!c) return null;
+    const base = H.pal[c - 1] || [170, 180, 190], k = 0.5 + 0.5 * (H.ty[i] / Math.max(1, H.h));
+    return [base[0] * k, base[1] * k, base[2] * k];
+  });
+}
+function hullSideUrl() {
+  const H = HULL; if (H.url.side) return H.url.side;
+  const L = H.axis === "x" ? H.w : H.d;
+  return H.url.side = hullCanvas(L, H.h, (l, row) => {
+    const i = l + (H.h - 1 - row) * L, c = H.sc[i]; if (!c) return null;
+    const base = H.pal[c - 1] || [170, 180, 190], k = 1.05 - 0.55 * (H.sd[i] / 255);
+    return [base[0] * k, base[1] * k, base[2] * k];
+  });
+}
+/* Silhouette d'un pont : réunion des tranches scannées entre y0 et y1. */
+function hullDeckUrl(y0, y1) {
+  const H = HULL, key = "d" + y0 + "_" + y1; if (H.url[key] !== undefined) return H.url[key];
+  const n = H.w * H.d, occ = new Uint8Array(n); let any = false;
+  for (const d of H.dk) if (d.y1 >= y0 && d.y0 <= y1) { if (!d.m) d.m = unrle(d.occ, n); for (let i = 0; i < n; i++) if (d.m[i]) { occ[i] = 1; any = true; } }
+  if (!any) return H.url[key] = null;
+  // Contour plus clair que l'intérieur, pour lire la forme de la coque.
+  return H.url[key] = hullCanvas(H.w, H.d, (x, z) => {
+    const i = x + z * H.w; if (!occ[i]) return null;
+    const edge = x === 0 || z === 0 || x === H.w - 1 || z === H.d - 1 || !occ[i - 1] || !occ[i + 1] || !occ[i - H.w] || !occ[i + H.w];
+    return edge ? [98, 230, 242, 200] : [98, 230, 242, 34];
+  });
+}
+/* Image posée sur son emprise dans le monde (x0..x1+1, z0..z1+1), tournée avec le plan. */
+function hullImage(url, extra = "") {
+  const H = HULL;
+  return `<g${HULL_TF()}><image href="${url}" x="${H.x0}" y="${H.z0}" width="${H.w * H.r}" height="${H.d * H.r}" preserveAspectRatio="none" style="image-rendering:pixelated"${extra}/></g>`;
+}
+/* Emprise du vaisseau sur le plan (coordonnées u, v). */
+function hullBox() {
+  const H = HULL, a = hullP(H.x0, H.z0), b = hullP(H.x0 + H.w * H.r, H.z0 + H.d * H.r);
+  return { u0: Math.min(a[0], b[0]), v0: Math.min(a[1], b[1]), u1: Math.max(a[0], b[0]), v1: Math.max(a[1], b[1]) };
+}
+const hullDecks = () => V.decks.filter(d => d.kind !== "ring" && d.y0 != null && !String(d.id).includes("/") && d.y1 >= HULL.y0 && d.y0 <= HULL.y1);
+
+/* Vue d'ensemble : dessus + profil découpé en ponts. */
+function hullSchematic() {
+  const H = HULL, B = hullBox(), W = B.u1 - B.u0, top = B.v1 - B.v0, Hy = (H.y1 - H.y0 + 1), gap = Math.max(W * 0.05, 12);
+  const fs = Math.max(4, W / 48), lab = fs * 6, sideV = B.v1 + gap * 1.4, L = H.axis === "x" ? H.w : H.d;
+  let g = `<defs><pattern id="hgrid" width="${fs * 4}" height="${fs * 4}" patternUnits="userSpaceOnUse"><path d="M${fs * 4} 0H0V${fs * 4}" fill="none" stroke="var(--ln)" stroke-width="${fs * .05}"/></pattern></defs>`;
+  g += `<rect x="${B.u0 - lab}" y="${B.v0 - gap}" width="${W + lab + gap}" height="${top + Hy + gap * 3.4}" fill="url(#hgrid)"/>`;
+  g += `<text x="${B.u0 - lab + fs * .3}" y="${B.v0 - gap * .35}" fill="var(--dim)" font-size="${fs * .8}" font-family="IBM Plex Mono,monospace" letter-spacing="${fs * .1}">VUE DE DESSUS</text>`;
+  g += hullImage(hullTopUrl());
+  // Pièces : un point par compartiment, couleur d'état.
+  for (const r of Object.values(V.rooms)) {
+    const d = V.decks.find(x => x.id === r.deck); if (!d || d.kind === "ring" || String(d.id).includes("/") || !r.rects || !r.rects.length) continue;
+    const big = r.rects.reduce((m, q) => (Math.abs(q[2] - q[0]) * Math.abs(q[3] - q[1]) > Math.abs(m[2] - m[0]) * Math.abs(m[3] - m[1]) ? q : m), r.rects[0]);
+    const [u, v] = hullP((big[0] + big[2]) / 2, (big[1] + big[3]) / 2), s = rs(r);
+    if (s === "ok" && ui.room !== r.id) continue;
+    g += `<circle class="hit" data-room="${esc(r.id)}" data-deck="${esc(d.id)}" cx="${u}" cy="${v}" r="${fs * .55}" fill="${COL[s]}" stroke="${ui.room === r.id ? "#fff" : "var(--bg)"}" stroke-width="${fs * .15}"><title>${esc(r.name)} · ${ST[s]}</title></circle>`;
+  }
+  // Profil
+  g += `<text x="${B.u0 - lab + fs * .3}" y="${sideV - gap * .35}" fill="var(--dim)" font-size="${fs * .8}" font-family="IBM Plex Mono,monospace" letter-spacing="${fs * .1}">PROFIL · PONTS</text>`;
+  g += `<image href="${hullSideUrl()}" x="${B.u0}" y="${sideV}" width="${L * H.r}" height="${H.h * H.r}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+  const vy = (y) => sideV + (H.y0 + H.h * H.r - y);
+  for (const d of hullDecks()) {
+    const s = deckStatus(d.id), sel = ui.deck === d.id && ui.page === "plan", ya = vy(d.y1 + 1), yb = vy(d.y0);
+    g += `<g class="hit" data-deck="${esc(d.id)}"><rect x="${B.u0 - lab}" y="${ya}" width="${W + lab}" height="${yb - ya}" fill="${COL[s]}" fill-opacity="${s === "ok" ? .06 : .3}" stroke="${sel ? "#fff" : COL[s]}" stroke-opacity="${sel ? .9 : .35}" stroke-width="${fs * .08}"/>`;
+    g += `<text x="${B.u0 - lab + fs * .4}" y="${(ya + yb) / 2 + fs * .35}" fill="${s === "ok" ? "var(--tx)" : COL[s]}" font-size="${Math.min(fs, (yb - ya) * .8)}" font-family="IBM Plex Mono,monospace">${esc(d.id)}</text><title>${esc(d.name)} · ${ST[s] || ""}</title></g>`;
+  }
+  const scale = niceStep(W);
+  g += `<g font-family="IBM Plex Mono,monospace" font-size="${fs * .7}" fill="var(--dim)"><line x1="${B.u1 - scale}" y1="${vy(H.y0) + gap * .8}" x2="${B.u1}" y2="${vy(H.y0) + gap * .8}" stroke="var(--mu)" stroke-width="${fs * .12}"/><text x="${B.u1}" y="${vy(H.y0) + gap * .8 - fs * .4}" text-anchor="end">${scale} blocs</text></g>`;
+  return `<svg viewBox="${B.u0 - lab} ${B.v0 - gap} ${W + lab + gap} ${top + Hy + gap * 3.4}" role="img" aria-label="Forme réelle du vaisseau : vue de dessus et profil par ponts">${g}</svg>`;
+}
+
+/* Démo : coque de synthèse (corps, trois anneaux, deux nacelles) autour des pièces de démonstration. */
+function demoHull() {
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9, yA = 1e9, yB = -1e9;
+  for (const r of Object.values(V.rooms)) for (const q of r.rects || []) { x0 = Math.min(x0, q[0], q[2]); x1 = Math.max(x1, q[0], q[2]); z0 = Math.min(z0, q[1], q[3]); z1 = Math.max(z1, q[1], q[3]); }
+  for (const d of V.decks) if (d.y0 != null && d.kind !== "ring") { yA = Math.min(yA, d.y0); yB = Math.max(yB, d.y1); }
+  if (x0 > x1 || yA > yB) return null;
+  const X0 = x0 - 40, X1 = x1 + 60, cz = (z0 + z1) / 2, hw = (z1 - z0) / 2 + 10, Y0 = yA - 6, Y1 = yB + 14, cy = (Y0 + Y1) / 2;
+  const r = 1, W = X1 - X0 + 1, D = Math.ceil(hw * 2 + 50), Z0 = Math.floor(cz - D / 2), Hh = Y1 - Y0 + 1;
+  const solid = (x, y, z) => {
+    const t = (x - X0) / (X1 - X0), w = hw * (t > .82 ? 1 - (t - .82) / .18 * .7 : 1), hy = (Y1 - Y0) / 2 * (t > .82 ? 1 - (t - .82) / .18 * .5 : 1);
+    if (t < .32 || t > .62) return Math.abs(z - cz) < w && Math.abs(y - cy) < hy;
+    if (Math.abs(z - cz) < 6 && Math.abs(y - cy) < 6) return true;
+    for (const k of [.38, .47, .56]) { const rx = X0 + k * (X1 - X0); if (Math.abs(x - rx) < 5) { const d = Math.hypot(z - cz, y - cy); if (d < hw + 22 && d > hw + 8) return true; } }
+    return false;
+  };
+  const pal = ["#c8cdd2", "#7d858c", "#3b4248", "#5ad0e0"], tc = new Uint8Array(W * D), ty = new Uint8Array(W * D), sc = new Uint8Array(W * Hh), sd = new Uint8Array(W * Hh), decks = {};
+  for (let x = X0; x <= X1; x++) for (let z = Z0; z < Z0 + D; z++) for (let y = Y0; y <= Y1; y++) {
+    if (!solid(x, y, z)) continue;
+    const i = (x - X0) + (z - Z0) * W, col = ((x * 7 + z * 3) % 11 < 2) ? 3 : (Math.abs(z - cz) < 3 ? 2 : 1);
+    if (y - Y0 + 1 > ty[i]) { ty[i] = y - Y0 + 1; tc[i] = col; }
+    const s = (x - X0) + (y - Y0) * W, dd = 1 + Math.round((z - Z0) * 254 / D);
+    if (!sd[s] || dd < sd[s]) { sd[s] = dd; sc[s] = col; }
+    const b = Math.floor(y / 16); (decks[b] || (decks[b] = new Uint8Array(W * D)))[i] = 1;
+  }
+  const enc = (a) => { let s = ""; for (let i = 0; i < a.length;) { let n = 1; while (i + n < a.length && a[i + n] === a[i] && n < 255) n++; s += String.fromCharCode(n, a[i]); i += n; } return btoa(s); };
+  return { dim: "minecraft:overworld", x0: X0, y0: Y0, z0: Z0, x1: X1, y1: Y1, z1: Z0 + D - 1, r, w: W, h: Hh, d: D, axis: "x", deckH: 16, palette: pal,
+    top: { col: enc(tc), y: enc(ty) }, side: { col: enc(sc), depth: enc(sd) }, decks: Object.entries(decks).map(([b, m]) => ({ y0: b * 16, y1: b * 16 + 15, occ: enc(m) })) };
+}
+
 /* ---------------------------- Schéma radial ---------------------------- */
 function arcPath(cx, cy, r1, r2, a0, a1) {
   const p = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
@@ -1359,6 +1491,7 @@ function arcPath(cx, cy, r1, r2, a0, a1) {
   return `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r2} ${r2} 0 ${big} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}L${x3.toFixed(1)} ${y3.toFixed(1)}A${r1} ${r1} 0 ${big} 0 ${x4.toFixed(1)} ${y4.toFixed(1)}Z`;
 }
 function schematic() {
+  if (HULL) return hullSchematic();
   const C = 300, rings = V.decks.filter(d => d.kind === "ring"), hulls = V.decks.filter(d => d.kind !== "ring");
   let g = "";
   // décor : graduations
@@ -1394,21 +1527,27 @@ function schematic() {
 /* ---------------------------- Plan d'un pont ---------------------------- */
 function deckPlan(did) {
   const list = roomsOf(did), deck = V.decks.find(d => d.id === did);
-  if (!list.length) return `<p class="empty">Aucune pièce sur ce pont.</p>`;
+  // Coque réelle à la hauteur de ce pont, si le scan la couvre.
+  const hullUrl = HULL && deck && deck.kind !== "ring" && deck.y0 != null && !String(deck.id).includes("/") ? hullDeckUrl(deck.y0, deck.y1) : null;
+  if (!list.length && !hullUrl) return `<p class="empty">Aucune pièce sur ce pont.</p>`;
+  const P = HULL ? hullP : (x, z) => [x, z];
+  const R = ([a, b, c, d]) => { const p = P(a, b), q = P(c, d); return [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])]; };
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
-  list.forEach(r => r.rects.forEach(([a, b, c, d]) => { x0 = Math.min(x0, a, c); z0 = Math.min(z0, b, d); x1 = Math.max(x1, a, c); z1 = Math.max(z1, b, d); }));
+  list.forEach(r => r.rects.forEach(q => { const [a, b, c, d] = R(q); x0 = Math.min(x0, a); z0 = Math.min(z0, b); x1 = Math.max(x1, c); z1 = Math.max(z1, d); }));
+  if (hullUrl) { const B = hullBox(); x0 = Math.min(x0, B.u0); z0 = Math.min(z0, B.v0); x1 = Math.max(x1, B.u1); z1 = Math.max(z1, B.v1); }
   const W = x1 - x0, H = z1 - z0, pad = Math.max(10, W * 0.04), fs = Math.max(4, Math.min(W, H * 3) / 70);
   let g = "";
-  if (deck && deck.kind !== "ring") {
+  if (hullUrl) g += hullImage(hullUrl, ` opacity=".9"`);
+  else if (deck && deck.kind !== "ring") {
     const m = pad * 0.5;
     g += `<path d="M${x0 - m} ${z0 - m}L${x1 + m} ${z0 - m}L${x1 + pad * 1.8} ${(z0 + z1) / 2}L${x1 + m} ${z1 + m}L${x0 - m} ${z1 + m}L${x0 - m - pad * .4} ${z1 - H * .2}L${x0 - m - pad * .4} ${z0 + H * .2}Z" fill="rgba(98,230,242,.025)" stroke="var(--cy2)" stroke-width="${fs * .25}"/>`;
   }
   for (const r of list) {
     const s = rs(r), sel = ui.room === r.id, cor = r.kind === "corridor";
-    for (const [a, b, c, d] of r.rects) g += `<rect class="hit" data-room="${esc(r.id)}" x="${Math.min(a, c)}" y="${Math.min(b, d)}" width="${Math.abs(c - a)}" height="${Math.abs(d - b)}" fill="${COL[s]}" fill-opacity="${cor ? .06 : s === "ok" ? .14 : s === "gone" ? .05 : .45}" stroke="${sel ? "#fff" : COL[s]}" stroke-opacity="${sel ? 1 : .7}" stroke-width="${(sel ? .5 : .25) * fs}"><title>${esc(r.name)} · ${ST[s]}</title></rect>`;
-    const big = r.rects.reduce((m, q) => (Math.abs(q[2] - q[0]) * Math.abs(q[3] - q[1]) > Math.abs(m[2] - m[0]) * Math.abs(m[3] - m[1]) ? q : m), r.rects[0]);
+    for (const q of r.rects) { const [a, b, c, d] = R(q); g += `<rect class="hit" data-room="${esc(r.id)}" x="${a}" y="${b}" width="${c - a}" height="${d - b}" fill="${COL[s]}" fill-opacity="${cor ? .06 : s === "ok" ? .14 : s === "gone" ? .05 : .45}" stroke="${sel ? "#fff" : COL[s]}" stroke-opacity="${sel ? 1 : .7}" stroke-width="${(sel ? .5 : .25) * fs}"><title>${esc(r.name)} · ${ST[s]}</title></rect>`; }
+    const big = r.rects.length ? R(r.rects.reduce((m, q) => (Math.abs(q[2] - q[0]) * Math.abs(q[3] - q[1]) > Math.abs(m[2] - m[0]) * Math.abs(m[3] - m[1]) ? q : m), r.rects[0])) : null;
     if (big && !cor) {
-      const w = Math.abs(big[2] - big[0]), h = Math.abs(big[3] - big[1]), cx = (big[0] + big[2]) / 2, cz = (big[1] + big[3]) / 2;
+      const w = big[2] - big[0], h = big[3] - big[1], cx = (big[0] + big[2]) / 2, cz = (big[1] + big[3]) / 2;
       const vert = h > w * 1.6, max = Math.floor((vert ? h : w) / (fs * .58));
       const label = r.name.length > max ? r.name.slice(0, Math.max(3, max - 1)) + "…" : r.name;
       g += `<text x="${cx}" y="${cz}" fill="var(--tx)" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" pointer-events="none"${vert ? ` transform="rotate(-90 ${cx} ${cz})"` : ""}>${esc(label)}</text>`;
@@ -1416,11 +1555,11 @@ function deckPlan(did) {
     }
   }
   for (const d of Object.values(V.doors).filter(x => x.deck === did)) {
-    const c = d.state.lockdown ? "var(--red)" : d.state.locked ? "var(--amb)" : d.state.open ? "var(--cy)" : "var(--mu)", sz = fs * .9, sel = ui.door === d.id;
-    g += `<rect class="hit" data-door="${esc(d.id)}" x="${d.x - sz / 2}" y="${d.z - sz / 2}" width="${sz}" height="${sz}" fill="${d.state.open ? c : "var(--bg)"}" stroke="${sel ? "#fff" : c}" stroke-width="${fs * .18}"><title>Porte ${esc(d.id)} · ${esc(d.name)}</title></rect>`;
-    g += `<text x="${d.x}" y="${d.z - sz * .9}" fill="${c}" font-size="${fs * .62}" text-anchor="middle" font-family="IBM Plex Mono,monospace" pointer-events="none">${esc(d.id)}</text>`;
+    const c = d.state.lockdown ? "var(--red)" : d.state.locked ? "var(--amb)" : d.state.open ? "var(--cy)" : "var(--mu)", sz = fs * .9, sel = ui.door === d.id, [dx, dz] = P(d.x, d.z);
+    g += `<rect class="hit" data-door="${esc(d.id)}" x="${dx - sz / 2}" y="${dz - sz / 2}" width="${sz}" height="${sz}" fill="${d.state.open ? c : "var(--bg)"}" stroke="${sel ? "#fff" : c}" stroke-width="${fs * .18}"><title>Porte ${esc(d.id)} · ${esc(d.name)}</title></rect>`;
+    g += `<text x="${dx}" y="${dz - sz * .9}" fill="${c}" font-size="${fs * .62}" text-anchor="middle" font-family="IBM Plex Mono,monospace" pointer-events="none">${esc(d.id)}</text>`;
   }
-  const extra = deck && deck.kind !== "ring" ? pad * 2.2 : pad;
+  const extra = deck && deck.kind !== "ring" && !hullUrl ? pad * 2.2 : pad;
   return `<svg viewBox="${x0 - pad} ${z0 - pad} ${W + pad + extra} ${H + pad * 2}" role="img" aria-label="Plan de ${esc(deck ? deck.name : did)}">${g}</svg>`;
 }
 
@@ -1485,7 +1624,7 @@ ${panel("Équipage", "BIO.SCAN", perm("crew.vitals") ? `<div class="tiles"><div 
 ${panel("Alarmes actives", "ALR." + String(alerts.length).padStart(2, "0"), alerts.length ? alerts.slice(0, 8).map(alertRow).join("") + (alerts.length > 8 ? `<p class="note">${alerts.length - 8} de plus dans le journal.</p>` : "") : `<p class="empty">Aucune alarme.</p>`)}
 ${panel("Procédures", "PRC", procs.length ? procs.map(p => procMini(p)).join("") : `<p class="empty">Aucune procédure en cours.</p>`)}
 ${panel("Réserves du bord", "STK", [["Carburant", "fuel"], ["Eau", "water"], ["Vivres", "food"], ["Oxygène en cuves", "o2"], ["Pièces de rechange", "parts"]].map(([l, k]) => { const v = +V.stocks[k] || 0; return `<div class="kv" style="border:0;padding:2px 0"><span>${l}</span><b>${n0(v)} %</b></div>${bar(v, v < 25 ? "crit" : v < 50 ? "warn" : "")}`; }).join(""))}`;
-  return `<div class="grid g-ov"><div class="stack">${left}</div><div class="center">${panel("Plan général · " + V.ship.name, "MAP.OV", `<div class="svgw">${schematic()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px">${Object.entries(ST).map(([k, l]) => `<span class="st ${k}">${l}</span>`).join("")}</div><p class="note" style="text-align:center;margin-inline:auto">Au centre, les ponts de la coque. Autour, de l’intérieur vers l’extérieur : ${V.decks.filter(d => d.kind === "ring").map(d => esc(d.name)).join(" · ") || "aucun anneau"}. Cliquez pour ouvrir un plan.</p>`)}</div><div class="stack">${right}</div></div>`;
+  return `<div class="grid g-ov"><div class="stack">${left}</div><div class="center">${panel("Plan général · " + V.ship.name, "MAP.OV", `<div class="svgw">${schematic()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px">${Object.entries(ST).map(([k, l]) => `<span class="st ${k}">${l}</span>`).join("")}</div><p class="note" style="text-align:center;margin-inline:auto">${HULL ? `Forme scannée ${esc(new Date(HULL.at || Date.now()).toLocaleDateString("fr-FR"))} (1 case = ${HULL.r} bloc${HULL.r > 1 ? "s" : ""}). Les points signalent les pièces en alerte. Cliquez un pont sur le profil pour ouvrir son plan.` : `Au centre, les ponts de la coque. Autour, de l’intérieur vers l’extérieur : ${V.decks.filter(d => d.kind === "ring").map(d => esc(d.name)).join(" · ") || "aucun anneau"}. Cliquez pour ouvrir un plan. Pour la forme réelle : /meridian coque scan.`}</p>`)}</div><div class="stack">${right}</div></div>`;
 };
 function alertRow(a) {
   const c = a.lvl === "crit" ? "var(--red)" : "var(--amb)";
