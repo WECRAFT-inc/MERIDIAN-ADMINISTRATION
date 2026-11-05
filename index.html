@@ -187,6 +187,7 @@ svg .hit:hover{filter:brightness(1.45)}
 .feed div{padding:3px 0;border-bottom:1px solid var(--ln);white-space:pre-wrap;word-break:break-word}
 
 /* ---------- Fenêtre modale et notifications ---------- */
+#modal[hidden]{display:none}
 #modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(2,6,9,.72);padding:16px}
 #modal .pn{width:min(640px,100%);max-height:calc(100% - 32px)}
 #modal .pi{max-height:calc(100vh - 34px);overflow:auto}
@@ -216,6 +217,8 @@ const MC = (() => {
    place et renvoient les commandes à transmettre au mod.
    ===================================================================== */
 
+const NAV_JSON = {"version":1,"jump":{"maxLy":12,"fuelPerLy":0.5,"baseSeconds":30,"secondsPerLy":6},"ship":{"x":0,"y":100,"z":0},"start":"sol","systems":[{"id":"sol","name":"Système solaire","x":-2400,"y":1800,"star":"Naine jaune (G2V)","color":"#fff1a8","description":"Berceau de l'humanité. Toutes ses planètes sont aujourd'hui saturées de Rethium.","planets":[{"id":"mercure","name":"Mercure","pos":[650,85,-300],"size":70,"style":"rocky_grey","atmosphere":"#bbbbbb","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"venus","name":"Vénus","pos":[-800,160,650],"size":130,"style":"toxic_yellow","atmosphere":"#f0d27a","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"terre","name":"Terre","pos":[1300,115,850],"size":140,"style":"earth","atmosphere":"#8cc8ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"mars","name":"Mars","pos":[-1400,70,-950],"size":100,"style":"desert_red","atmosphere":"#e0a080","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"jupiter","name":"Jupiter","pos":[2050,205,-1400],"size":300,"style":"gas_orange","atmosphere":"#e8c79a","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"saturne","name":"Saturne","pos":[-2250,250,1550],"size":260,"style":"gas_pale","atmosphere":"#f0e2b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"ring":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"uranus","name":"Uranus","pos":[2625,40,2050],"size":190,"style":"ice_cyan","atmosphere":"#a8f0f0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"neptune","name":"Neptune","pos":[-2875,130,-2250],"size":180,"style":"ice_blue","atmosphere":"#7aa8ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"ceinture_sol","name":"Ceinture d'astéroïdes","pos":[-500,-1750],"radius":360,"density":"forte","show":true}]},{"id":"rex_magna_1","name":"Rex Magna 1","x":0,"y":0,"star":"Naine orange (K3V)","color":"#ffb060","description":"Carrefour de la région : la plupart des systèmes voisins sont à un saut.","planets":[{"id":"rex_magna_1a","name":"Rex Magna 1-a","pos":[1050,190,-750],"size":240,"style":"gas_purple","atmosphere":"#c9a0ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"rex_magna_1b","name":"Rex Magna 1-b","pos":[-950,55,900],"size":130,"style":"rocky_dark","atmosphere":"#9aa4b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"ceinture_rex","name":"Ceinture de Rex","pos":[500,1250],"radius":320,"density":"moyenne","show":true}]},{"id":"kronos","name":"Kronos","x":-9,"y":-4,"star":"Naine jaune (G8V)","color":"#ffe08a","description":"Géante gazeuse annelée et sa grande lune brumeuse.","planets":[{"id":"kronos_planet","name":"Kronos","pos":[-1300,235,-1050],"size":290,"style":"gas_pale","atmosphere":"#f4dca0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"ring":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"neo_titan","name":"Néo-Titan (équivalent de Titan)","pos":[750,115,650],"size":150,"style":"titan","atmosphere":"#d9a45a","spin":0.4,"dimension":"rebirth:neo_titan","rethium":false,"env":{"g":0.14,"t":-179,"atm":{"N2":140,"CH4":7}},"info":[{"k":"Particularité","v":"Océan souterrain liquide","show":true},{"k":"Pôles","v":"Lacs d'hydrocarbures liquides","show":true},{"k":"Saisons","v":"Oui","show":true},{"k":"Ressource","v":"Diazote (N₂) en grande quantité","show":true},{"k":"Température","v":"−179 °C","show":true},{"k":"Gravité","v":"0,14 g","show":true},{"k":"Atmosphère","v":"N₂ 95 %, CH₄ 5 % · 147 kPa","show":true},{"k":"Statut","v":"Non respirable, combinaison et lifepack","show":true}]},{"id":"ondine","name":"Ondine","pos":[-300,40,1550],"size":90,"style":"ice_white","atmosphere":"#e8f4ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"anneaux_kronos","name":"Débris des anneaux","pos":[-750,-375],"radius":280,"density":"forte","show":true}]},{"id":"alpha_centauri","name":"Alpha Centauri","x":58,"y":-20,"star":"Étoiles A, B et naine rouge Proxima","color":"#ffd0a0","description":"Le système le plus lointain de la région : il faut au moins six sauts depuis Rex Magna 1.","planets":[{"id":"proxima_b","name":"Proxima b du Centaure","pos":[950,100,-500],"size":160,"style":"earth","atmosphere":"#9cd0ff","spin":0.4,"dimension":"rebirth:proxima_b","rethium":false,"env":{"g":1.1,"t":12,"atm":{"N2":78,"O2":21,"CO2":0.4}},"info":[{"k":"Particularité","v":"Très semblable à la Terre","show":true},{"k":"Gravité","v":"1,1 g","show":true},{"k":"Température","v":"≈ 12 °C","show":true},{"k":"Atmosphère","v":"Respirable · 100 kPa","show":true},{"k":"Statut","v":"Habitable","show":true}]},{"id":"proxima_d","name":"Proxima d","pos":[-750,70,750],"size":90,"style":"rocky_grey","atmosphere":"#bbbbbb","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"nuage_centauri","name":"Nuage de poussières","pos":[0,-1250],"radius":400,"density":"faible","show":true}]},{"id":"jovia_2","name":"Jovia-2","x":14,"y":10,"star":"Naine jaune (G5V)","color":"#fff0a0","description":"Géante gazeuse et ses lunes volcaniques.","planets":[{"id":"jovia_2_planet","name":"Jovia-2","pos":[-1400,250,750],"size":300,"style":"gas_orange","atmosphere":"#e8b888","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"io_2b","name":"IO-2b","pos":[650,85,-650],"size":120,"style":"io","atmosphere":"#f2e070","spin":0.4,"dimension":"rebirth:io_2b","rethium":false,"env":{"g":0.18,"t":-143,"atm":{"CO2":0.0005}},"info":[{"k":"Particularité","v":"Activité sismique extrême","show":true},{"k":"Radiations","v":"Très fortes","show":true},{"k":"Température","v":"−143 °C","show":true},{"k":"Ressource","v":"Soufre","show":true},{"k":"Atmosphère","v":"Quasi nulle (vide)","show":true},{"k":"Statut","v":"Hostile","show":true}]},{"id":"europa_2","name":"Europa-2","pos":[375,160,1300],"size":100,"style":"ice_white","atmosphere":"#e8f4ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[]},{"id":"trappist_1","name":"TRAPPIST-1","x":5,"y":-9,"star":"Naine rouge ultra-froide (M8V)","color":"#ff7060","description":"Sept planètes rocheuses serrées autour d'une petite étoile rouge.","planets":[{"id":"trappist_1b","name":"TRAPPIST-1 b","pos":[500,115,-300],"size":120,"style":"lava","atmosphere":"#ff9060","spin":0.4,"dimension":"rebirth:trappist_1b","rethium":false,"env":{"g":1,"t":230,"atm":{"CO2":1}},"info":[{"k":"Température","v":"≈ 230 °C","show":true},{"k":"Atmosphère","v":"Presque inexistante","show":true},{"k":"Statut","v":"Non habitable","show":true}]},{"id":"trappist_1c","name":"TRAPPIST-1 c","pos":[-650,85,250],"size":115,"style":"rocky_dark","atmosphere":"#9aa4b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"trappist_1d","name":"TRAPPIST-1 d","pos":[150,175,850],"size":90,"style":"ocean","atmosphere":"#80b0ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"trappist_1e","name":"TRAPPIST-1 e","pos":[-1100,130,-750],"size":120,"style":"ocean_ice","atmosphere":"#a8d8ff","spin":0.4,"dimension":"rebirth:trappist_1e","rethium":false,"env":{"g":0.82,"t":-20,"atm":{"N2":70,"O2":12,"CO2":2}},"info":[{"k":"Particularité","v":"Océans possibles, glace en surface","show":true},{"k":"Température","v":"≈ −20 °C","show":true},{"k":"Atmosphère","v":"Pauvre en oxygène (12 kPa)","show":true},{"k":"Gravité","v":"0,82 g","show":true},{"k":"Statut","v":"Respirable avec assistance","show":true}]},{"id":"trappist_1f","name":"TRAPPIST-1 f","pos":[1300,70,650],"size":130,"style":"ice_blue","atmosphere":"#9ab8ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"trappist_1g","name":"TRAPPIST-1 g","pos":[-300,205,-1550],"size":140,"style":"ice_white","atmosphere":"#e0f0ff","spin":0.4,"dimension":"rebirth:trappist_1g","rethium":false,"env":{"g":1,"t":-75,"atm":{"N2":150,"CO2":50}},"info":[{"k":"Température","v":"≈ −75 °C","show":true},{"k":"Atmosphère","v":"Épaisse, N₂ et CO₂ · 200 kPa","show":true},{"k":"Statut","v":"Non respirable","show":true}]},{"id":"trappist_1h","name":"TRAPPIST-1 h","pos":[1750,160,-1250],"size":80,"style":"ice_grey","atmosphere":"#c8d0d8","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[]},{"id":"kepler_442","name":"Kepler-442","x":8,"y":3,"star":"Géante rouge","color":"#ff8a60","description":"Une étoile rouge : 30 % de lumière en moins sur ses planètes.","planets":[{"id":"kepler_442b","name":"Kepler-442b","pos":[-800,115,-650],"size":200,"style":"ocean_cold","atmosphere":"#9ad0ff","spin":0.4,"dimension":"rebirth:kepler_442b","rethium":false,"env":{"g":1.5,"t":-40,"atm":{"H2":150,"N2":90,"O2":5,"CO2":5}},"info":[{"k":"Particularité","v":"Reçoit 30 % de lumière en moins (géante rouge)","show":true},{"k":"Taille","v":"1,34 × la Terre","show":true},{"k":"Masse","v":"Semblable à la Terre","show":true},{"k":"Température","v":"−40 °C au maximum","show":true},{"k":"Eau","v":"Liquide en surface grâce à la forte pression","show":true},{"k":"Gravité","v":"1,5 g","show":true},{"k":"Ressources","v":"Eau en grande quantité, atmosphère riche en hydrogène : planète à carburant","show":true},{"k":"Statut","v":"Bof habitable","show":true}]},{"id":"kepler_442c","name":"Kepler-442c","pos":[1050,205,750],"size":150,"style":"gas_purple","atmosphere":"#c9a0ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[]},{"id":"gliese_581","name":"Gliese 581","x":-6,"y":7,"star":"Naine rouge (M3V)","color":"#ff9070","description":"Planète en rotation synchrone : une face brûlante, une face gelée, une bande habitable.","planets":[{"id":"gliese_581c","name":"Gliese 581 c","pos":[700,100,800],"size":160,"style":"tidal","atmosphere":"#ffd8a0","spin":0.4,"dimension":"rebirth:gliese_581c","rethium":false,"env":{"g":1,"t":20,"atm":{"N2":78,"O2":21,"CO2":0.5}},"info":[{"k":"Particularité","v":"Verrouillage gravitationnel : face chaude, face froide","show":true},{"k":"Masse","v":"Semblable à la Terre","show":true},{"k":"Température","v":"0 à 40 °C à l'équateur","show":true},{"k":"Eau","v":"Liquide à l'équateur","show":true},{"k":"Ressources","v":"Faune, flore, ressources vivantes","show":true},{"k":"Statut","v":"Habitable à l'équateur","show":true},{"k":"Note","v":"Désillusion potentielle","show":false}]},{"id":"gliese_581b","name":"Gliese 581 b","pos":[-1000,175,-500],"size":220,"style":"gas_blue","atmosphere":"#90b8ff","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]},{"id":"gliese_581e","name":"Gliese 581 e","pos":[300,40,-1150],"size":90,"style":"lava","atmosphere":"#ff8050","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[]},{"id":"hd_188753","name":"HD 188753","x":-15,"y":12,"star":"Système triple (trois soleils)","color":"#ffe8c0","description":"Trois étoiles en orbite serrée. Ciel toujours éclairé.","planets":[{"id":"hd_188753_ab","name":"HD 188753 Ab","pos":[-650,130,-750],"size":220,"style":"lava_methane","atmosphere":"#ffb070","spin":0.4,"dimension":"rebirth:hd_188753_ab","rethium":false,"env":{"g":2.2,"t":1000,"atm":{"CO2":300,"CH4":150,"N2":50}},"info":[{"k":"Particularité","v":"Trois soleils","show":true},{"k":"Masse","v":"5 à 6 fois la Terre","show":true},{"k":"Température","v":"≈ 1 000 °C en surface","show":true},{"k":"Eau","v":"Aucune eau liquide","show":true},{"k":"Minerais","v":"Abondants","show":true},{"k":"Surface","v":"Gaz et geysers de méthane brûlant (mortels)","show":true},{"k":"Statut","v":"Non habitable","show":true}]},{"id":"hd_188753_ac","name":"HD 188753 Ac","pos":[950,220,700],"size":170,"style":"gas_orange","atmosphere":"#f0b080","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"debris_hd","name":"Champ de débris stellaires","pos":[250,-1125],"radius":400,"density":"forte","show":true}]},{"id":"vesta_nebula","name":"Nébuleuse de Vesta","x":16,"y":-11,"star":"Proto-étoile","color":"#ff8a70","description":"Système relais sur la route d'Alpha Centauri.","planets":[{"id":"vesta_nebula_b","name":"Nébuleuse de Vesta b","pos":[750,115,-625],"size":130,"style":"rocky_dark","atmosphere":"#9aa4b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"champ_vesta_nebula","name":"Champ de météorites","pos":[-625,750],"radius":340,"density":"moyenne","show":true}]},{"id":"ross_128","name":"Ross 128","x":27,"y":-14,"star":"Naine rouge","color":"#ff8a70","description":"Système relais sur la route d'Alpha Centauri.","planets":[{"id":"ross_128_b","name":"Ross 128 b","pos":[750,115,-625],"size":130,"style":"rocky_dark","atmosphere":"#9aa4b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"champ_ross_128","name":"Champ de météorites","pos":[-625,750],"radius":340,"density":"moyenne","show":true}]},{"id":"wolf_359","name":"Wolf 359","x":38,"y":-17,"star":"Naine rouge","color":"#ff8a70","description":"Système relais sur la route d'Alpha Centauri.","planets":[{"id":"wolf_359_b","name":"Wolf 359 b","pos":[750,115,-625],"size":130,"style":"rocky_dark","atmosphere":"#9aa4b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"champ_wolf_359","name":"Champ de météorites","pos":[-625,750],"radius":340,"density":"moyenne","show":true}]},{"id":"lalande_21185","name":"Lalande 21185","x":48,"y":-19,"star":"Naine rouge","color":"#ff8a70","description":"Système relais sur la route d'Alpha Centauri.","planets":[{"id":"lalande_21185_b","name":"Lalande 21185 b","pos":[750,115,-625],"size":130,"style":"rocky_dark","atmosphere":"#9aa4b0","spin":0.4,"dimension":"rebirth:rethium","rethium":true,"info":[{"k":"Atmosphère","v":"Présence de Rethium : explosif pour les coques","show":true},{"k":"Statut","v":"Approche déconseillée","show":true}]}],"fields":[{"id":"champ_lalande_21185","name":"Champ de météorites","pos":[-625,750],"radius":340,"density":"moyenne","show":true}]}]};
+
 const PROTOCOL_VERSION = 1;
 const EJECT_COUNTDOWN_MS = 15000;
 const LOG_MAX = 400;
@@ -230,9 +233,11 @@ const TEAMS = ["jour", "nuit", "aucune"];
 /* Pages de la console. Un terminal (bloc en jeu) n'ouvre que ses pages. */
 const PAGES = {
   overview: "Vue d’ensemble", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
-  doors: "Portes et accès", crew: "Équipage", procs: "Procédures", log: "Journal",
-  structure: "Structure", admin: "Ordinateur de bord"
+  doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
+  galaxy: "Carte interstellaire", log: "Journal", structure: "Structure", screens: "Écrans", admin: "Ordinateur de bord"
 };
+/* Pages réservées au poste admin. */
+const ADMIN_PAGES = ["admin", "screens"];
 
 /* action : [libellé, niveau minimum par défaut, page qui porte l'action] */
 const ACTIONS = {
@@ -251,7 +256,9 @@ const ACTIONS = {
   "crew.assign":    ["Affecter le personnel", 5, "crew"],
   "structure.edit": ["Nommer ponts, pièces et sections", 5, "structure"],
   "perms.edit":     ["Changer les niveaux requis", 7, "structure"],
-  "announce":       ["Annonce générale", 6, "overview"]
+  "announce":       ["Annonce générale", 6, "overview"],
+  "nav.jump":       ["Lancer un saut hyperespace", 6, "galaxy"],
+  "comlink.rename": ["Renommer une liaison com (navette)", 4, "starmap"]
 };
 const defaultPerms = () => Object.fromEntries(Object.entries(ACTIONS).map(([k, v]) => [k, v[1]]));
 
@@ -311,8 +318,70 @@ function emptyShip(name = "Meridian") {
     procs: [], faults: [], acks: [], log: [],
     computer: { refuse: false, message: "" },
     stocks: { fuel: 100, water: 100, food: 100, o2: 100, parts: 100 },
+    nav: navEmpty(),
     seq: 1
   };
+}
+
+/* ============================ Navigation ============================= */
+/* Catalogue (systèmes, planètes, champs de météorites) : même JSON que le mod (meridian/shared/nav-default.json).
+   Le Worker fait autorité sur le catalogue ; le mod fait autorité sur la position réelle (système, carburant, saut). */
+const NAV_DEFAULT = NAV_JSON;
+const PLANET_STYLES = ["earth", "titan", "io", "lava", "lava_methane", "ocean", "ocean_ice", "ocean_cold", "tidal", "ice_white", "ice_blue",
+  "ice_cyan", "ice_grey", "rocky_grey", "rocky_dark", "desert_red", "toxic_yellow", "gas_orange", "gas_pale", "gas_purple", "gas_blue"];
+const RETHIUM_DIM = "rebirth:rethium";
+const JUMP_INTRO_MS = 3000;
+function navEmpty() {
+  return { catalog: clone(NAV_JSON), system: NAV_JSON.start, fuel: 0, fuelMode: "tanks", tanks: 0, jump: null, comlinks: [], at: 0 };
+}
+function navSystem(cat, id) { return (cat.systems || []).find(s => s.id === id) || null; }
+function navDistance(a, b) { return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : Infinity; }
+/* Peut-on sauter vers ce système ? { ok, why, dist, fuel, seconds } */
+function navReach(state, id) {
+  const n = state.nav, cat = n.catalog, from = navSystem(cat, n.system), to = navSystem(cat, id), J = cat.jump || {};
+  if (!to) return { ok: false, why: "Système inconnu." };
+  const dist = navDistance(from, to), fuel = dist * (J.fuelPerLy ?? 0.5), seconds = Math.round((J.baseSeconds ?? 30) + (J.secondsPerLy ?? 6) * dist);
+  let why = null;
+  if (n.jump) why = "Un saut est déjà en cours.";
+  else if (from && from.id === to.id) why = "Le vaisseau est déjà dans ce système.";
+  else if (dist > (J.maxLy ?? 12) + 1e-6) why = `Hors de portée : ${dist.toFixed(1)} al (saut maximal ${J.maxLy ?? 12} al).`;
+  else if ((n.fuel || 0) + 1e-9 < fuel) why = `Antimatière insuffisante : ${fuel.toFixed(2)} g requis, ${(+n.fuel || 0).toFixed(2)} g disponibles.`;
+  return { ok: !why, why, dist, fuel, seconds };
+}
+/* Message « nav » du mod : position réelle du vaisseau. */
+function applyNav(state, m, now = Date.now()) {
+  const n = state.nav || (state.nav = navEmpty());
+  if (m.system && navSystem(n.catalog, m.system)) n.system = m.system;
+  if (m.fuel !== undefined) n.fuel = +m.fuel;
+  if (m.fuelMode) n.fuelMode = m.fuelMode;
+  if (m.tanks !== undefined) n.tanks = m.tanks | 0;
+  n.jump = m.jump ? { to: m.jump.to, seconds: m.jump.seconds | 0, startAt: now - (+m.jump.elapsedMs || 0) } : null;
+  if (Array.isArray(m.comlinks)) n.comlinks = m.comlinks.slice(0, 200);
+  n.at = now;
+}
+function cleanPlanet(p, old) {
+  const num = (v, d) => isFinite(+v) ? +v : d;
+  const out = {
+    id: clean(p.id || (old && old.id) || (String(p.name || "planete").normalize("NFD").replace(/[\u0300-\u036f]/g, "").slice(0, 24) + "_" + Math.random().toString(36).slice(2, 5)), 40).replace(/[^a-z0-9_]/gi, "_").toLowerCase(),
+    name: clean(p.name, 60) || "Planète", style: PLANET_STYLES.includes(p.style) ? p.style : "rocky_grey",
+    atmosphere: /^#[0-9a-f]{6}$/i.test(p.atmosphere || "") ? p.atmosphere : "#aaccff",
+    spin: num(p.spin, 0.4), size: Math.max(16, Math.min(1024, num(p.size, 160))),
+    pos: [num((p.pos || [])[0], 0), num((p.pos || [])[1], 100), num((p.pos || [])[2], 0)],
+    dimension: clean(p.dimension, 80) || RETHIUM_DIM, ring: !!p.ring,
+    info: (p.info || []).filter(i => i && (i.k || i.v)).slice(0, 30).map(i => ({ k: clean(i.k, 40), v: clean(i.v, 200), show: i.show !== false }))
+  };
+  out.rethium = out.dimension === RETHIUM_DIM;
+  if (p.env && !out.rethium) {
+    const atm = {};
+    for (const [k, v] of Object.entries(p.env.atm || {})) if (["O2", "N2", "CO2", "H2", "CH4", "NH3"].includes(k) && isFinite(+v)) atm[k] = Math.max(0, +v);
+    out.env = { g: Math.max(0, Math.min(12, num(p.env.g, 1))), t: num(p.env.t, 15), atm };
+  }
+  return out;
+}
+/* Simulation du saut en démo / sans mod. */
+function navSimulate(S, now) {
+  const n = S.nav; if (!n || !n.jump) return;
+  if (now - n.jump.startAt >= JUMP_INTRO_MS + n.jump.seconds * 1000) { n.system = n.jump.to; n.jump = null; log(S, "NAVIGATION", "Sortie d’hyperespace : système " + (navSystem(n.catalog, n.system) || {}).name + ".", "nav", now); }
 }
 
 function log(state, who, text, kind = "info", now = Date.now()) {
@@ -498,7 +567,7 @@ function mergeStructure(state, s, now = Date.now()) {
   for (const t of s.terminals || []) {
     const old = state.terminals[t.id];
     state.terminals[t.id] = { id: t.id, name: (old && old.named) ? old.name : (t.name || t.id), named: !!(old && old.named), room: t.room || null,
-      pages: old ? old.pages : Object.keys(PAGES).filter(k => k !== "admin") };
+      pages: old ? old.pages : Object.keys(PAGES).filter(k => !ADMIN_PAGES.includes(k)) };
   }
   state.ship.lastStructure = now;
   log(state, "SYSTÈME", `Structure synchronisée : ${state.decks.length} ponts, ${Object.keys(rooms).length} pièces, ${Object.keys(doors).length} portes.`, "sys", now);
@@ -627,7 +696,7 @@ function apply(state, actor, a, ctx = {}) {
         if (a.rooms) for (const r of Object.values(state.rooms)) { if (a.rooms.includes(r.id)) { r.section = id; r.sectionSet = true; } else if (r.section === id) { r.section = null; r.sectionSet = true; } }
         L(`enregistre la section « ${state.sections[id].name} »${a.ejectable ? " (éjectable)" : ""}.`, "struct"); break;
       }
-      case "terminal.save": { need("structure.edit"); const t = state.terminals[a.id]; if (!t) throw new Error("Terminal inconnu."); if (a.name) { t.name = clean(a.name, 40); t.named = true; } if (a.pages) t.pages = a.pages.filter(p => PAGES[p] && p !== "admin"); L(`configure le terminal ${t.name}.`, "struct"); break; }
+      case "terminal.save": { need("structure.edit"); const t = state.terminals[a.id]; if (!t) throw new Error("Terminal inconnu."); if (a.name) { t.name = clean(a.name, 40); t.named = true; } if (a.pages) t.pages = a.pages.filter(p => PAGES[p] && !ADMIN_PAGES.includes(p)); L(`configure le terminal ${t.name}.`, "struct"); break; }
       case "perms.set": {
         need("perms.edit"); if (!ACTIONS[a.action]) throw new Error("Action inconnue.");
         const v = Math.max(0, Math.min(7, a.level | 0));
@@ -690,6 +759,90 @@ function apply(state, actor, a, ctx = {}) {
       case "admin.setAdmin": { if (!actor.admin) throw new Error("Réservé au poste admin."); const p = person(a.person); p.admin = !!a.on; log(state, "ORDINATEUR", `${p.name} ${a.on ? "reçoit" : "perd"} l’accès admin.`, "admin", now); break; }
       case "admin.env": { if (!actor.admin) throw new Error("Réservé au poste admin."); const r = room(a.room); cmds.push({ type: "env.set", room: r.id, env: a.env }); Object.assign(r.env, a.env); log(state, "ORDINATEUR", `force l’environnement de ${r.name}.`, "admin", now); break; }
       case "admin.stocks": { if (!actor.admin) throw new Error("Réservé au poste admin."); for (const k of Object.keys(state.stocks)) if (a.stocks && a.stocks[k] !== undefined) state.stocks[k] = Math.max(0, Math.min(100, +a.stocks[k])); cmds.push({ type: "stocks.set", stocks: state.stocks }); break; }
+      /* Navigation */
+      case "nav.jump": {
+        need("nav.jump"); const r = navReach(state, a.system); if (!r.ok) throw new Error(r.why);
+        const to = navSystem(state.nav.catalog, a.system);
+        state.nav.jump = { to: to.id, seconds: r.seconds, startAt: now, pending: true };
+        if (state.nav.fuelMode === "manual" || state.ship.demo) state.nav.fuel = Math.max(0, state.nav.fuel - r.fuel);
+        cmds.push({ type: "nav.jump", system: to.id, by: who });
+        L(`ordonne le saut vers ${to.name} (${r.dist.toFixed(1)} al, ${r.fuel.toFixed(2)} g d’antimatière).`, "nav"); break;
+      }
+      case "comlink.rename": {
+        need("comlink.rename"); const c = (state.nav.comlinks || []).find(x => x.id === a.id); if (!c) throw new Error("Liaison com inconnue.");
+        c.name = clean(a.name, 40) || c.name; cmds.push({ type: "comlink.rename", id: c.id, name: c.name }); L(`renomme la navette ${c.id} : ${c.name}.`, "nav"); break;
+      }
+      case "admin.nav.force": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const to = navSystem(state.nav.catalog, a.system); if (!to) throw new Error("Système inconnu.");
+        const seconds = a.seconds ? Math.max(1, Math.min(86400, a.seconds | 0)) : null;
+        const dir = ["north", "south", "east", "west", "up", "down"].includes(a.direction) ? a.direction : null;
+        state.nav.jump = { to: to.id, seconds: seconds || navReach(state, to.id).seconds || 30, startAt: now, pending: true };
+        cmds.push({ type: "nav.force", system: to.id, seconds, direction: dir, by: who });
+        log(state, "ORDINATEUR", `saut forcé vers ${to.name}${seconds ? " (" + seconds + " s)" : ""}.`, "admin", now); break;
+      }
+      case "admin.nav.set": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const to = navSystem(state.nav.catalog, a.system); if (!to) throw new Error("Système inconnu.");
+        state.nav.system = to.id; state.nav.jump = null; cmds.push({ type: "nav.set", system: to.id });
+        log(state, "ORDINATEUR", `place le vaisseau dans le système ${to.name}.`, "admin", now); break;
+      }
+      case "admin.nav.fuel": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const mode = a.mode === "manual" ? "manual" : "tanks"; const value = Math.max(0, +a.value || 0);
+        state.nav.fuelMode = mode; if (mode === "manual") state.nav.fuel = value;
+        cmds.push({ type: "nav.fuel", mode, value }); log(state, "ORDINATEUR", mode === "manual" ? `fixe le carburant à ${value} g.` : "calcule le carburant sur les cuves.", "admin", now); break;
+      }
+      case "admin.nav.system.save": case "admin.nav.system.delete": case "admin.nav.planet.save": case "admin.nav.planet.delete":
+      case "admin.nav.field.save": case "admin.nav.field.delete": case "admin.nav.rules": case "admin.nav.catalog": case "admin.nav.reset": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const cat = state.nav.catalog;
+        const sysOf = (id) => { const s = navSystem(cat, id); if (!s) throw new Error("Système inconnu."); return s; };
+        const num = (v, d) => isFinite(+v) ? +v : d;
+        switch (a.type) {
+          case "admin.nav.system.save": {
+            const x = a.sys || {}; let s = x.id && navSystem(cat, x.id);
+            if (!s) { s = { id: clean(x.id || x.name || "sys" + state.seq++, 40).replace(/[^a-z0-9_]/gi, "_").toLowerCase(), planets: [], fields: [] }; if (navSystem(cat, s.id)) throw new Error("Identifiant déjà utilisé."); cat.systems.push(s); }
+            Object.assign(s, { name: clean(x.name, 60) || s.name || s.id, x: num(x.x, s.x || 0), y: num(x.y, s.y || 0), star: clean(x.star, 60), color: /^#[0-9a-f]{6}$/i.test(x.color || "") ? x.color : (s.color || "#ffd080"), description: clean(x.description, 400) });
+            log(state, "ORDINATEUR", `enregistre le système ${s.name}.`, "admin", now); break;
+          }
+          case "admin.nav.system.delete": {
+            if (a.id === state.nav.system) throw new Error("Impossible de supprimer le système où se trouve le vaisseau.");
+            const s = sysOf(a.id); cat.systems = cat.systems.filter(x => x !== s); if (cat.start === s.id) cat.start = state.nav.system;
+            log(state, "ORDINATEUR", `supprime le système ${s.name}.`, "admin", now); break;
+          }
+          case "admin.nav.planet.save": {
+            const s = sysOf(a.system); const old = (a.planet && a.planet.id) ? s.planets.find(p => p.id === a.planet.id) : null;
+            const p = cleanPlanet(a.planet || {}, old);
+            if (!old && cat.systems.some(sy => sy.planets.some(q => q.id === p.id))) throw new Error("Identifiant de planète déjà utilisé.");
+            if (old) s.planets[s.planets.indexOf(old)] = p; else s.planets.push(p);
+            log(state, "ORDINATEUR", `enregistre la planète ${p.name} (${s.name}).`, "admin", now); break;
+          }
+          case "admin.nav.planet.delete": { const s = sysOf(a.system); s.planets = s.planets.filter(p => p.id !== a.id); log(state, "ORDINATEUR", `retire une planète de ${s.name}.`, "admin", now); break; }
+          case "admin.nav.field.save": {
+            const s = sysOf(a.system), f = a.field || {}; const old = f.id && s.fields.find(x => x.id === f.id);
+            const n = { id: old ? old.id : "f" + (state.seq++), name: clean(f.name, 60) || "Champ de météorites", pos: [num((f.pos || [])[0], 0), num((f.pos || [])[1], 0)],
+              radius: Math.max(10, num(f.radius, 200)), density: ["faible", "moyenne", "forte"].includes(f.density) ? f.density : "moyenne", show: f.show !== false };
+            if (old) s.fields[s.fields.indexOf(old)] = n; else s.fields.push(n);
+            log(state, "ORDINATEUR", `enregistre le champ « ${n.name} » (${s.name}).`, "admin", now); break;
+          }
+          case "admin.nav.field.delete": { const s = sysOf(a.system); s.fields = s.fields.filter(f => f.id !== a.id); break; }
+          case "admin.nav.rules": {
+            const j = cat.jump || (cat.jump = {});
+            for (const k of ["maxLy", "fuelPerLy", "baseSeconds", "secondsPerLy"]) if (a[k] !== undefined && isFinite(+a[k])) j[k] = Math.max(0, +a[k]);
+            if (a.ship) cat.ship = { x: num(a.ship.x, 0), y: num(a.ship.y, 100), z: num(a.ship.z, 0) };
+            log(state, "ORDINATEUR", "modifie les règles de saut.", "admin", now); break;
+          }
+          case "admin.nav.catalog": {
+            const c = typeof a.catalog === "string" ? JSON.parse(a.catalog) : a.catalog;
+            if (!c || !Array.isArray(c.systems) || !c.systems.length) throw new Error("Catalogue invalide.");
+            c.systems.forEach(sy => { sy.planets = (sy.planets || []).map(p => cleanPlanet(p)); sy.fields = sy.fields || []; });
+            state.nav.catalog = c; log(state, "ORDINATEUR", `importe un catalogue de ${c.systems.length} systèmes.`, "admin", now); break;
+          }
+          case "admin.nav.reset": state.nav.catalog = clone(NAV_JSON); log(state, "ORDINATEUR", "recharge le catalogue de navigation par défaut.", "admin", now); break;
+        }
+        cmds.push({ type: "nav.catalog", catalog: state.nav.catalog }); break;
+      }
       default: return ERR("Action inconnue : " + a.type);
     }
   } catch (e) { return ERR(e.message); }
@@ -724,6 +877,7 @@ function sanitizeRule(r) {
 /* Simulateur d'environnement : sert la démo et les tests sans mod.
    En production, c'est le mod qui calcule la physique et envoie la télémétrie. */
 function simulate(S, dt, now = Date.now()) {
+  navSimulate(S, now);
   const valveOpen = (rid, kind) => { const v = Object.values(S.valves).filter(x => x.room === rid && x.kind === kind); return v.length ? v.some(x => x.open) : kind === "o2"; };
   for (const r of Object.values(S.rooms)) {
     const e = r.env, gone = roomStatus(S, r) === "gone";
@@ -776,7 +930,7 @@ function viewFor(state, actor, term) {
   const adm = !!(actor && actor.admin);
   const perms = Object.fromEntries(Object.keys(ACTIONS).map(k => [k, can(state, actor, k, term)]));
   const termPages = term && state.terminals[term] ? state.terminals[term].pages : Object.keys(PAGES);
-  let pages = Object.keys(PAGES).filter(p => adm || (termPages.includes(p) && p !== "admin"));
+  let pages = Object.keys(PAGES).filter(p => adm || (termPages.includes(p) && !ADMIN_PAGES.includes(p)));
   if (!adm && !perms["structure.edit"] && !perms["perms.edit"]) pages = pages.filter(p => p !== "structure");
   v.alerts = computeAlerts(state, adm);
   if (!adm) {
@@ -784,6 +938,11 @@ function viewFor(state, actor, term) {
     for (const sf of state.faults) if (sf.active && sf.silent && sf.key === "sensor.lie" && sf.target.kind === "room" && v.rooms[sf.target.id]) Object.assign(v.rooms[sf.target.id].env, { p: 101.3, o2: 20.9, t: 21 });
     if (!perms["crew.vitals"]) for (const p of Object.values(v.people)) { if (p.id !== (actor && actor.id)) { p.vitals = null; p.room = null; } }
     for (const p of Object.values(v.people)) if (p.id !== (actor && actor.id)) delete p.joined;
+    if (v.nav) for (const sys of v.nav.catalog.systems || []) {
+      for (const pl of sys.planets || []) { pl.info = (pl.info || []).filter(i => i.show !== false); delete pl.env; }
+      sys.fields = (sys.fields || []).filter(f => f.show !== false);
+    }
+    delete v.screens;
   }
   v.me = actor ? {
     id: actor.id, name: actor.name, level: actor.level | 0, admin: adm, role: actor.role, job: actor.job, rank: actor.rank, group: actor.group, team: actor.team,
@@ -892,6 +1051,10 @@ function seedDemo(now = Date.now()) {
     { id: "f3", key: "fuel.leak", target: { kind: "ship" }, silent: true, active: true, t: now - 900000 }
   ];
   s.stocks = { fuel: 81, water: 74, food: 68, o2: 88, parts: 42 };
+  s.nav = navEmpty(); s.nav.system = "rex_magna_1"; s.nav.fuel = 14.5; s.nav.tanks = 3;
+  s.nav.comlinks = [
+    { id: "COM-1A2F", name: "Navette Hirondelle", dim: "minecraft:overworld", x: 640, y: 120, z: -310, seen: now, shuttle: true },
+    { id: "COM-7B03", name: "Navette Grue", dim: "rebirth:rethium", x: 12, y: 80, z: -4, seen: now, shuttle: true }];
   s.seq = 10;
   const L = (dt, who, t, k) => s.log.push({ t: now - dt, who, text: t, kind: k });
   L(60000, "Lina Fabre", "scelle toutes les portes de Cuisine.", "door");
@@ -904,7 +1067,7 @@ function seedDemo(now = Date.now()) {
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSystem, navDistance, navReach, applyNav, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
 </script>
 <script>
@@ -976,7 +1139,7 @@ async function boot() {
 /* =====================================================================
    État de l'interface
    ===================================================================== */
-const ui = { page: "overview", deck: null, room: null, door: null, person: null, sec: null, crewF: "all", logF: "all", q: {}, atF: "all", draft: null };
+const ui = { page: "overview", deck: null, room: null, door: null, person: null, sec: null, crewF: "all", logF: "all", q: {}, atF: "all", draft: null, planet: null, field: null, comlink: null, system: null };
 function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
 
 function act(action, ok) {
@@ -1027,7 +1190,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["plan", "02"], ["atmos", "03"], ["doors", "04"], ["crew", "05"], ["procs", "06"], ["log", "07"], ["structure", "08"], ["admin", "09"]];
+const NAV = [["overview", "01"], ["plan", "02"], ["atmos", "03"], ["doors", "04"], ["crew", "05"], ["procs", "06"], ["starmap", "07"], ["galaxy", "08"], ["log", "09"], ["structure", "10"], ["screens", "11"], ["admin", "12"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -1476,6 +1639,210 @@ const FN = {
       () => { act({ type: "terminal.save", id: t.id, name: val("te-n"), pages: [...document.querySelectorAll("[data-tp]:checked")].map(x => x.dataset.tp) }, "Terminal enregistré."); return true; });
   }
 };
+
+/* =====================================================================
+   Navigation : carte stellaire (système actuel) et carte interstellaire
+   ===================================================================== */
+const NAVS = () => V.nav || { catalog: { systems: [], jump: {} }, comlinks: [] };
+const curSys = () => MC.navSystem(NAVS().catalog, NAVS().system);
+const SPACE_DIM = "minecraft:overworld";
+const fmtLy = (d) => (d < 100 ? d.toFixed(1) : Math.round(d).toLocaleString("fr-FR")).replace(".", ",") + " al";
+const fmtG = (g) => (+g || 0).toFixed(2).replace(".", ",") + " g";
+const ago = (t) => { const s = Math.max(0, Math.round((now() - t) / 1000)); return s < 60 ? `il y a ${s} s` : s < 3600 ? `il y a ${Math.round(s / 60)} min` : `il y a ${Math.round(s / 3600)} h`; };
+const niceStep = (span) => { const r = span / 8, p = 10 ** Math.floor(Math.log10(r)); return [1, 2, 2.5, 5, 10].map(k => k * p).find(v => v >= r) || p * 10; };
+function jumpBanner() {
+  const n = NAVS(); if (!n.jump) return "";
+  const to = MC.navSystem(n.catalog, n.jump.to), end = n.jump.startAt + MC.JUMP_INTRO_MS + n.jump.seconds * 1000;
+  return `<div class="banner amb" style="margin-bottom:12px">EN HYPERESPACE · destination ${esc(to ? to.name : n.jump.to)} · sortie dans <span class="m" data-cd="${end}">${Math.max(0, Math.ceil((end - now()) / 1000))}</span> s</div>`;
+}
+function planetDimName(dim) {
+  if (dim === SPACE_DIM) return "dans l’espace";
+  if (dim === MC.RETHIUM_DIM) return "sur une planète à Rethium";
+  const s = curSys(); const p = s && s.planets.find(x => x.dimension === dim);
+  if (p) return "sur " + p.name;
+  for (const sy of NAVS().catalog.systems) { const q = sy.planets.find(x => x.dimension === dim); if (q) return "sur " + q.name + " (" + sy.name + ")"; }
+  return dim;
+}
+
+function starMap(s) {
+  const n = NAVS(), cat = n.catalog, ship = cat.ship || { x: 0, z: 0 };
+  const planets = n.jump || !s ? [] : s.planets, fields = n.jump || !s ? [] : s.fields || [];
+  const coms = (n.comlinks || []).filter(c => c.dim === SPACE_DIM);
+  let x0 = ship.x - 300, x1 = ship.x + 300, z0 = ship.z - 300, z1 = ship.z + 300;
+  const grow = (x, z, r) => { x0 = Math.min(x0, x - r); x1 = Math.max(x1, x + r); z0 = Math.min(z0, z - r); z1 = Math.max(z1, z + r); };
+  planets.forEach(p => grow(p.pos[0], p.pos[2], p.size * 0.62)); fields.forEach(f => grow(f.pos[0], f.pos[1], f.radius)); coms.forEach(c => grow(c.x, c.z, 60));
+  const span = Math.max(x1 - x0, z1 - z0), pad = span * 0.08; x0 -= pad; x1 += pad; z0 -= pad; z1 += pad;
+  const W = x1 - x0, H = z1 - z0, fs = span / 55, step = niceStep(span);
+  let g = `<defs>${planets.map(p => `<radialGradient id="pg-${esc(p.id)}" cx="35%" cy="35%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".35" stop-color="${esc(p.atmosphere)}"/><stop offset="1" stop-color="#050a10"/></radialGradient>`).join("")}</defs>`;
+  g += `<rect x="${x0}" y="${z0}" width="${W}" height="${H}" fill="#02060a"/>`;
+  for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) g += `<line x1="${x}" y1="${z0}" x2="${x}" y2="${z1}" stroke="var(--ln)" stroke-width="${fs * .06}"/>`;
+  for (let z = Math.ceil(z0 / step) * step; z <= z1; z += step) g += `<line x1="${x0}" y1="${z}" x2="${x1}" y2="${z}" stroke="var(--ln)" stroke-width="${fs * .06}"/>`;
+  for (const f of fields) {
+    const sel = ui.field === f.id;
+    g += `<g class="hit" data-fn="selField" data-arg="${esc(f.id)}"><circle cx="${f.pos[0]}" cy="${f.pos[1]}" r="${f.radius}" fill="var(--amb)" fill-opacity=".05" stroke="${sel ? "#fff" : "var(--amb)"}" stroke-width="${fs * .12}" stroke-dasharray="${fs * .6} ${fs * .4}"/>`;
+    const k = f.density === "forte" ? 26 : f.density === "faible" ? 8 : 16;
+    for (let i = 0; i < k; i++) { const a = i * 2.39996, r = f.radius * Math.sqrt((i + .5) / k); g += `<rect x="${f.pos[0] + Math.cos(a) * r}" y="${f.pos[1] + Math.sin(a) * r}" width="${fs * .35}" height="${fs * .35}" fill="var(--amb)" fill-opacity=".7" transform="rotate(${i * 37} ${f.pos[0] + Math.cos(a) * r} ${f.pos[1] + Math.sin(a) * r})"/>`; }
+    g += `<text x="${f.pos[0]}" y="${f.pos[1] - f.radius - fs * .5}" fill="var(--amb)" font-size="${fs * .8}" text-anchor="middle">${esc(f.name)}</text><title>${esc(f.name)} · densité ${esc(f.density)}</title></g>`;
+  }
+  for (const p of planets) {
+    const r = Math.max(p.size * 0.56, span * 0.012), sel = ui.planet === p.id, x = p.pos[0], z = p.pos[2];
+    g += `<g class="hit" data-fn="selPlanet" data-arg="${esc(p.id)}"><circle cx="${x}" cy="${z}" r="${r * 1.18}" fill="${esc(p.atmosphere)}" fill-opacity=".12"/>`;
+    if (p.ring) g += `<ellipse cx="${x}" cy="${z}" rx="${r * 1.9}" ry="${r * .55}" fill="none" stroke="${esc(p.atmosphere)}" stroke-opacity=".6" stroke-width="${fs * .25}"/>`;
+    g += `<circle cx="${x}" cy="${z}" r="${r}" fill="url(#pg-${esc(p.id)})" stroke="${sel ? "#fff" : p.rethium ? "var(--vio)" : esc(p.atmosphere)}" stroke-width="${fs * (sel ? .28 : .14)}"${p.rethium ? ` stroke-dasharray="${fs * .5} ${fs * .3}"` : ""}/>`;
+    g += `<text x="${x}" y="${z + r * 1.18 + fs * 1.1}" fill="${p.rethium ? "var(--vio)" : "var(--tx)"}" font-size="${fs}" text-anchor="middle">${esc(p.name)}${p.rethium ? " ⚠" : ""}</text><title>${esc(p.name)}${p.rethium ? " · Rethium" : ""}</title></g>`;
+  }
+  const sx = ship.x, sz = ship.z, k = fs * 1.6;
+  g += `<g><polygon points="${sx},${sz - k * 1.5} ${sx + k * .7},${sz + k} ${sx},${sz + k * .55} ${sx - k * .7},${sz + k}" fill="var(--cy)" stroke="#fff" stroke-width="${fs * .08}"/><circle cx="${sx}" cy="${sz}" r="${k * 2.4}" fill="none" stroke="var(--cy2)" stroke-opacity=".5" stroke-width="${fs * .08}"/><text x="${sx}" y="${sz + k * 2.4 + fs * 1.2}" fill="var(--cy)" font-size="${fs * .9}" text-anchor="middle" font-family="IBM Plex Mono,monospace">${esc(V.ship.name.toUpperCase())}</text></g>`;
+  for (const c of coms) {
+    const d = fs * .7, sel = ui.comlink === c.id;
+    g += `<g class="hit" data-fn="selCom" data-arg="${esc(c.id)}"><polygon points="${c.x},${c.z - d} ${c.x + d},${c.z} ${c.x},${c.z + d} ${c.x - d},${c.z}" fill="var(--ok)" stroke="${sel ? "#fff" : "var(--bg)"}" stroke-width="${fs * .12}"/><text x="${c.x + d * 1.4}" y="${c.z + fs * .3}" fill="var(--ok)" font-size="${fs * .8}">${esc(c.name)}</text><title>${esc(c.name)} · ${esc(c.id)}</title></g>`;
+  }
+  if (n.jump) g += `<text x="${(x0 + x1) / 2}" y="${z0 + H * .2}" fill="var(--amb)" font-size="${fs * 1.6}" text-anchor="middle" letter-spacing="${fs * .2}">EN HYPERESPACE</text>`;
+  g += `<text x="${x0 + fs * .6}" y="${z1 - fs * .6}" fill="var(--dim)" font-size="${fs * .75}" font-family="IBM Plex Mono,monospace">grille ${step} blocs · nord en haut</text>`;
+  return `<svg viewBox="${x0} ${z0} ${W} ${H}" role="img" aria-label="Carte stellaire du système">${g}</svg>`;
+}
+
+PAGE.starmap = () => {
+  const n = NAVS(), s = curSys(), adm = V.me.admin, ship = n.catalog.ship || { x: 0, y: 100, z: 0 };
+  const p = s && ui.planet ? s.planets.find(x => x.id === ui.planet) : null;
+  const f = s && ui.field ? (s.fields || []).find(x => x.id === ui.field) : null;
+  let side = panel("Système " + (s ? s.name : "inconnu"), "SYS." + (s ? s.id.toUpperCase() : "?"),
+    kv("Étoile", esc(s ? s.star || "—" : "—")) + kv("Planètes", s ? s.planets.length + (s.planets.some(x => x.rethium) ? ` <span class="vio">(${s.planets.filter(x => x.rethium).length} à Rethium)</span>` : "") : "—") +
+    kv("Antimatière", fmtG(n.fuel)) + (s && s.description ? `<p class="note">${esc(s.description)}</p>` : "") +
+    (adm && s ? `<div class="btns" style="margin-top:10px">${btn("Ajouter une planète", null, { fn: "editPlanet", arg: "", cls: "sm" })}${btn("Ajouter un champ de météorites", null, { fn: "editField", arg: "", cls: "sm ghost" })}</div>` : ""));
+  if (p) {
+    const dist = Math.hypot(p.pos[0] - ship.x, p.pos[1] - ship.y, p.pos[2] - ship.z);
+    let b = (p.rethium ? `<div class="banner red" style="margin:0 0 10px">Atmosphère chargée de Rethium : 15 s pour en ressortir, sinon la navette explose.</div>` : "") +
+      kv("Distance du vaisseau", n0(dist) + " blocs") + kv("Diamètre", n0(p.size) + " blocs");
+    if (adm) b += kv("Dimension", `<span class="m">${esc(p.dimension)}</span>`) + (p.env ? kv("Environnement", esc(`${p.env.g} g · ${p.env.t} °C · ` + Object.entries(p.env.atm || {}).map(([k, v]) => `${k} ${v}`).join(", ") + " kPa")) : "");
+    b += (p.info || []).map(i => kv(i.k, esc(i.v) + (adm && i.show === false ? ` <span class="pill vio" style="color:var(--vio);border-color:var(--vio)">masqué</span>` : ""))).join("") || `<p class="empty">Aucune information transmise.</p>`;
+    const here = (n.comlinks || []).filter(c => c.dim === p.dimension);
+    if (here.length) b += `<div class="lbl">Navettes en surface</div>` + here.map(c => `<div class="vrow"><span>${esc(c.name)} <span class="m dim" style="font-size:11px">${esc(c.id)}</span></span><span class="mu" style="font-size:12px">${ago(c.seen)}</span></div>`).join("");
+    if (adm) b += `<div class="btns" style="margin-top:10px">${btn("Modifier", null, { fn: "editPlanet", arg: p.id, cls: "sm" })}${btn("Retirer", { type: "admin.nav.planet.delete", system: s.id, id: p.id }, { cls: "sm red", confirm: `Retirer ${p.name} du système ${s.name} ?` })}</div>`;
+    side += panel(p.name, "PLN." + p.id.toUpperCase().slice(0, 10), b);
+  } else if (f) {
+    side += panel(f.name, "AST", kv("Densité", esc(f.density)) + kv("Rayon", n0(f.radius) + " blocs") + kv("Position", `<span class="m">${n0(f.pos[0])} · ${n0(f.pos[1])}</span>`) +
+      (adm ? `<div class="btns" style="margin-top:10px">${btn("Modifier", null, { fn: "editField", arg: f.id, cls: "sm" })}${btn("Supprimer", { type: "admin.nav.field.delete", system: s.id, id: f.id }, { cls: "sm red", confirm: "Supprimer ce champ ?" })}</div>` : ""));
+  }
+  const coms = (n.comlinks || []).map(c => {
+    const where = c.dim === SPACE_DIM ? n0(Math.hypot(c.x - ship.x, c.y - ship.y, c.z - ship.z)) + " blocs du vaisseau" : planetDimName(c.dim);
+    return `<div class="vrow${ui.comlink === c.id ? " sel" : ""}"><div style="min-width:0"><b style="font-weight:600">${esc(c.name)}</b> <span class="m dim" style="font-size:11px">${esc(c.id)}</span><div class="mu" style="font-size:12px">${esc(where)} · ${ago(c.seen)}</div></div>${perm("comlink.rename") ? btn("Renommer", null, { fn: "renameCom", arg: c.id, cls: "sm ghost" }) : ""}</div>`;
+  }).join("") || `<p class="empty">Aucune liaison com posée. Posez un bloc « liaison com » sur une navette pour la suivre ici.</p>`;
+  side += panel("Navettes suivies", "COM." + (n.comlinks || []).length, coms);
+  return `${jumpBanner()}<div class="grid g-2b"><div class="stack">${panel("Carte stellaire · " + (s ? s.name : "?"), "NAV.MAP", `<div class="svgw">${starMap(s)}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st ok">Navette (liaison com)</span><span class="st warn">Champ de météorites</span><span class="st vac">Planète à Rethium</span><span class="st" style="color:var(--cy)">Vaisseau</span></div>`)}</div><div class="stack">${side}</div></div>`;
+};
+
+function galaxyMap() {
+  const n = NAVS(), cat = n.catalog, J = cat.jump || {}, sys = cat.systems || [], cur = curSys();
+  if (!sys.length) return `<p class="empty">Aucun système au catalogue.</p>`;
+  const xs = sys.map(s => s.x).sort((a, b) => a - b), ys = sys.map(s => s.y).sort((a, b) => a - b);
+  const cx = xs[xs.length >> 1], cy = ys[ys.length >> 1];
+  const far = (s) => Math.hypot(s.x - cx, s.y - cy) > 150;
+  const near = sys.filter(s => !far(s));
+  let x0 = Math.min(...near.map(s => s.x)), x1 = Math.max(...near.map(s => s.x)), y0 = Math.min(...near.map(s => s.y)), y1 = Math.max(...near.map(s => s.y));
+  const span0 = Math.max(x1 - x0, y1 - y0, 20), pad = span0 * 0.16; x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  const W = x1 - x0, H = y1 - y0, span = Math.max(W, H), fs = span / 48, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  const place = (s) => { if (!far(s)) return [s.x, s.y]; const dx = s.x - mx, dy = s.y - my, t = Math.min((W * .44) / Math.abs(dx || 1e-9), (H * .40) / Math.abs(dy || 1e-9)); return [mx + dx * t, my + dy * t]; };
+  let g = `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="#02060a"/>`;
+  for (let i = 0; i < 90; i++) { const rx = x0 + ((i * 7919) % 997) / 997 * W, ry = y0 + ((i * 104729) % 991) / 991 * H; g += `<circle cx="${rx}" cy="${ry}" r="${fs * .05}" fill="#fff" fill-opacity="${.15 + (i % 5) * .1}"/>`; }
+  for (let i = 0; i < near.length; i++) for (let j = i + 1; j < near.length; j++) {
+    const a = near[i], b = near[j]; if (MC.navDistance(a, b) <= (J.maxLy ?? 12)) g += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--cy2)" stroke-opacity=".18" stroke-width="${fs * .06}"/>`;
+  }
+  if (cur && !far(cur)) {
+    const fr = Math.min(J.maxLy ?? 12, (+n.fuel || 0) / (J.fuelPerLy || 0.5));
+    g += `<circle cx="${cur.x}" cy="${cur.y}" r="${J.maxLy ?? 12}" fill="none" stroke="var(--cy)" stroke-opacity=".5" stroke-dasharray="${fs * .4} ${fs * .3}" stroke-width="${fs * .08}"/>`;
+    if (fr > 0) g += `<circle cx="${cur.x}" cy="${cur.y}" r="${fr}" fill="var(--ok)" fill-opacity=".08" stroke="var(--ok)" stroke-opacity=".6" stroke-width="${fs * .08}"/>`;
+  }
+  if (n.jump && cur) { const t = MC.navSystem(cat, n.jump.to); if (t) { const [ax, ay] = place(cur), [bx, by] = place(t); g += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="var(--amb)" stroke-width="${fs * .15}" stroke-dasharray="${fs * .5} ${fs * .3}"><animate attributeName="stroke-dashoffset" from="${fs * 4}" to="0" dur="1s" repeatCount="indefinite"/></line>`; } }
+  for (const s of sys) {
+    const [x, y] = place(s), isCur = cur && s.id === cur.id, r = MC.navReach(V, s.id), sel = ui.system === s.id, rad = fs * (far(s) ? 0.45 : 0.45 + Math.min(0.5, s.planets.length * 0.06));
+    const col = isCur ? "var(--cy)" : r.ok ? "var(--ok)" : "var(--mu)";
+    g += `<g class="hit" data-fn="selSys" data-arg="${esc(s.id)}">`;
+    if (far(s)) g += `<line x1="${mx + (x - mx) * .9}" y1="${my + (y - my) * .9}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${fs * .1}" marker-end="url(#arr)"/>`;
+    g += `<circle cx="${x}" cy="${y}" r="${rad * 2.2}" fill="${esc(s.color || "#ffd080")}" fill-opacity=".12"/><circle cx="${x}" cy="${y}" r="${rad}" fill="${esc(s.color || "#ffd080")}" stroke="${sel ? "#fff" : col}" stroke-width="${fs * (sel ? .22 : .12)}"/>`;
+    if (isCur) g += `<circle cx="${x}" cy="${y}" r="${rad * 2.6}" fill="none" stroke="var(--cy)" stroke-width="${fs * .1}"><animate attributeName="r" values="${rad * 2};${rad * 3.2};${rad * 2}" dur="2.4s" repeatCount="indefinite"/></circle>`;
+    g += `<text x="${x}" y="${y + rad + fs * 1.15}" fill="${col}" font-size="${fs * .9}" text-anchor="middle">${esc(s.name)}${far(s) ? " · " + fmtLy(cur ? MC.navDistance(cur, s) : Math.hypot(s.x - cx, s.y - cy)) : ""}</text>`;
+    if (isCur) g += `<text x="${x}" y="${y - rad - fs * .6}" fill="var(--cy)" font-size="${fs * .65}" text-anchor="middle" font-family="IBM Plex Mono,monospace">VOUS ÊTES ICI</text>`;
+    g += `<title>${esc(s.name)}${r.ok ? " · atteignable" : r.why ? " · " + esc(r.why) : ""}</title></g>`;
+  }
+  return `<svg viewBox="${x0} ${y0} ${W} ${H}" role="img" aria-label="Carte interstellaire"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--mu)"/></marker></defs>${g}</svg>`;
+}
+
+PAGE.galaxy = () => {
+  const n = NAVS(), cat = n.catalog, J = cat.jump || {}, cur = curSys(), adm = V.me.admin;
+  const range = Math.min(J.maxLy ?? 12, (+n.fuel || 0) / (J.fuelPerLy || 0.5));
+  let side = panel("État de la navigation", "NAV.STAT", kv("Système actuel", esc(cur ? cur.name : "?")) + kv("Antimatière", fmtG(n.fuel) + ` <span class="dim" style="font-size:12px">${n.fuelMode === "manual" ? "fixée par l’ordinateur" : n.tanks + " cuve(s)"}</span>`) +
+    kv("Portée actuelle", fmtLy(range) + ` <span class="dim" style="font-size:12px">max ${J.maxLy ?? 12} al par saut</span>`) + kv("Consommation", fmtG(J.fuelPerLy ?? .5) + " par année-lumière") +
+    (n.jump ? kv("Saut en cours", `<span class="amb">→ ${esc((MC.navSystem(cat, n.jump.to) || {}).name || n.jump.to)}</span>`) : ""));
+  const s = ui.system && MC.navSystem(cat, ui.system);
+  if (s) {
+    const r = MC.navReach(V, s.id), isCur = cur && cur.id === s.id;
+    let b = (s.description ? `<p class="note" style="margin-top:0">${esc(s.description)}</p>` : "") + kv("Étoile", esc(s.star || "—")) +
+      (isCur ? kv("Position", `<span class="cy">le vaisseau est ici</span>`) : kv("Distance", fmtLy(r.dist)) + kv("Antimatière nécessaire", fmtG(r.fuel)) + kv("Durée du saut", `${r.seconds} s`));
+    b += `<div class="lbl">Planètes · ${s.planets.length}</div>` + (s.planets.map(p => `<span class="pill${p.rethium ? " vio" : ""}"${p.rethium ? ` style="color:var(--vio);border-color:var(--vio)"` : ""}>${esc(p.name)}${p.rethium ? " ⚠" : ""}</span>`).join("") || `<span class="dim">Aucune</span>`);
+    if (!isCur) b += (r.ok ? "" : `<p class="note amb">${esc(r.why)}</p>`) + `<div class="btns" style="margin-top:10px">${btn("Sauter vers " + s.name, { type: "nav.jump", system: s.id }, { perm: "nav.jump", cls: "solid", disabled: !r.ok, confirm: `Lancer le saut vers ${s.name} ? ${fmtG(r.fuel)} d’antimatière, ${r.seconds} s d’hyperespace.` })}</div>`;
+    if (adm) b += `<div class="lbl">Poste admin</div><div class="f2"><label class="f">Durée forcée (s)<input type="number" id="fj-s" min="1" placeholder="${r.seconds || 30}"></label><label class="f">Direction<select id="fj-d"><option value="">auto</option>${["north", "south", "east", "west", "up", "down"].map(d => `<option>${d}</option>`).join("")}</select></label></div><div class="btns">${btn("Saut forcé", null, { fn: "forceJump", arg: s.id, cls: "amb sm" })}${btn("Arrivée immédiate", { type: "admin.nav.set", system: s.id }, { cls: "ghost sm", confirm: `Placer le vaisseau dans ${s.name} sans animation ?` })}${btn("Modifier", null, { fn: "editSystem", arg: s.id, cls: "ghost sm" })}${isCur ? "" : btn("Supprimer", { type: "admin.nav.system.delete", id: s.id }, { cls: "red sm", confirm: `Supprimer le système ${s.name} et ses planètes ?` })}</div>`;
+    side += panel(s.name, "SYS." + s.id.toUpperCase().slice(0, 12), b);
+  } else side += panel("Système", "SYS", `<p class="empty">Cliquez sur un système de la carte.</p>`);
+  if (adm) {
+    side += panel("Carburant", "FUEL.ADM", `<div class="f2"><label class="f">Mode<select id="fu-m"><option value="tanks"${n.fuelMode !== "manual" ? " selected" : ""}>Somme des cuves à antimatière</option><option value="manual"${n.fuelMode === "manual" ? " selected" : ""}>Valeur fixée</option></select></label><label class="f">Antimatière (g)<input type="number" id="fu-v" min="0" step="0.1" value="${(+n.fuel || 0).toFixed(2)}"></label></div><div class="btns">${btn("Appliquer", null, { fn: "setFuel", cls: "sm" })}</div>`) +
+      panel("Règles de saut", "JUMP.ADM", `<div class="f2"><label class="f">Saut maximal (al)<input type="number" id="jr-max" step="0.5" value="${J.maxLy ?? 12}"></label><label class="f">Antimatière par al (g)<input type="number" id="jr-fuel" step="0.05" value="${J.fuelPerLy ?? .5}"></label><label class="f">Durée de base (s)<input type="number" id="jr-base" value="${J.baseSeconds ?? 30}"></label><label class="f">Secondes par al<input type="number" id="jr-per" step="0.5" value="${J.secondsPerLy ?? 6}"></label></div><div class="btns">${btn("Enregistrer", null, { fn: "saveRules", cls: "sm" })}${btn("Nouveau système", null, { fn: "editSystem", arg: "", cls: "sm ghost" })}</div>`) +
+      panel("Catalogue", "CAT.JSON", `<p class="note" style="margin-top:0">Systèmes, planètes et champs de météorites au format JSON (même format que le mod). Copiez-le pour le sauvegarder ou collez-en un autre pour le remplacer.</p><div class="btns">${btn("Exporter / importer", null, { fn: "catalogJson", cls: "sm" })}${btn("Catalogue par défaut", { type: "admin.nav.reset" }, { cls: "sm red", confirm: "Remplacer tout le catalogue par celui d’origine ?" })}</div>`);
+  }
+  return `${jumpBanner()}<div class="grid g-2b"><div class="stack">${panel("Carte interstellaire", "NAV.GAL", `<div class="svgw">${galaxyMap()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st" style="color:var(--cy)">Vaisseau</span><span class="st ok">Atteignable</span><span class="st gone">Hors de portée</span></div><p class="note" style="text-align:center;margin-inline:auto">Cercle pointillé : saut maximal. Disque vert : portée avec l’antimatière à bord. Les systèmes très lointains sont indiqués au bord de la carte avec leur distance.</p>`)}</div><div class="stack">${side}</div></div>`;
+};
+
+PAGE.screens = PAGE.screens || (() => panel("Écrans", "SCR", `<p class="empty">Aucun écran enregistré.</p>`));
+
+Object.assign(FN, {
+  selPlanet(el) { ui.planet = el.dataset.arg; ui.field = null; ui.comlink = null; render(); },
+  selField(el) { ui.field = el.dataset.arg; ui.planet = null; ui.comlink = null; render(); },
+  selCom(el) { ui.comlink = el.dataset.arg; render(); },
+  selSys(el) { ui.system = el.dataset.arg; render(); },
+  renameCom(el) {
+    const c = (NAVS().comlinks || []).find(x => x.id === el.dataset.arg); if (!c) return;
+    openModal(() => `<h3>Renommer la navette</h3><p class="mu m">${esc(c.id)}</p><label class="f">Nom<input type="text" id="cm-n" maxlength="40" value="${esc(c.name)}"></label>${mfoot()}`,
+      () => { act({ type: "comlink.rename", id: c.id, name: val("cm-n") }, "Navette renommée."); return true; });
+  },
+  forceJump(el) { act({ type: "admin.nav.force", system: el.dataset.arg, seconds: +val("fj-s") || null, direction: val("fj-d") || null }, "Saut forcé lancé."); },
+  setFuel() { act({ type: "admin.nav.fuel", mode: val("fu-m"), value: +val("fu-v") }, "Carburant mis à jour."); },
+  saveRules() { act({ type: "admin.nav.rules", maxLy: +val("jr-max"), fuelPerLy: +val("jr-fuel"), baseSeconds: +val("jr-base"), secondsPerLy: +val("jr-per") }, "Règles de saut enregistrées."); },
+  catalogJson() {
+    openModal(() => `<h3>Catalogue de navigation</h3><label class="f">JSON<textarea id="cat-j" rows="14" class="m" style="font-size:11.5px">${esc(JSON.stringify(NAVS().catalog, null, 1))}</textarea></label>${mfoot("Importer", "amb")}`,
+      () => { try { const c = JSON.parse(val("cat-j")); act({ type: "admin.nav.catalog", catalog: c }, "Catalogue importé."); return true; } catch (e) { toast("JSON invalide : " + e.message, "err"); return false; } });
+  },
+  editSystem(el) {
+    const s = el.dataset.arg ? MC.navSystem(NAVS().catalog, el.dataset.arg) : null;
+    openModal(() => `<h3>${s ? "Modifier " + esc(s.name) : "Nouveau système"}</h3><div class="f2">${s ? "" : `<label class="f">Identifiant<input type="text" id="sy-id" maxlength="40" placeholder="ross_154"></label>`}<label class="f">Nom<input type="text" id="sy-n" maxlength="60" value="${esc(s ? s.name : "")}"></label><label class="f">X (al)<input type="number" id="sy-x" step="0.5" value="${s ? s.x : 0}"></label><label class="f">Y (al)<input type="number" id="sy-y" step="0.5" value="${s ? s.y : 0}"></label><label class="f">Étoile<input type="text" id="sy-st" maxlength="60" value="${esc(s ? s.star || "" : "")}"></label><label class="f">Couleur<input type="color" id="sy-c" value="${esc(s ? s.color || "#ffd080" : "#ffd080")}"></label></div><label class="f">Description<textarea id="sy-d" rows="3" maxlength="400">${esc(s ? s.description || "" : "")}</textarea></label><p class="note">Les systèmes sont placés les uns par rapport aux autres, en années-lumière.</p>${mfoot()}`,
+      () => { act({ type: "admin.nav.system.save", sys: { id: s ? s.id : val("sy-id"), name: val("sy-n"), x: +val("sy-x"), y: +val("sy-y"), star: val("sy-st"), color: val("sy-c"), description: val("sy-d") } }, "Système enregistré."); return true; });
+  },
+  editField(el) {
+    const s = curSys(); if (!s) return; const f = el.dataset.arg ? (s.fields || []).find(x => x.id === el.dataset.arg) : null; const ship = NAVS().catalog.ship || { x: 0, z: 0 };
+    openModal(() => `<h3>${f ? "Modifier le champ" : "Nouveau champ de météorites"}</h3><div class="f2"><label class="f">Nom<input type="text" id="fd-n" maxlength="60" value="${esc(f ? f.name : "Champ de météorites")}"></label><label class="f">Densité<select id="fd-d">${["faible", "moyenne", "forte"].map(d => `<option${f && f.density === d ? " selected" : ""}>${d}</option>`).join("")}</select></label><label class="f">X<input type="number" id="fd-x" value="${f ? f.pos[0] : ship.x + 400}"></label><label class="f">Z<input type="number" id="fd-z" value="${f ? f.pos[1] : ship.z}"></label><label class="f">Rayon (blocs)<input type="number" id="fd-r" value="${f ? f.radius : 250}"></label></div><label class="chk"><input type="checkbox" id="fd-s"${!f || f.show !== false ? " checked" : ""}> Visible par l’équipage</label>${mfoot()}`,
+      () => { act({ type: "admin.nav.field.save", system: s.id, field: { id: f ? f.id : null, name: val("fd-n"), density: val("fd-d"), pos: [+val("fd-x"), +val("fd-z")], radius: +val("fd-r"), show: document.getElementById("fd-s").checked } }, "Champ enregistré."); return true; });
+  },
+  editPlanet(el) {
+    const s = curSys(); if (!s) return; const p = el.dataset.arg ? s.planets.find(x => x.id === el.dataset.arg) : null; const ship = NAVS().catalog.ship || { x: 0, y: 100, z: 0 };
+    const dims = [...new Set(NAVS().catalog.systems.flatMap(sy => sy.planets.map(q => q.dimension)).concat([MC.RETHIUM_DIM]))];
+    ui.draft = { info: p ? JSON.parse(JSON.stringify(p.info || [])) : [{ k: "Statut", v: "", show: true }] };
+    const env = p && p.env ? p.env : null;
+    modal.planet = { s, p };
+    openModal(() => `<h3>${p ? "Modifier " + esc(p.name) : "Nouvelle planète · " + esc(s.name)}</h3><div class="f2"><label class="f">Nom<input type="text" id="pl-n" maxlength="60" value="${esc(p ? p.name : "")}"></label><label class="f">Dimension<input type="text" id="pl-dim" list="pl-dims" value="${esc(p ? p.dimension : MC.RETHIUM_DIM)}"><datalist id="pl-dims">${dims.map(d => `<option value="${esc(d)}">`).join("")}</datalist></label><label class="f">Apparence<select id="pl-st">${MC.PLANET_STYLES.map(st => `<option${p && p.style === st ? " selected" : ""}>${st}</option>`).join("")}</select></label><label class="f">Atmosphère<input type="color" id="pl-c" value="${esc(p ? p.atmosphere : "#aaccff")}"></label><label class="f">Taille (blocs)<input type="number" id="pl-sz" value="${p ? p.size : 160}"></label><label class="f">Rotation<input type="number" id="pl-sp" step="0.1" value="${p ? p.spin : 0.4}"></label><label class="f">X<input type="number" id="pl-x" value="${p ? p.pos[0] : ship.x + 800}"></label><label class="f">Y<input type="number" id="pl-y" value="${p ? p.pos[1] : ship.y}"></label><label class="f">Z<input type="number" id="pl-z" value="${p ? p.pos[2] : ship.z}"></label><label class="f">Gravité (g)<input type="number" id="pl-g" step="0.01" value="${env ? env.g : ""}" placeholder="—"></label><label class="f">Température (°C)<input type="number" id="pl-t" value="${env ? env.t : ""}" placeholder="—"></label><label class="f">Atmosphère (kPa)<input type="text" id="pl-atm" value="${esc(env ? Object.entries(env.atm || {}).map(([k, v]) => k + "=" + v).join(", ") : "")}" placeholder="N2=78, O2=21, CO2=0.4"></label></div><label class="chk"><input type="checkbox" id="pl-r"${p && p.ring ? " checked" : ""}> Anneaux</label><p class="note">Dimension « ${MC.RETHIUM_DIM} » = planète à Rethium. Les dimensions planétaires doivent exister dans le mod (datapack).</p><div class="lbl">Informations affichées sur la carte</div>${ui.draft.info.map((i, k) => `<div class="row" style="gap:6px;margin-bottom:6px"><input type="text" id="pi-k-${k}" value="${esc(i.k)}" placeholder="Particularité" style="flex:1 1 30%"><input type="text" id="pi-v-${k}" value="${esc(i.v)}" placeholder="Valeur" style="flex:2 1 50%"><label class="chk" title="Visible par l’équipage"><input type="checkbox" id="pi-s-${k}"${i.show !== false ? " checked" : ""}> visible</label><button class="b sm ghost" data-fn="infRm" data-arg="${k}" aria-label="Retirer">✕</button></div>`).join("")}<div class="btns">${btn("Ajouter une information", null, { fn: "infAdd", cls: "sm ghost" })}</div>${mfoot()}`,
+      () => {
+        readInfos();
+        const atm = {}; val("pl-atm").split(/[,;]+/).map(x => x.trim()).filter(Boolean).forEach(x => { const [k, v] = x.split("="); if (k && v !== undefined) atm[k.trim().toUpperCase()] = +v; });
+        const hasEnv = val("pl-g") !== "" || val("pl-t") !== "" || Object.keys(atm).length;
+        act({ type: "admin.nav.planet.save", system: s.id, planet: { id: p ? p.id : null, name: val("pl-n"), dimension: val("pl-dim"), style: val("pl-st"), atmosphere: val("pl-c"), size: +val("pl-sz"), spin: +val("pl-sp"), pos: [+val("pl-x"), +val("pl-y"), +val("pl-z")], ring: document.getElementById("pl-r").checked, env: hasEnv ? { g: +val("pl-g") || 1, t: +val("pl-t") || 15, atm } : null, info: ui.draft.info } }, "Planète enregistrée.");
+        return true;
+      });
+  },
+  infAdd() { readInfos(); ui.draft.info.push({ k: "", v: "", show: true }); drawModal(); },
+  infRm(el) { readInfos(); ui.draft.info.splice(+el.dataset.arg, 1); drawModal(); }
+});
+function readInfos() {
+  if (!ui.draft || !ui.draft.info) return;
+  ui.draft.info.forEach((i, k) => { const kk = document.getElementById("pi-k-" + k); if (!kk) return; i.k = kk.value; i.v = val("pi-v-" + k); i.show = document.getElementById("pi-s-" + k).checked; });
+}
 
 /* =====================================================================
    Événements
