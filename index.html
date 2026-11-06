@@ -206,6 +206,12 @@ body.glass,html.glass{background:transparent!important}
 body.glass .kio{background:transparent}
 body.glass .pn,body.glass .pn .pi{background:rgba(3,14,20,.42)!important}
 body.glass .kio .khead{border-color:rgba(98,230,242,.25)}
+.lvls{display:grid;gap:8px;margin-top:12px}
+.lvls .lvlb{display:grid;grid-template-columns:28px 1fr;text-align:left;align-items:center;gap:2px 10px;padding:10px 12px;height:auto;white-space:normal}
+.lvls .lvlb b{grid-row:span 2;font-size:22px;font-family:var(--f-mono)}
+.lvls .lvlb span{font-size:13px;letter-spacing:.02em;text-transform:none}
+.lvls .lvlb i{font-style:normal;font-size:11px;text-transform:none;letter-spacing:0}
+.lvls .lvlb.on{box-shadow:0 0 0 2px #fff inset}
 #modal[hidden]{display:none}
 #modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(2,6,9,.72);padding:16px}
 #modal .pn{width:min(640px,100%);max-height:calc(100% - 32px)}
@@ -253,7 +259,7 @@ const TEAMS = ["jour", "nuit", "aucune"];
 const PAGES = {
   overview: "Vue d’ensemble", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
-  galaxy: "Carte interstellaire", log: "Journal", structure: "Structure", screens: "Écrans", admin: "Ordinateur de bord"
+  galaxy: "Carte interstellaire", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", admin: "Ordinateur de bord"
 };
 /* Pages réservées au poste admin. */
 const ADMIN_PAGES = ["admin", "screens"];
@@ -276,6 +282,7 @@ const ACTIONS = {
   "structure.edit": ["Nommer ponts, pièces et sections", 5, "structure"],
   "perms.edit":     ["Changer les niveaux requis", 7, "structure"],
   "announce":       ["Annonce générale", 6, "overview"],
+  "pa.play":        ["Diffuser un signal (quart, début/fin de communication)", 4, "pa"],
   "nav.jump":       ["Lancer un saut hyperespace", 6, "galaxy"],
   "comlink.rename": ["Renommer une liaison com (navette)", 4, "starmap"]
 };
@@ -339,6 +346,7 @@ function emptyShip(name = "Meridian") {
     stocks: { fuel: 100, water: 100, food: 100, o2: 100, parts: 100 },
     nav: navEmpty(),
     screens: screensEmpty(),
+    pa: paEmpty(),
     seq: 1
   };
 }
@@ -411,7 +419,7 @@ function cleanScreenCfg(c) {
   c = c || {};
   const mode = SCREEN_MODES[c.mode] ? c.mode : "status";
   const out = { mode };
-  if (mode === "page") { out.page = PAGES[c.page] && !ADMIN_PAGES.includes(c.page) ? c.page : "overview"; out.level = Math.max(0, Math.min(7, c.level | 0)); if (c.uuid) out.uuid = clean(c.uuid, 64); }
+  if (mode === "page") { out.page = PAGES[c.page] && !ADMIN_PAGES.includes(c.page) ? c.page : "overview"; out.level = Math.max(0, Math.min(7, c.level | 0)); if (c.uuid) out.uuid = clean(c.uuid, 64); if (c.mirror) out.mirror = clean(String(c.mirror), 24); }
   if (mode === "text") { out.text = clean(c.text, 600); out.size = Math.max(1, Math.min(5, (c.size | 0) || 3)); out.color = /^#[0-9a-f]{6}$/i.test(c.color || "") ? c.color : "#62e6f2"; }
   if (mode === "url") { const u = String(c.url || "").trim().slice(0, 500); out.url = /^https:\/\//i.test(u) ? u : ""; }
   return out;
@@ -449,6 +457,54 @@ function displayView(S, id) {
   v.display = { id, cfg, screen: sc.list[id] || null, name: (sc.meta[id] || {}).name || id };
   v.me.perms = Object.fromEntries(Object.keys(v.me.perms).map(k => [k, false]));
   return v;
+}
+
+/* =========================== Diffusion (haut-parleurs) ===========================
+   Haut-parleurs et micros déclarés par le mod. Alerte générale niveaux 1 à 5 (son en boucle sur les
+   haut-parleurs ciblés), signaux ponctuels, messages enregistrés par l'admin joués par-dessus l'alarme. */
+const PA_LEVELS = {
+  "1": ["Niveau 1 · rassemblement", "warn"], "2": ["Niveau 2 · dépressurisation ou manœuvre technique", "warn"],
+  "3": ["Niveau 3 · pressurisation non garantie, verrouillage des portes imminent", "crit"],
+  "4": ["Niveau 4 · incendie ou brèche, évacuez", "crit"], "5": ["Niveau 5 · évacuation vers une zone sécurisée", "crit"]
+};
+const PA_SOUNDS = { shift_change: "Changement de quart", comm_start: "Début de communication", comm_end: "Fin de communication", big_door: "Bruit de grosse porte" };
+function paEmpty() { return { list: {}, mics: {}, meta: {}, msgs: {}, alert: null }; }
+/* Message « speakers » du mod : liste complète des haut-parleurs et micros. */
+function applySpeakers(S, m, now = Date.now()) {
+  const pa = S.pa || (S.pa = paEmpty());
+  const one = (x) => ({ id: clean(x.id, 24), dim: clean(x.dim, 80), x: +x.x || 0, y: +x.y || 0, z: +x.z || 0, room: x.room ? clean(x.room, 60) : null, seen: now });
+  if (Array.isArray(m.list)) { pa.list = {}; for (const x of m.list.slice(0, 1000)) if (x && x.id) { const o = one(x); pa.list[o.id] = o; } }
+  if (Array.isArray(m.mics)) { pa.mics = {}; for (const x of m.mics.slice(0, 200)) if (x && x.id) { const o = one(x); o.onAir = x.onAir ? clean(x.onAir, 40) : null; pa.mics[o.id] = o; } }
+}
+const paMeta = (S, id) => (S.pa.meta[id] || {});
+/* Cible → identifiants des haut-parleurs actifs. target : {kind:"all"} | {kind:"group", value} | {kind:"room", value} | {kind:"ids", value:[...]} */
+function paTargets(S, target) {
+  const pa = S.pa || paEmpty(), t = target || { kind: "all" };
+  return Object.values(pa.list).filter(sp => paMeta(S, sp.id).enabled !== false && (
+    t.kind === "group" ? paMeta(S, sp.id).group === t.value :
+    t.kind === "room" ? sp.room === t.value :
+    t.kind === "ids" ? (t.value || []).includes(sp.id) : true)).map(sp => sp.id);
+}
+function cleanTarget(t) {
+  t = t || {};
+  const kind = ["all", "group", "room", "ids"].includes(t.kind) ? t.kind : "all";
+  return kind === "ids" ? { kind, value: (Array.isArray(t.value) ? t.value : []).map(x => clean(x, 24)).slice(0, 500) } : kind === "all" ? { kind } : { kind, value: clean(t.value, 60) };
+}
+function paTargetLabel(S, t) {
+  if (!t || t.kind === "all") return "tout le vaisseau";
+  if (t.kind === "group") return "groupe « " + t.value + " »";
+  if (t.kind === "room") return (S.rooms[t.value] ? S.rooms[t.value].name : t.value);
+  return (t.value || []).length + " haut-parleur(s)";
+}
+/* État complet envoyé au mod (idempotent). */
+function paStateCmd(S) {
+  const pa = S.pa || paEmpty(), a = pa.alert;
+  const msg = a && pa.msgs[a.level] ? { id: pa.msgs[a.level].audio, interval: pa.msgs[a.level].interval } : null;
+  const rooms = {};
+  for (const r of Object.values(S.rooms)) if (r.alarm) rooms[r.id] = "4";
+  return { type: "pa.state", alert: a ? { level: a.level, speakers: paTargets(S, a.target), message: msg } : null, rooms,
+    disabled: Object.keys(pa.list).filter(id => paMeta(S, id).enabled === false),
+    mics: Object.fromEntries(Object.keys(pa.mics).map(id => [id, paTargets(S, (pa.meta[id] || {}).target || { kind: "all" })])) };
 }
 /* Simulation du saut en démo / sans mod. */
 function navSimulate(S, now) {
@@ -557,7 +613,7 @@ function roomStatus(state, r) {
 
 function computeAlerts(state, withSilent = false) {
   const out = [];
-  if (state.ship.alert) out.push({ key: "ship", lvl: state.ship.alert === "rouge" ? "crit" : "warn", text: "Alerte " + state.ship.alert + " générale", room: null });
+  if (state.ship.alert) out.push({ key: "ship", lvl: (PA_LEVELS[state.ship.alert] || [0, "warn"])[1], text: "Alerte générale · " + (PA_LEVELS[state.ship.alert] ? PA_LEVELS[state.ship.alert][0] : state.ship.alert), room: null });
   for (const r of Object.values(state.rooms)) {
     const st = roomStatus(state, r), e = r.env || {};
     if (st === "gone") continue;
@@ -756,7 +812,7 @@ function apply(state, actor, a, ctx = {}) {
       case "room.pressurize": { need("room.pressurize"); const r = room(a.room); r.mode = "pressurize"; cmds.push({ type: "room.pressurize", room: r.id }); L(`lance la pressurisation de ${r.name}.`, "atmos"); break; }
       case "room.vent": { need("room.vent"); const r = room(a.room); r.mode = "vent"; cmds.push({ type: "room.vent", room: r.id }); L(`lance le vidage de l’air de ${r.name}.`, "crit"); break; }
       case "room.stop": { const r = room(a.room); need(r.mode === "vent" ? "room.vent" : "room.pressurize"); r.mode = null; cmds.push({ type: "room.stop", room: r.id }); L(`arrête le cycle d’air de ${r.name}.`, "atmos"); break; }
-      case "room.alarm": { need("room.alarm"); const r = room(a.room); r.alarm = !!a.on; cmds.push({ type: "alarm.set", room: r.id, on: r.alarm, level: "jaune" }); if (!a.on) state.acks = state.acks.filter(k => k !== "man:" + r.id); L(`${a.on ? "déclenche" : "coupe"} l’alarme de ${r.name}.`, "alarm"); break; }
+      case "room.alarm": { need("room.alarm"); const r = room(a.room); r.alarm = !!a.on; cmds.push({ type: "alarm.set", room: r.id, on: r.alarm, level: "4" }); cmds.push(paStateCmd(state)); if (!a.on) state.acks = state.acks.filter(k => k !== "man:" + r.id); L(`${a.on ? "déclenche" : "coupe"} l’alarme de ${r.name}.`, "alarm"); break; }
       case "room.rename": { need("structure.edit"); const r = state.rooms[a.room]; if (!r) throw new Error("Pièce inconnue."); r.name = clean(a.name, 40) || r.name; r.named = true; break; }
       case "room.setSection": { need("structure.edit"); const r = state.rooms[a.room]; if (!r) throw new Error("Pièce inconnue."); if (a.section && !state.sections[a.section]) throw new Error("Section inconnue."); r.section = a.section || null; r.sectionSet = true; break; }
       case "deck.rename": { need("structure.edit"); const d = state.decks.find(x => x.id === a.deck); if (!d) throw new Error("Pont inconnu."); d.name = clean(a.name, 40) || d.name; d.named = true; break; }
@@ -776,7 +832,47 @@ function apply(state, actor, a, ctx = {}) {
         state.perms[a.action] = v; L(`« ${ACTIONS[a.action][0]} » exige désormais le niveau ${v}.`, "struct"); break;
       }
       /* Alertes */
-      case "alarm.general": { need("alarm.general"); state.ship.alert = a.level || null; cmds.push({ type: "alarm.set", room: null, on: !!a.level, level: a.level || null }); L(a.level ? `déclare l’alerte ${a.level}.` : "lève l’alerte générale.", "alarm"); break; }
+      case "alarm.general": {
+        need("alarm.general");
+        const lv = a.level != null && PA_LEVELS[String(a.level)] ? String(a.level) : null;
+        state.ship.alert = lv;
+        if (!state.pa) state.pa = paEmpty();
+        state.pa.alert = lv ? { level: lv, target: cleanTarget(a.target), since: now, by: actor.name } : null;
+        cmds.push({ type: "alarm.set", room: null, on: !!lv, level: lv });
+        cmds.push(paStateCmd(state));
+        L(lv ? `déclare l’alerte de ${PA_LEVELS[lv][0].toLowerCase()} (${paTargetLabel(state, state.pa.alert.target)}).` : "lève l’alerte générale.", "alarm");
+        break;
+      }
+      case "pa.play": {
+        need("pa.play");
+        const snd = PA_SOUNDS[a.sound] ? a.sound : null; if (!snd) throw new Error("Signal inconnu.");
+        const t = cleanTarget(a.target);
+        cmds.push({ type: "pa.play", sound: snd, speakers: paTargets(state, t) });
+        L(`diffuse « ${PA_SOUNDS[snd]} » (${paTargetLabel(state, t)}).`, "alarm");
+        break;
+      }
+      case "admin.pa.meta": case "admin.pa.msg.save": case "admin.pa.msg.delete": case "admin.pa.mic": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const pa = state.pa || (state.pa = paEmpty());
+        if (a.type === "admin.pa.meta") {
+          const ids = (Array.isArray(a.ids) ? a.ids : []).map(x => clean(x, 24)).filter(Boolean).slice(0, 1000);
+          for (const id of ids) { const m = pa.meta[id] || (pa.meta[id] = {}); if (a.name !== undefined) m.name = clean(a.name, 40); if (a.group !== undefined) m.group = clean(a.group, 40); if (a.enabled !== undefined) m.enabled = !!a.enabled; }
+          if (a.groupEnable !== undefined && a.group) for (const id of Object.keys(pa.list)) { if ((pa.meta[id] || {}).group === a.group) (pa.meta[id] || (pa.meta[id] = {})).enabled = !!a.groupEnable; }
+          if (a.allEnable !== undefined) for (const id of Object.keys(pa.list)) (pa.meta[id] || (pa.meta[id] = {})).enabled = !!a.allEnable;
+        } else if (a.type === "admin.pa.mic") {
+          const id = clean(a.id, 24); (pa.meta[id] || (pa.meta[id] = {})).target = cleanTarget(a.target);
+          if (a.name !== undefined) pa.meta[id].name = clean(a.name, 40);
+        } else if (a.type === "admin.pa.msg.save") {
+          const lv = PA_LEVELS[String(a.level)] ? String(a.level) : null; if (!lv) throw new Error("Niveau d’alerte inconnu.");
+          if (!a.audio) throw new Error("Aucun enregistrement.");
+          pa.msgs[lv] = { audio: clean(a.audio, 40), name: clean(a.name || "Message", 60), interval: Math.max(10, Math.min(600, a.interval | 0 || 30)), dur: Math.max(0, +a.dur || 0), at: now };
+          L(`enregistre le message du niveau ${lv} (toutes les ${pa.msgs[lv].interval} s).`, "admin");
+        } else {
+          const lv = String(a.level); delete pa.msgs[lv]; L(`supprime le message du niveau ${lv}.`, "admin");
+        }
+        cmds.push(paStateCmd(state));
+        break;
+      }
       case "alarm.ack": { need("alarm.ack"); if (!state.acks.includes(a.key)) state.acks.push(a.key); if (a.key.startsWith("dead:") && state.people[a.key.slice(5)]) state.people[a.key.slice(5)].vitals.reported = true; L(`acquitte une alarme.`, "alarm"); break; }
       case "announce": { need("announce"); const text = clean(a.text, 280); if (!text) throw new Error("Annonce vide."); cmds.push({ type: "announce", text, from: who }); L(`annonce : « ${text} »`, "announce"); break; }
       /* Procédures */
@@ -1022,6 +1118,7 @@ function viewFor(state, actor, term) {
   const termPages = term && state.terminals[term] ? state.terminals[term].pages : Object.keys(PAGES);
   let pages = Object.keys(PAGES).filter(p => adm || (termPages.includes(p) && !ADMIN_PAGES.includes(p)));
   if (!adm && !perms["structure.edit"] && !perms["perms.edit"]) pages = pages.filter(p => p !== "structure");
+  if (!adm && !perms["alarm.general"] && !perms["pa.play"]) pages = pages.filter(p => p !== "pa");
   v.alerts = computeAlerts(state, adm);
   if (!adm) {
     v.faults = []; v.computer = { refuse: state.computer.refuse, message: state.computer.refuse ? state.computer.message : "" };
@@ -1141,6 +1238,14 @@ function seedDemo(now = Date.now()) {
     { id: "f3", key: "fuel.leak", target: { kind: "ship" }, silent: true, active: true, t: now - 900000 }
   ];
   s.stocks = { fuel: 81, water: 74, food: 68, o2: 88, parts: 42 };
+  s.pa = paEmpty();
+  [["SPK-1A20", 120, 70, -6, "Passerelle"], ["SPK-2B31", 136, 70, 4, "Passerelle"], ["SPK-3C42", 60, 54, 10, "Habitat"], ["SPK-4D53", 40, 38, 20, "Machines"], ["SPK-5E64", 90, 38, -12, "Machines"], ["SPK-6F75", 10, 54, -4, ""]].forEach(([id, x, y, z, g], k) => {
+    const rid = Object.keys(s.rooms)[k * 7 % Object.keys(s.rooms).length];
+    s.pa.list[id] = { id, dim: "minecraft:overworld", x, y, z, room: rid, seen: now };
+    s.pa.meta[id] = { name: (g || "Coursive") + " " + (k + 1), group: g, enabled: id !== "SPK-6F75" };
+  });
+  s.pa.mics = { "MIC-9A01": { id: "MIC-9A01", dim: "minecraft:overworld", x: 128, y: 70, z: 0, room: null, onAir: null, seen: now } };
+  s.pa.meta["MIC-9A01"] = { name: "Micro passerelle", target: { kind: "all" } };
   s.screens = screensEmpty();
   [["SCR-4A1C", "screen", 4, 2, 120, 66, -8], ["SCR-7B20", "flatscreen", 2, 1, 132, 66, -4], ["SCR-90D3", "transparent", 3, 2, 104, 67, 2], ["SCR-B2E8", "flatscreen", 1, 1, 60, 66, 0]].forEach(([id, type, w, h, x, y, z]) => { s.screens.list[id] = { id, type, dim: "minecraft:overworld", x, y, z, w, h, relay: null, override: null, seen: now }; });
   s.screens.meta = { "SCR-4A1C": { name: "Passerelle · grand écran", group: "Passerelle" }, "SCR-7B20": { name: "Passerelle · console", group: "Passerelle" }, "SCR-90D3": { name: "Hublot navigation", group: "" }, "SCR-B2E8": { name: "Cantine", group: "Habitat" } };
@@ -1162,7 +1267,7 @@ function seedDemo(now = Date.now()) {
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
 </script>
 <script>
@@ -1181,12 +1286,26 @@ const now = () => Date.now() + OFF;
 /* Écran en jeu : ?screen=ID (lecture seule). Le fond devient transparent pour les écrans transparents. */
 const SCREEN = (Q.get("screen") || "").slice(0, 24);
 const SCREEN_Q = SCREEN ? "&screen=" + encodeURIComponent(SCREEN) : "";
+/* Ordinateur en jeu : ?mirror=CLÉ → la console publie ce qu'elle affiche, les écrans en recopie la suivent. */
+const MIRROR_KEY = (Q.get("mirror") || "").slice(0, 24);
+let MIRROR = null, mirrorLast = "", mirrorTimer = 0;
+function mirrorState() {
+  const m = document.getElementById("main"), max = m ? m.scrollHeight - m.clientHeight : 0;
+  return { page: ui.page, deck: ui.deck, room: ui.room, door: ui.door, person: ui.person, sec: ui.sec, system: ui.system, planet: ui.planet, field: ui.field, comlink: ui.comlink, crewF: ui.crewF, logF: ui.logF, scroll: max > 0 ? Math.round(m.scrollTop / max * 1000) / 1000 : 0 };
+}
+function mirrorPush() {
+  if (!MIRROR_KEY || !T || !T.mirror) return;
+  clearTimeout(mirrorTimer);
+  mirrorTimer = setTimeout(() => { const st = mirrorState(), k = JSON.stringify(st); if (k !== mirrorLast) { mirrorLast = k; T.mirror(st); } }, 150);
+}
 
 function makeDemo() {
   const S = MC.seedDemo();
   const d = { S, actor: "p-vasseur", term: "" };
   d.view = () => SCREEN ? MC.displayView(S, SCREEN) : MC.viewFor(S, S.people[d.actor], d.term || null);
   d.send = (a) => {
+    // Démo : l'audio enregistré n'est pas stocké, on garde juste sa durée.
+    if (a && a.type === "admin.pa.msg.save" && a.pcm) a = Object.assign({}, a, { audio: "demo-" + Date.now(), dur: Math.round(a.pcm.length * 3 / 4 / 2 / 16000 * 10) / 10, pcm: undefined });
     const r = MC.apply(S, S.people[d.actor], a, { now: Date.now(), term: d.term || null });
     if (r.ok) r.cmds.forEach(c => MODFEED.unshift({ t: Date.now(), c }));
     MODFEED.length = Math.min(MODFEED.length, 40);
@@ -1207,12 +1326,14 @@ function makeRemote(token) {
       const m = JSON.parse(ev.data);
       if (m.type === "state") update(m.state, m.now);
       if (m.type === "hull") { setHull(m.hull); if (V) render(); }
+      if (m.type === "mirror") { MIRROR = m.ui || null; if (V) render(); }
       if (m.type === "result" && R.pend.has(m.reqId)) { R.pend.get(m.reqId)(m); R.pend.delete(m.reqId); }
     };
     ws.onclose = (ev) => { LINK = "lost"; renderChrome(); if (ev.code === 1008) return; setTimeout(open, Math.min(15000, 800 * 2 ** R.retry++)); };
   };
   open();
   setInterval(() => { if (R.ws && R.ws.readyState === 1) R.ws.send('{"type":"ping"}'); }, 25000);
+  R.mirror = (ui) => { if (R.ws && R.ws.readyState === 1) R.ws.send(JSON.stringify({ type: "mirror", key: MIRROR_KEY, ui })); };
   R.as = (person) => { if (R.ws && R.ws.readyState === 1) R.ws.send(JSON.stringify({ type: "as", person: person || null })); };
   R.send = (action) => new Promise(res => {
     if (!R.ws || R.ws.readyState !== 1) return res({ ok: false, error: "Liaison perdue avec l’ordinateur de bord." });
@@ -1239,6 +1360,7 @@ async function boot() {
    État de l'interface
    ===================================================================== */
 const ui = { page: "overview", deck: null, room: null, door: null, person: null, sec: null, crewF: "all", logF: "all", q: {}, atF: "all", draft: null, planet: null, field: null, comlink: null, system: null };
+document.addEventListener("scroll", () => { if (MIRROR_KEY) mirrorPush(); }, true);
 /* Page affichée dans l'adresse (#page) : l'ordinateur en jeu la lit pour la recopie sur les écrans. */
 { const h = location.hash.replace(/^#/, ""); if (h && MC.PAGES[h]) ui.page = h; }
 let lastHash = "";
@@ -1293,7 +1415,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["plan", "02"], ["atmos", "03"], ["doors", "04"], ["crew", "05"], ["procs", "06"], ["starmap", "07"], ["galaxy", "08"], ["log", "09"], ["structure", "10"], ["screens", "11"], ["admin", "12"]];
+const NAV = [["overview", "01"], ["plan", "02"], ["atmos", "03"], ["doors", "04"], ["crew", "05"], ["procs", "06"], ["pa", "07"], ["starmap", "08"], ["galaxy", "09"], ["log", "10"], ["structure", "11"], ["screens", "12"], ["admin", "13"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -1305,12 +1427,13 @@ function render() {
   if (!V) return renderChrome();
   if (V.display) return renderDisplay();
   syncHash();
+  queueMicrotask(mirrorPush);
   const app = document.getElementById("app");
   const snap = snapshotForm();
   if (!V.me) { app.innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">IDENTITÉ INCONNUE DU REGISTRE</p><p class="mu">Reconnectez-vous depuis un terminal du vaisseau.</p></div></div>`; return; }
   const alerts = V.alerts.filter(a => !a.ack);
   const crit = alerts.some(a => a.lvl === "crit");
-  const shipChip = V.ship.alert === "rouge" ? `<span class="chip crit"><i></i>Alerte rouge</span>` : V.ship.alert ? `<span class="chip warn"><i></i>Alerte ${esc(V.ship.alert)}</span>` : crit ? `<span class="chip crit"><i></i>${alerts.filter(a => a.lvl === "crit").length} alarme(s) critique(s)</span>` : alerts.length ? `<span class="chip warn"><i></i>${alerts.length} alarme(s)</span>` : `<span class="chip ok"><i></i>Nominal</span>`;
+  const shipChip = V.ship.alert ? `<span class="chip ${V.ship.alert >= "3" ? "crit" : "warn"}"><i></i>Alerte niveau ${esc(V.ship.alert)}</span>` : crit ? `<span class="chip crit"><i></i>${alerts.filter(a => a.lvl === "crit").length} alarme(s) critique(s)</span>` : alerts.length ? `<span class="chip warn"><i></i>${alerts.length} alarme(s)</span>` : `<span class="chip ok"><i></i>Nominal</span>`;
   const linkChip = LINK === "demo" ? `<span class="chip cy">Démo · sans mod</span>` : LINK === "lost" ? `<span class="chip crit">Liaison perdue</span>` : V.ship.modOnline ? `<span class="chip ok">Mod en ligne</span>` : `<span class="chip off">Mod hors ligne</span>`;
   const term = V.me.term && V.terminals[V.me.term];
   const d = new Date(now()), hh = d.getHours();
@@ -1614,9 +1737,9 @@ PAGE.overview = () => {
   const procs = V.procs.filter(p => p.status === "wait" || p.status === "countdown");
   const lvl = V.ship.alert;
   const left = `
-${panel("État du vaisseau", "SYS.STAT", `<div class="big ${lvl === "rouge" ? "red" : lvl ? "amb" : alerts.some(a => a.lvl === "crit") ? "red" : "okc"}" style="font-size:24px;letter-spacing:.12em">${lvl ? "ALERTE " + lvl.toUpperCase() : alerts.length ? "INCIDENTS EN COURS" : "NOMINAL"}</div>
+${panel("État du vaisseau", "SYS.STAT", `<div class="big ${lvl >= "3" ? "red" : lvl ? "amb" : alerts.some(a => a.lvl === "crit") ? "red" : "okc"}" style="font-size:24px;letter-spacing:.12em">${lvl ? "ALERTE NIVEAU " + esc(lvl) : alerts.length ? "INCIDENTS EN COURS" : "NOMINAL"}</div>${lvl && MC.PA_LEVELS[lvl] ? `<p class="note" style="margin-top:4px">${esc(MC.PA_LEVELS[lvl][0])}</p>` : ""}
 <p class="note">${alerts.length} alarme(s) active(s) · ${bad} pièce(s) hors norme sur ${rooms.length}</p>
-<div class="btns" style="margin-top:12px">${btn("Alerte jaune", { type: "alarm.general", level: "jaune" }, { perm: "alarm.general", cls: "amb sm" })}${btn("Alerte rouge", { type: "alarm.general", level: "rouge" }, { perm: "alarm.general", cls: "red sm", confirm: "Déclarer l’alerte rouge sur tout le vaisseau ?" })}${lvl ? btn("Lever l’alerte", { type: "alarm.general", level: null }, { perm: "alarm.general", cls: "ghost sm" }) : ""}</div>
+<div class="btns" style="margin-top:12px">${["1", "2", "3", "4", "5"].map(l => btn("Niv. " + l, { type: "alarm.general", level: l, target: { kind: "all" } }, { perm: "alarm.general", cls: (l >= "3" ? "red" : "amb") + " sm", confirm: `Déclarer l’alerte ${MC.PA_LEVELS[l][0].toLowerCase()} sur tout le vaisseau ?` })).join("")}${lvl ? btn("Lever l’alerte", { type: "alarm.general", level: null }, { perm: "alarm.general", cls: "ghost sm" }) : ""}</div>
 <div class="btns" style="margin-top:8px">${btn("Annonce générale", null, { perm: "announce", fn: "announce", cls: "sm" })}</div>`)}
 ${panel("Atmosphère", "ENV.AVG", `<div class="tiles"><div class="tile"><span>Pression moy.</span><div class="big">${n1(avgP)}<small>kPa</small></div>${bar(avgP / 101.3 * 100, avgP < 90 ? "warn" : "", true)}</div><div class="tile"><span>O₂ minimum</span><div class="big ${minO2 < 15 ? "red" : minO2 < 18 ? "amb" : ""}">${n1(minO2)}<small>%</small></div>${bar(minO2 / 21 * 100, minO2 < 15 ? "crit" : minO2 < 18 ? "warn" : "", true)}</div></div>`)}
 ${panel("Équipage", "BIO.SCAN", perm("crew.vitals") ? `<div class="tiles"><div class="tile"><span>En vie</span><div class="big okc">${alive.length}</div></div><div class="tile"><span>Blessés</span><div class="big ${hurt.length ? "amb" : ""}">${hurt.length}</div></div><div class="tile"><span>Signal perdu</span><div class="big ${lost.length ? "red" : ""}">${lost.length}</div></div><div class="tile"><span>En ligne</span><div class="big">${online.length}<small>/ ${ppl.length}</small></div></div></div>` : `<p class="empty">Données biométriques réservées (niv. ${need("crew.vitals")}).</p>`)}`;
@@ -1787,7 +1910,7 @@ function openModal(draw, onOk) {
   setTimeout(() => { const f = el.querySelector("input,select,textarea,button"); if (f) f.focus(); }, 0);
 }
 function drawModal() { const el = document.getElementById("modal"); el.innerHTML = `<div class="pn" role="dialog" aria-modal="true"><div class="pi">${modal.draw()}</div></div>`; }
-function closeModal() { const el = document.getElementById("modal"); el.hidden = true; el.innerHTML = ""; modal.onOk = null; }
+function closeModal() { if (typeof REC !== "undefined" && REC.stream) recStop(); const el = document.getElementById("modal"); el.hidden = true; el.innerHTML = ""; modal.onOk = null; }
 const mfoot = (ok = "Enregistrer", cls = "solid") => `<div class="mfoot"><button class="b ghost" data-m="cancel">Annuler</button><button class="b ${cls}" data-m="ok">${esc(ok)}</button></div>`;
 const val = (id) => (document.getElementById(id) || {}).value;
 
@@ -2100,15 +2223,22 @@ function renderDisplay() {
   if (c.mode === "text") body = `<div class="ktext" style="color:${esc(c.color || "var(--cy)")};font-size:${(c.size || 3) * 2.6}vh">${esc(c.text || "")}</div>`;
   else if (c.mode === "url") body = c.url ? `<iframe src="${esc(c.url)}" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>` : `<div class="ktext mu">Adresse non définie</div>`;
   else if (c.mode === "page" && PAGE[c.page]) {
-    const keep = ui.page; ui.page = c.page;
-    let inner = ""; try { inner = PAGE[c.page](); } catch (e) { inner = `<p class="empty">${esc(e.message)}</p>`; }
-    ui.page = keep;
+    // Recopie : on reprend l'état exact de la console de l'ordinateur (si la page est permise à ce niveau).
+    const mir = c.mirror && MIRROR && V.me.pages.includes(MIRROR.page) && PAGE[MIRROR.page] ? MIRROR : null;
+    const keys = ["page", "deck", "room", "door", "person", "sec", "system", "planet", "field", "comlink", "crewF", "logF"], keep = {};
+    keys.forEach(k => keep[k] = ui[k]);
+    if (mir) keys.forEach(k => { if (mir[k] !== undefined) ui[k] = mir[k]; }); else ui.page = c.page;
+    const pg = ui.page;
+    let inner = ""; try { inner = PAGE[pg](); } catch (e) { inner = `<p class="empty">${esc(e.message)}</p>`; }
+    keys.forEach(k => ui[k] = keep[k]);
+    c.page = pg;
     body = `${head.replace('<span class="sp"', `<span>· ${esc(MC.PAGES[c.page].toUpperCase())}</span><span class="sp"`)}<div class="kbody"><main>${inner}</main></div>`;
   } else {
     const jump = n && n.jump ? (() => { const to = MC.navSystem(n.catalog, n.jump.to), end = n.jump.startAt + MC.JUMP_INTRO_MS + n.jump.seconds * 1000; return `<span class="chip warn">HYPERESPACE → ${esc(to ? to.name : n.jump.to)} · <span data-cd="${end}">${Math.max(0, Math.ceil((end - now()) / 1000))}</span> s</span>`; })() : "";
     body = `<div class="kstat"><div><div class="big">${esc(V.ship.name.toUpperCase())}</div><div class="sub">${sys ? "SYSTÈME " + esc(sys.name.toUpperCase()) : ""}</div></div><div class="clk" data-clock>${fmtT(now())}</div><div class="row">${V.ship.alert ? `<span class="chip crit">ALERTE ${esc(V.ship.alert.toUpperCase())}</span>` : crit.length ? `<span class="chip crit">${crit.length} ALARME(S) CRITIQUE(S)</span>` : alerts.length ? `<span class="chip warn">${alerts.length} ALARME(S)</span>` : `<span class="chip ok">NOMINAL</span>`}${jump}</div>${c.denied ? `<div class="sub" style="font-size:1.8vh">Page non autorisée à ce niveau d’accès</div>` : ""}</div>`;
   }
   app.innerHTML = `<div class="kio">${c.mode === "page" ? body : (c.mode === "status" ? "" : head) + body}</div>`;
+  if (c.mode === "page" && c.mirror && MIRROR) { const kb = app.querySelector(".kbody"); if (kb) kb.scrollTop = (MIRROR.scroll || 0) * (kb.scrollHeight - kb.clientHeight); }
 }
 
 const scrEff = (id) => MC.screenEffective(V, id);
@@ -2164,6 +2294,139 @@ function readScr() {
 }
 
 /* =====================================================================
+   Diffusion : haut-parleurs, alertes, signaux, micros, messages enregistrés
+   ===================================================================== */
+const PAV = () => V.pa || { list: {}, mics: {}, meta: {}, msgs: {}, alert: null };
+const spMeta = (id) => (PAV().meta || {})[id] || {};
+function paTargetPicker(prefix) {
+  const groups = [...new Set(Object.values(PAV().meta || {}).map(m => m.group).filter(Boolean))].sort();
+  const rooms = Object.values(V.rooms).filter(r => Object.values(PAV().list).some(sp => sp.room === r.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const k = ui.q[prefix + "k"] || "all";
+  return `<div class="f2"><label class="f">Cible<select id="${prefix}-k" data-fn="paKind" data-arg="${prefix}"><option value="all"${k === "all" ? " selected" : ""}>Tout le vaisseau</option><option value="group"${k === "group" ? " selected" : ""}>Un groupe</option><option value="room"${k === "room" ? " selected" : ""}>Une pièce</option></select></label>` +
+    (k === "group" ? `<label class="f">Groupe<select id="${prefix}-v">${groups.map(g => `<option>${esc(g)}</option>`).join("") || "<option value=''>aucun groupe</option>"}</select></label>` : "") +
+    (k === "room" ? `<label class="f">Pièce<select id="${prefix}-v">${rooms.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join("") || "<option value=''>aucune pièce équipée</option>"}</select></label>` : "") + `</div>`;
+}
+function readTarget(prefix) {
+  const k = val(prefix + "-k") || "all";
+  return k === "all" ? { kind: "all" } : { kind: k, value: val(prefix + "-v") };
+}
+PAGE.pa = () => {
+  const pa = PAV(), adm = V.me.admin, lvl = V.ship.alert, list = Object.values(pa.list || {}).sort((a, b) => a.id.localeCompare(b.id));
+  const active = list.filter(sp => spMeta(sp.id).enabled !== false).length;
+  let left = panel("Alerte générale", "PA.ALERT", `<div class="big ${lvl >= "3" ? "red" : lvl ? "amb" : "okc"}" style="font-size:22px;letter-spacing:.1em">${lvl ? "NIVEAU " + esc(lvl) : "AUCUNE ALERTE"}</div>` +
+    (lvl && pa.alert ? `<p class="note">${esc(MC.PA_LEVELS[lvl][0])} · ${esc(MC.paTargetLabel(V, pa.alert.target))} · depuis ${fmtT(pa.alert.since)} (${esc(pa.alert.by || "")})</p>` : `<p class="note">${active} haut-parleur(s) actif(s) sur ${list.length}.</p>`) +
+    paTargetPicker("al") +
+    `<div class="lvls">${Object.entries(MC.PA_LEVELS).map(([l, [txt, c]]) => `<button class="b ${c === "crit" ? "red" : "amb"} lvlb${lvl === l ? " on" : ""}" data-fn="paAlert" data-arg="${l}"${perm("alarm.general") ? "" : " disabled"}><b>${l}</b><span>${esc(txt.replace(/^Niveau \d · /, ""))}</span>${pa.msgs && pa.msgs[l] ? `<i class="dim">+ message toutes les ${pa.msgs[l].interval} s</i>` : ""}</button>`).join("")}</div>` +
+    (lvl ? `<div class="btns" style="margin-top:10px">${btn("Lever l’alerte", { type: "alarm.general", level: null }, { perm: "alarm.general", cls: "ghost" })}</div>` : ""));
+  left += panel("Signaux", "PA.SIG", paTargetPicker("sg") + `<div class="btns">${Object.entries(MC.PA_SOUNDS).map(([k, l]) => btn(l, null, { fn: "paPlay", arg: k, perm: "pa.play", cls: "sm" })).join("")}</div><p class="note">Le changement de quart sonne 3 fois, à 5 s d’intervalle.</p>`);
+  if (!adm) return `<div class="grid g-2b"><div class="stack">${left}</div><div class="stack">${panel("Micros", "PA.MIC", micList(false))}</div></div>`;
+  // Poste admin
+  ui.spSel = (ui.spSel || []).filter(id => pa.list[id]);
+  const groups = [...new Set(Object.values(pa.meta || {}).map(m => m.group).filter(Boolean))].sort();
+  const q = (ui.q.sp || "").toLowerCase();
+  const rows = list.filter(sp => !q || (sp.id + " " + (spMeta(sp.id).name || "") + " " + (spMeta(sp.id).group || "") + " " + (V.rooms[sp.room] ? V.rooms[sp.room].name : "")).toLowerCase().includes(q)).map(sp => {
+    const m = spMeta(sp.id), on = m.enabled !== false, sel = ui.spSel.includes(sp.id);
+    return `<tr${sel ? ' class="sel"' : ""}><td><input type="checkbox" data-fn="spPick" data-arg="${esc(sp.id)}"${sel ? " checked" : ""} aria-label="Sélectionner ${esc(sp.id)}"></td><td class="m cy">${esc(sp.id)}</td><td>${esc(m.name || "—")}</td><td>${m.group ? `<span class="pill">${esc(m.group)}</span>` : `<span class="dim">—</span>`}</td><td class="mu">${esc(V.rooms[sp.room] ? V.rooms[sp.room].name : sp.room || "hors compartiment")}</td><td>${sw(on, { type: "admin.pa.meta", ids: [sp.id], enabled: !on }, null)}</td></tr>`;
+  }).join("");
+  const tools = `<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><input type="search" data-fn="q" data-arg="sp" placeholder="Rechercher (identifiant, nom, groupe, pièce)" value="${esc(ui.q.sp || "")}" style="flex:1 1 220px"><span class="mu" style="font-size:12px">${ui.spSel.length} sélectionné(s)</span>${btn("Nommer / grouper", null, { fn: "spMeta", cls: "sm", disabled: !ui.spSel.length })}${btn("Tout activer", { type: "admin.pa.meta", allEnable: true }, { cls: "sm ghost" })}${btn("Tout couper", { type: "admin.pa.meta", allEnable: false }, { cls: "sm red", confirm: "Couper tous les haut-parleurs ?" })}</div>`;
+  const table = list.length ? `<div class="tw"><table><thead><tr><th></th><th>ID</th><th>Nom</th><th>Groupe</th><th>Pièce</th><th>Actif</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="empty">Aucun haut-parleur posé. Les blocs « haut-parleur » apparaissent ici dès que le mod est connecté.</p>`;
+  const gp = groups.map(g => { const ids = list.filter(sp => spMeta(sp.id).group === g), on = ids.filter(sp => spMeta(sp.id).enabled !== false).length; return `<div class="vrow"><span><b style="font-weight:600">${esc(g)}</b> <span class="mu" style="font-size:12px">${on}/${ids.length} actif(s)</span></span><span class="row" style="gap:6px">${btn("Activer", { type: "admin.pa.meta", group: g, groupEnable: true }, { cls: "sm ghost" })}${btn("Couper", { type: "admin.pa.meta", group: g, groupEnable: false }, { cls: "sm red" })}</span></div>`; }).join("") || `<p class="empty">Aucun groupe. Sélectionnez des haut-parleurs puis « Nommer / grouper ».</p>`;
+  const msgs = Object.entries(MC.PA_LEVELS).map(([l, [txt]]) => { const m = (pa.msgs || {})[l]; return `<div class="vrow"><div style="min-width:0"><b style="font-weight:600">Niveau ${l}</b> <span class="mu" style="font-size:12px">${esc(txt.replace(/^Niveau \d · /, ""))}</span><div class="mu" style="font-size:12px">${m ? `« ${esc(m.name)} » · ${String(m.dur).replace(".", ",")} s · toutes les ${m.interval} s` : "aucun message"}</div></div><span class="row" style="gap:6px">${btn(m ? "Remplacer" : "Enregistrer", null, { fn: "paRec", arg: l, cls: "sm" })}${m ? btn("Retirer", { type: "admin.pa.msg.delete", level: l }, { cls: "sm ghost", confirm: "Retirer ce message ?" }) : ""}</span></div>`; }).join("");
+  const right = panel("Messages d’alerte", "PA.MSG", `<p class="note" style="margin-top:0">Joués par-dessus l’alarme du niveau, à intervalle régulier, avec l’effet intercom. Il faut Simple Voice Chat sur le serveur.</p>${msgs}`) +
+    panel("Groupes", "PA.GRP", gp) + panel("Micros", "PA.MIC", micList(true));
+  return `<div class="grid g-2b"><div class="stack">${left}${panel("Haut-parleurs", "SPK." + list.length, tools + table)}</div><div class="stack">${right}</div></div>`;
+};
+function micList(adm) {
+  const mics = Object.values(PAV().mics || {});
+  return mics.map(mc => { const m = spMeta(mc.id); return `<div class="vrow"><div style="min-width:0"><b style="font-weight:600">${esc(m.name || mc.id)}</b> <span class="m dim" style="font-size:11px">${esc(mc.id)}</span><div class="mu" style="font-size:12px">${mc.onAir ? `<span class="red">● À L’ANTENNE · ${esc(mc.onAir)}</span>` : "hors antenne"} · diffuse vers ${esc(MC.paTargetLabel(V, m.target || { kind: "all" }))}</div></div>${adm ? btn("Régler", null, { fn: "micSet", arg: mc.id, cls: "sm ghost" }) : ""}</div>`; }).join("") || `<p class="empty">Aucun micro posé. Clic sur un bloc « micro » pour passer à l’antenne (Simple Voice Chat requis).</p>`;
+}
+
+/* Enregistrement d'un message au micro du navigateur (ou depuis un fichier), converti en PCM 16 kHz mono. */
+const REC = { stream: null, rec: null, chunks: [], t0: 0, pcm: null, dur: 0, timer: 0, url: null };
+async function blobToPcm16k(blob) {
+  const buf = await blob.arrayBuffer();
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const audio = await ctx.decodeAudioData(buf); ctx.close();
+  const len = Math.min(20, audio.duration);
+  const off = new OfflineAudioContext(1, Math.ceil(len * 16000), 16000), src = off.createBufferSource();
+  src.buffer = audio; src.connect(off.destination); src.start(0);
+  const out = (await off.startRendering()).getChannelData(0);
+  let peak = 0; for (const v of out) peak = Math.max(peak, Math.abs(v));
+  const g = peak > 0 ? Math.min(4, 0.9 / peak) : 1, i16 = new Int16Array(out.length);
+  for (let i = 0; i < out.length; i++) i16[i] = Math.max(-32768, Math.min(32767, Math.round(out[i] * g * 32767)));
+  let bin = ""; const u8 = new Uint8Array(i16.buffer);
+  for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return { b64: btoa(bin), dur: Math.round(out.length / 16000 * 10) / 10, i16 };
+}
+/* Écoute avec l'effet intercom (même esprit que le filtre du mod). */
+function playIntercom(i16) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)(), b = ctx.createBuffer(1, i16.length, 16000), d = b.getChannelData(0);
+  for (let i = 0; i < i16.length; i++) d[i] = i16[i] / 32768;
+  const src = ctx.createBufferSource(); src.buffer = b;
+  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 350;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200;
+  const ws = ctx.createWaveShaper(), curve = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; curve[i] = Math.tanh(2.4 * x) / Math.tanh(2.4); } ws.curve = curve;
+  src.connect(hp); hp.connect(lp); lp.connect(ws); ws.connect(ctx.destination); src.start(); src.onended = () => ctx.close();
+}
+function recKeep() { const n = document.getElementById("rec-n"), i = document.getElementById("rec-i"); if (n) REC.name = n.value; if (i) REC.interval = i.value; }
+function recStop() {
+  clearInterval(REC.timer);
+  if (REC.rec && REC.rec.state !== "inactive") REC.rec.stop();
+  if (REC.stream) REC.stream.getTracks().forEach(t => t.stop());
+  REC.stream = null;
+}
+Object.assign(FN, {
+  paKind(el) { ui.q[el.dataset.arg + "k"] = el.value; render(); },
+  paAlert(el) {
+    const l = el.dataset.arg, t = readTarget("al");
+    confirmModal(`Déclarer l’alerte ${MC.PA_LEVELS[l][0].toLowerCase()} (${MC.paTargetLabel(V, t)}) ?`, () => act({ type: "alarm.general", level: l, target: t }, "Alerte déclarée."));
+  },
+  paPlay(el) { act({ type: "pa.play", sound: el.dataset.arg, target: readTarget("sg") }, "Signal diffusé."); },
+  spPick(el) { const id = el.dataset.arg, s = ui.spSel || (ui.spSel = []); const i = s.indexOf(id); if (i < 0) s.push(id); else s.splice(i, 1); render(); },
+  spMeta() {
+    const ids = (ui.spSel || []).slice(), one = ids.length === 1 ? spMeta(ids[0]) : {}, groups = [...new Set(Object.values(PAV().meta || {}).map(m => m.group).filter(Boolean))];
+    openModal(() => `<h3>${ids.length === 1 ? "Haut-parleur " + esc(ids[0]) : ids.length + " haut-parleurs"}</h3>${ids.length === 1 ? `<label class="f">Nom<input type="text" id="spm-n" maxlength="40" value="${esc(one.name || "")}"></label>` : ""}<label class="f">Groupe<input type="text" id="spm-g" maxlength="40" list="spm-gl" value="${esc(one.group || "")}" placeholder="aucun"><datalist id="spm-gl">${groups.map(g => `<option value="${esc(g)}">`).join("")}</datalist></label>${mfoot()}`,
+      () => { const a = { type: "admin.pa.meta", ids, group: val("spm-g") }; if (ids.length === 1) a.name = val("spm-n"); act(a, "Haut-parleurs enregistrés."); return true; });
+  },
+  micSet(el) {
+    const id = el.dataset.arg, m = spMeta(id); ui.q.mck = (m.target || {}).kind || "all";
+    openModal(() => `<h3>Micro ${esc(id)}</h3><label class="f">Nom<input type="text" id="mc-n" maxlength="40" value="${esc(m.name || "")}"></label>${paTargetPicker("mc")}${mfoot()}`,
+      () => { act({ type: "admin.pa.mic", id, name: val("mc-n"), target: readTarget("mc") }, "Micro réglé."); return true; });
+  },
+  paRec(el) {
+    const level = el.dataset.arg, old = (PAV().msgs || {})[level];
+    REC.pcm = null; REC.dur = 0; REC.name = null; REC.interval = null;
+    openModal(() => `<h3>Message · niveau ${esc(level)}</h3><p class="note" style="margin-top:0">${esc(MC.PA_LEVELS[level][0])}. 20 s au plus.</p>
+<div class="btns"><button class="b red" data-fn="recGo" type="button">${REC.stream ? "■ Arrêter" : "● Enregistrer au micro"}</button><label class="b ghost" style="cursor:pointer">Importer un fichier<input type="file" accept="audio/*" id="rec-file" data-fn="recFile" hidden></label>${REC.pcm ? `<button class="b" data-fn="recPlay" type="button">▶ Écouter (effet intercom)</button>` : ""}</div>
+<p class="m ${REC.stream ? "red" : "mu"}" id="rec-st">${REC.stream ? "● Enregistrement…" : REC.pcm ? `Prêt : ${String(REC.dur).replace(".", ",")} s` : "Aucun enregistrement."}</p>
+<div class="f2"><label class="f">Nom<input type="text" id="rec-n" maxlength="60" value="${esc(REC.name ?? (old ? old.name : "Alerte niveau " + level))}"></label><label class="f">Répéter toutes les (s)<input type="number" id="rec-i" min="10" max="600" value="${REC.interval ?? (old ? old.interval : 30)}"></label></div>${mfoot("Enregistrer")}`,
+      () => {
+        if (!REC.pcm) { toast("Enregistrez ou importez d’abord un message.", "err"); return false; }
+        recStop();
+        act({ type: "admin.pa.msg.save", level, pcm: REC.pcm.b64, name: val("rec-n"), interval: +val("rec-i") || 30 }, "Message enregistré.");
+        return true;
+      });
+  },
+  async recGo() {
+    if (REC.stream) { recStop(); return; }
+    try {
+      REC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      REC.chunks = []; REC.rec = new MediaRecorder(REC.stream); REC.t0 = Date.now();
+      REC.rec.ondataavailable = (e) => REC.chunks.push(e.data);
+      REC.rec.onstop = async () => { try { REC.pcm = await blobToPcm16k(new Blob(REC.chunks, { type: REC.rec.mimeType })); REC.dur = REC.pcm.dur; } catch (e) { toast("Enregistrement illisible : " + e.message, "err"); } recKeep(); drawModal(); };
+      REC.rec.start();
+      REC.timer = setInterval(() => { const s = (Date.now() - REC.t0) / 1000; const st = document.getElementById("rec-st"); if (st) st.textContent = "● Enregistrement… " + s.toFixed(1).replace(".", ",") + " s"; if (s >= 20) recStop(); }, 200);
+      recKeep(); drawModal();
+    } catch (e) { REC.stream = null; toast("Micro inaccessible : " + e.message, "err"); }
+  },
+  async recFile(el) {
+    const f = el.files && el.files[0]; if (!f) return;
+    try { REC.pcm = await blobToPcm16k(f); REC.dur = REC.pcm.dur; recKeep(); drawModal(); } catch (e) { toast("Fichier audio illisible : " + e.message, "err"); }
+  },
+  recPlay() { if (REC.pcm) playIntercom(REC.pcm.i16); }
+});
+
+/* =====================================================================
    Événements
    ===================================================================== */
 document.addEventListener("click", (e) => {
@@ -2193,8 +2456,9 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("change", (e) => {
   const el = e.target;
-  if (el.closest("#modal") && el.dataset.fn !== "scrMode") return;
-  if (el.dataset.fn && FN[el.dataset.fn] && (el.tagName === "SELECT" || el.type === "range" || el.type === "checkbox")) FN[el.dataset.fn](el);
+  if (el.closest("#modal") && !["scrMode", "paKind", "recFile"].includes(el.dataset.fn)) return;
+  if (el.dataset.fn === "paKind" && el.closest("#modal")) { ui.q[el.dataset.arg + "k"] = el.value; drawModal(); return; }
+  if (el.dataset.fn && FN[el.dataset.fn] && (el.tagName === "SELECT" || el.type === "range" || el.type === "checkbox" || el.type === "file")) FN[el.dataset.fn](el);
 });
 let qTimer = null;
 document.addEventListener("input", (e) => { const el = e.target; if (el.dataset.fn === "q") { clearTimeout(qTimer); qTimer = setTimeout(() => FN.q(el), 180); } });
