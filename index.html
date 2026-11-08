@@ -54,7 +54,7 @@ header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding-block:10p
 .demo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;padding-block:6px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--ln);background:rgba(98,230,242,.04)}
 .demo b{color:var(--cy);letter-spacing:.14em;font-size:11px;font-weight:600;margin-right:6px}
 .demo select{min-height:30px;padding:4px 8px}
-select,input[type=text],input[type=number],input[type=search],textarea{background:var(--bg2);border:1px solid var(--ln2);padding:7px 9px;min-height:36px;border-radius:0;max-width:100%}
+select,input[type=text],input[type=number],input[type=search],input[type=password],textarea{background:var(--bg2);border:1px solid var(--ln2);padding:7px 9px;min-height:36px;border-radius:0;max-width:100%}
 select:hover,input:hover{border-color:var(--cy2)}
 
 nav{border-right:1px solid var(--ln);padding:14px 0;overflow:auto;background:rgba(6,18,26,.6)}
@@ -1558,10 +1558,10 @@ async function adminLogin(key, remember) {
 /* Adresse fixe des admins : …/?connexion (ou la console nue une fois « rester connecté » coché). */
 function loginGate(msg) {
   document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><form id="login" style="width:min(380px,100%);text-align:left"><div class="brand" style="text-align:center">MERIDIAN</div><p class="mu m" style="text-align:center;margin:14px 0 22px;letter-spacing:.14em">POSTE ADMIN</p>
-<label class="f">Clé admin<input type="password" id="lg-k" autocomplete="current-password" required></label>
+<label class="f">Clé admin<input type="password" id="lg-k" autocomplete="current-password" required style="width:100%"></label>
 <label class="chk" style="margin-top:10px"><input type="checkbox" id="lg-r" checked> Rester connecté sur cet appareil (30 jours)</label>
 <p class="red" id="lg-e" style="min-height:1.4em;margin:10px 0">${esc(msg || "")}</p>
-<button class="btn solid" type="submit" style="width:100%">Ouvrir la console</button>
+<button class="b solid" type="submit" style="width:100%">Ouvrir la console</button>
 <p class="mu" style="margin-top:16px;font-size:12px">Gardez cette adresse en favori : <span class="m">${esc(location.origin + location.pathname)}?connexion</span>. Une fois connecté avec « rester connecté », la console s’ouvre directement en admin sur cet appareil.</p></form></div>`;
   document.getElementById("login").addEventListener("submit", async (e) => {
     e.preventDefault();
