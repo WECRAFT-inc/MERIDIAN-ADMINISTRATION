@@ -86,6 +86,16 @@ footer .tk span{margin-right:42px}
 .g-ov{grid-template-columns:minmax(240px,1fr) minmax(360px,1.7fr) minmax(260px,1fr)}
 .g-2{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr)}
 .g-2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g-map{grid-template-columns:minmax(0,1fr) minmax(300px,380px)}
+@media (max-width:1100px){.g-map{grid-template-columns:1fr}}
+.mapbox{position:relative;height:clamp(420px,calc(100vh - 290px),920px);background:#02060a;border:1px solid var(--ln);overflow:hidden;touch-action:none;cursor:grab;user-select:none}
+.mapbox.drag{cursor:grabbing}
+.mapbox>svg{width:100%;height:100%}
+.mapctl{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px;z-index:2}
+.mapctl button{width:34px;height:34px;border:1px solid var(--ln2);background:rgba(3,10,15,.85);color:var(--cy);font:600 17px/1 "IBM Plex Mono",monospace;cursor:pointer}
+.mapctl button:hover{border-color:var(--cy)}
+.mapctl button.w{width:auto;padding:0 9px;font-size:11px;letter-spacing:.08em}
+.maphint{position:absolute;left:10px;bottom:8px;font:11px "IBM Plex Mono",monospace;color:var(--dim);pointer-events:none}
 .stack{display:flex;flex-direction:column;gap:14px;min-width:0}
 @media (max-width:1180px){.g-ov{grid-template-columns:1fr 1fr}.g-ov>.center{grid-column:1/-1;order:-1}}
 @media (max-width:860px){#app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto}
@@ -2219,6 +2229,83 @@ function planetDimName(dim) {
   return dim;
 }
 
+/* ---------- Cartes : zoom (molette, boutons) et déplacement (glisser), conservés entre deux rafraîchissements ---------- */
+const MAPV = { asp: {} };
+/** Cadre visible d'une carte : ajusté au contenu et au format de la zone, puis zoom et déplacement de l'utilisateur. */
+function mapView(key, x0, y0, x1, y1) {
+  const asp = MAPV.asp[key] || 1.5;
+  let w = Math.max(1e-6, x1 - x0), h = Math.max(1e-6, y1 - y0);
+  if (w / h < asp) w = h * asp; else h = w / asp;
+  const st = MAPV[key], z = st ? st.z : 1, cx = st ? st.cx : (x0 + x1) / 2, cy = st ? st.cy : (y0 + y1) / 2;
+  const vw = w / z, vh = h / z;
+  return { x0: cx - vw / 2, y0: cy - vh / 2, x1: cx + vw / 2, y1: cy + vh / 2, w: vw, h: vh, fw: w, fcx: (x0 + x1) / 2, fcy: (y0 + y1) / 2, z };
+}
+function mapBox(key, v, svg, extra = "") {
+  return `<div class="mapbox" data-map="${key}">${svg}<div class="mapctl"><button data-fn="mapZoom" data-arg="${key}:in" aria-label="Zoomer" title="Zoomer">+</button><button data-fn="mapZoom" data-arg="${key}:out" aria-label="Dézoomer" title="Dézoomer">−</button><button data-fn="mapZoom" data-arg="${key}:fit" aria-label="Tout voir" title="Tout voir">⤢</button>${extra}</div><div class="maphint">molette : zoom · glisser : déplacer${v.z !== 1 ? ` · ×${v.z.toFixed(1).replace(".", ",")}` : ""}</div></div>`;
+}
+function svgAttrs(v, label) { return `viewBox="${v.x0} ${v.y0} ${v.w} ${v.h}" preserveAspectRatio="xMidYMid meet" data-fw="${v.fw}" data-fcx="${v.fcx}" data-fcy="${v.fcy}" role="img" aria-label="${label}"`; }
+function mapSet(key, svg, cx, cy, w) {
+  const fw = +svg.dataset.fw, z = Math.max(0.5, Math.min(400, fw / w));
+  MAPV[key] = { cx, cy, z };
+}
+let MAPRAF = 0;
+const mapRender = () => { if (!MAPRAF) MAPRAF = requestAnimationFrame(() => { MAPRAF = 0; render(); }); };
+function mapZoomAt(box, f, px, py) {
+  const svg = box.querySelector("svg"); if (!svg) return;
+  const vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect();
+  const fx = px == null ? .5 : (px - r.left) / r.width, fy = py == null ? .5 : (py - r.top) / r.height;
+  const wx = vb.x + fx * vb.width, wy = vb.y + fy * vb.height, nw = vb.width / f, nh = vb.height / f;
+  const nx = wx - fx * nw, ny = wy - fy * nh;
+  svg.setAttribute("viewBox", `${nx} ${ny} ${nw} ${nh}`);
+  mapSet(box.dataset.map, svg, nx + nw / 2, ny + nh / 2, nw);
+  mapRender();
+}
+FN.mapZoom = (el) => {
+  const [key, op] = el.dataset.arg.split(":"), box = el.closest(".mapbox");
+  if (op === "fit") { delete MAPV[key]; render(); return; }
+  if (op === "ship") { const svg = box.querySelector("svg"), sh = NAVS().catalog.ship || { x: 0, z: 0 }, vb = svg.viewBox.baseVal; mapSet(key, svg, sh.x, sh.z, vb.width); render(); return; }
+  mapZoomAt(box, op === "in" ? 1.6 : 1 / 1.6);
+};
+const MAPDRAG = { on: null, x: 0, y: 0, moved: 0, suppress: false };
+document.addEventListener("wheel", (e) => {
+  const box = e.target.closest && e.target.closest(".mapbox"); if (!box) return;
+  e.preventDefault();
+  mapZoomAt(box, Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY);
+}, { passive: false });
+document.addEventListener("pointerdown", (e) => {
+  const box = e.target.closest && e.target.closest(".mapbox");
+  if (!box || e.button !== 0 || e.target.closest(".mapctl")) return;
+  Object.assign(MAPDRAG, { on: box, x: e.clientX, y: e.clientY, moved: 0 });
+});
+document.addEventListener("pointermove", (e) => {
+  const box = MAPDRAG.on; if (!box) return;
+  const dx = e.clientX - MAPDRAG.x, dy = e.clientY - MAPDRAG.y;
+  MAPDRAG.moved += Math.abs(dx) + Math.abs(dy); MAPDRAG.x = e.clientX; MAPDRAG.y = e.clientY;
+  if (MAPDRAG.moved < 5) return;
+  box.classList.add("drag");
+  const svg = box.querySelector("svg"), vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect(), k = Math.max(vb.width / r.width, vb.height / r.height);
+  const nx = vb.x - dx * k, ny = vb.y - dy * k;
+  svg.setAttribute("viewBox", `${nx} ${ny} ${vb.width} ${vb.height}`);
+  mapSet(box.dataset.map, svg, nx + vb.width / 2, ny + vb.height / 2, vb.width);
+});
+document.addEventListener("pointerup", () => {
+  const box = MAPDRAG.on; if (!box) return;
+  MAPDRAG.on = null; box.classList.remove("drag");
+  if (MAPDRAG.moved >= 5) { MAPDRAG.suppress = true; setTimeout(() => { MAPDRAG.suppress = false; }, 0); mapRender(); }
+});
+document.addEventListener("click", (e) => { if (MAPDRAG.suppress) { e.stopPropagation(); e.preventDefault(); MAPDRAG.suppress = false; } }, true);
+/* Format de chaque zone de carte, pour que la carte remplisse tout le cadre. */
+function mapMeasure() {
+  let again = false;
+  document.querySelectorAll(".mapbox").forEach(b => {
+    const w = b.clientWidth, h = b.clientHeight; if (!w || !h) return;
+    const a = w / h, k = b.dataset.map;
+    if (!MAPV.asp[k] || Math.abs(MAPV.asp[k] - a) / a > 0.03) { MAPV.asp[k] = a; again = true; }
+  });
+  if (again) mapRender();
+}
+window.addEventListener("resize", () => queueMicrotask(mapMeasure));
+
 function starMap(s) {
   const n = NAVS(), cat = n.catalog, ship = cat.ship || { x: 0, z: 0 };
   const planets = n.jump || !s ? [] : s.planets, fields = n.jump || !s ? [] : s.fields || [];
@@ -2226,12 +2313,14 @@ function starMap(s) {
   let x0 = ship.x - 300, x1 = ship.x + 300, z0 = ship.z - 300, z1 = ship.z + 300;
   const grow = (x, z, r) => { x0 = Math.min(x0, x - r); x1 = Math.max(x1, x + r); z0 = Math.min(z0, z - r); z1 = Math.max(z1, z + r); };
   planets.forEach(p => grow(p.pos[0], p.pos[2], p.size * 0.62)); fields.forEach(f => grow(f.pos[0], f.pos[1], f.radius)); coms.forEach(c => grow(c.x, c.z, 60));
-  const span = Math.max(x1 - x0, z1 - z0), pad = span * 0.08; x0 -= pad; x1 += pad; z0 -= pad; z1 += pad;
-  const W = x1 - x0, H = z1 - z0, fs = span / 55, step = niceStep(span);
+  const full = Math.max(x1 - x0, z1 - z0), pad = full * 0.08;
+  const v = mapView("star", x0 - pad, z0 - pad, x1 + pad, z1 + pad);
+  x0 = v.x0; x1 = v.x1; z0 = v.y0; z1 = v.y1;
+  const W = v.w, H = v.h, span = Math.min(W, H), fs = span / 54, step = niceStep(Math.max(W, H));
   let g = `<defs>${planets.map(p => `<radialGradient id="pg-${esc(p.id)}" cx="35%" cy="35%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".35" stop-color="${esc(p.atmosphere)}"/><stop offset="1" stop-color="#050a10"/></radialGradient>`).join("")}</defs>`;
-  g += `<rect x="${x0}" y="${z0}" width="${W}" height="${H}" fill="#02060a"/>`;
-  for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) g += `<line x1="${x}" y1="${z0}" x2="${x}" y2="${z1}" stroke="var(--ln)" stroke-width="${fs * .06}"/>`;
-  for (let z = Math.ceil(z0 / step) * step; z <= z1; z += step) g += `<line x1="${x0}" y1="${z}" x2="${x1}" y2="${z}" stroke="var(--ln)" stroke-width="${fs * .06}"/>`;
+  g += `<rect x="${x0 - W}" y="${z0 - H}" width="${W * 3}" height="${H * 3}" fill="#02060a"/>`;
+  for (let x = Math.ceil((x0 - W) / step) * step; x <= x1 + W; x += step) g += `<line x1="${x}" y1="${z0 - H}" x2="${x}" y2="${z1 + H}" stroke="var(--ln)" stroke-width="${fs * .06}"/>`;
+  for (let z = Math.ceil((z0 - H) / step) * step; z <= z1 + H; z += step) g += `<line x1="${x0 - W}" y1="${z}" x2="${x1 + W}" y2="${z}" stroke="var(--ln)" stroke-width="${fs * .06}"/>`;
   for (const f of fields) {
     const sel = ui.field === f.id;
     g += `<g class="hit" data-fn="selField" data-arg="${esc(f.id)}"><circle cx="${f.pos[0]}" cy="${f.pos[1]}" r="${f.radius}" fill="var(--amb)" fill-opacity=".05" stroke="${sel ? "#fff" : "var(--amb)"}" stroke-width="${fs * .12}" stroke-dasharray="${fs * .6} ${fs * .4}"/>`;
@@ -2240,7 +2329,7 @@ function starMap(s) {
     g += `<text x="${f.pos[0]}" y="${f.pos[1] - f.radius - fs * .5}" fill="var(--amb)" font-size="${fs * .8}" text-anchor="middle">${esc(f.name)}</text><title>${esc(f.name)} · densité ${esc(f.density)}</title></g>`;
   }
   for (const p of planets) {
-    const r = Math.max(p.size * 0.56, span * 0.012), sel = ui.planet === p.id, x = p.pos[0], z = p.pos[2];
+    const r = Math.max(p.size * 0.56, span * 0.014), sel = ui.planet === p.id, x = p.pos[0], z = p.pos[2];
     g += `<g class="hit" data-fn="selPlanet" data-arg="${esc(p.id)}"><circle cx="${x}" cy="${z}" r="${r * 1.18}" fill="${esc(p.atmosphere)}" fill-opacity=".12"/>`;
     if (p.ring) g += `<ellipse cx="${x}" cy="${z}" rx="${r * 1.9}" ry="${r * .55}" fill="none" stroke="${esc(p.atmosphere)}" stroke-opacity=".6" stroke-width="${fs * .25}"/>`;
     g += `<circle cx="${x}" cy="${z}" r="${r}" fill="url(#pg-${esc(p.id)})" stroke="${sel ? "#fff" : p.rethium ? "var(--vio)" : esc(p.atmosphere)}" stroke-width="${fs * (sel ? .28 : .14)}"${p.rethium ? ` stroke-dasharray="${fs * .5} ${fs * .3}"` : ""}/>`;
@@ -2260,8 +2349,8 @@ function starMap(s) {
     g += `<g class="hit" data-fn="selCom" data-arg="${esc(c.id)}"><polygon points="${c.x},${c.z - d} ${c.x + d},${c.z} ${c.x},${c.z + d} ${c.x - d},${c.z}" fill="var(--ok)" stroke="${sel ? "#fff" : "var(--bg)"}" stroke-width="${fs * .12}"/><text x="${c.x + d * 1.4}" y="${c.z + fs * .3}" fill="var(--ok)" font-size="${fs * .8}">${esc(c.name)}</text><title>${esc(c.name)} · ${esc(c.id)}</title></g>`;
   }
   if (n.jump) g += `<text x="${(x0 + x1) / 2}" y="${z0 + H * .2}" fill="var(--amb)" font-size="${fs * 1.6}" text-anchor="middle" letter-spacing="${fs * .2}">EN HYPERESPACE</text>`;
-  g += `<text x="${x0 + fs * .6}" y="${z1 - fs * .6}" fill="var(--dim)" font-size="${fs * .75}" font-family="IBM Plex Mono,monospace">grille ${step} blocs · nord en haut</text>`;
-  return `<svg viewBox="${x0} ${z0} ${W} ${H}" role="img" aria-label="Carte stellaire du système">${g}</svg>`;
+  g += `<text x="${x0 + fs * .6}" y="${z0 + fs * 1.4}" fill="var(--dim)" font-size="${fs * .75}" font-family="IBM Plex Mono,monospace">grille ${step} blocs · nord en haut</text>`;
+  return mapBox("star", v, `<svg ${svgAttrs(v, "Carte stellaire du système")}>${g}</svg>`, `<button class="w" data-fn="mapZoom" data-arg="star:ship" title="Centrer sur le vaisseau">VAISSEAU</button>`);
 }
 
 PAGE.starmap = () => {
@@ -2291,7 +2380,8 @@ PAGE.starmap = () => {
     return `<div class="vrow${ui.comlink === c.id ? " sel" : ""}"><div style="min-width:0"><b style="font-weight:600">${esc(c.name)}</b> <span class="m dim" style="font-size:11px">${esc(c.id)}</span><div class="mu" style="font-size:12px">${esc(where)} · ${ago(c.seen)}</div></div>${perm("comlink.rename") ? btn("Renommer", null, { fn: "renameCom", arg: c.id, cls: "sm ghost" }) : ""}</div>`;
   }).join("") || `<p class="empty">Aucune liaison com posée. Posez un bloc « liaison com » sur une navette pour la suivre ici.</p>`;
   side += panel("Navettes suivies", "COM." + (n.comlinks || []).length, coms);
-  return `${jumpBanner()}<div class="grid g-2b"><div class="stack">${panel("Carte stellaire · " + (s ? s.name : "?"), "NAV.MAP", `<div class="svgw">${starMap(s)}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st ok">Navette (liaison com)</span><span class="st warn">Champ de météorites</span><span class="st vac">Planète à Rethium</span><span class="st" style="color:#ffd27a">Étoile (cercle rouge : danger)</span><span class="st" style="color:var(--cy)">Vaisseau</span></div>`)}</div><div class="stack">${side}</div></div>`;
+  queueMicrotask(mapMeasure);
+  return `${jumpBanner()}<div class="grid g-map"><div class="stack">${panel("Carte stellaire · " + (s ? s.name : "?"), "NAV.MAP", `${starMap(s)}<div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st ok">Navette (liaison com)</span><span class="st warn">Champ de météorites</span><span class="st vac">Planète à Rethium</span><span class="st" style="color:#ffd27a">Étoile (cercle rouge : danger)</span><span class="st" style="color:var(--cy)">Vaisseau</span></div>`)}</div><div class="stack">${side}</div></div>`;
 };
 
 function galaxyMap() {
@@ -2302,11 +2392,14 @@ function galaxyMap() {
   const far = (s) => Math.hypot(s.x - cx, s.y - cy) > 150;
   const near = sys.filter(s => !far(s));
   let x0 = Math.min(...near.map(s => s.x)), x1 = Math.max(...near.map(s => s.x)), y0 = Math.min(...near.map(s => s.y)), y1 = Math.max(...near.map(s => s.y));
-  const span0 = Math.max(x1 - x0, y1 - y0, 20), pad = span0 * 0.16; x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
-  const W = x1 - x0, H = y1 - y0, span = Math.max(W, H), fs = span / 48, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-  const place = (s) => { if (!far(s)) return [s.x, s.y]; const dx = s.x - mx, dy = s.y - my, t = Math.min((W * .44) / Math.abs(dx || 1e-9), (H * .40) / Math.abs(dy || 1e-9)); return [mx + dx * t, my + dy * t]; };
-  let g = `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="#02060a"/>`;
-  for (let i = 0; i < 90; i++) { const rx = x0 + ((i * 7919) % 997) / 997 * W, ry = y0 + ((i * 104729) % 991) / 991 * H; g += `<circle cx="${rx}" cy="${ry}" r="${fs * .05}" fill="#fff" fill-opacity="${.15 + (i % 5) * .1}"/>`; }
+  const span0 = Math.max(x1 - x0, y1 - y0, 20), pad = span0 * 0.12;
+  const v = mapView("gal", x0 - pad, y0 - pad, x1 + pad, y1 + pad);
+  const FW = v.fw, FH = FW / (MAPV.asp.gal || 1.5);
+  x0 = v.x0; x1 = v.x1; y0 = v.y0; y1 = v.y1;
+  const W = v.w, H = v.h, span = Math.min(W, H), fs = span / 46, mx = v.fcx, my = v.fcy;
+  const place = (s) => { if (!far(s)) return [s.x, s.y]; const dx = s.x - mx, dy = s.y - my, t = Math.min((FW * .46) / Math.abs(dx || 1e-9), (FH * .42) / Math.abs(dy || 1e-9)); return [mx + dx * t, my + dy * t]; };
+  let g = `<rect x="${x0 - W}" y="${y0 - H}" width="${W * 3}" height="${H * 3}" fill="#02060a"/>`;
+  for (let i = 0; i < 160; i++) { const rx = mx - FW + ((i * 7919) % 997) / 997 * FW * 2, ry = my - FH + ((i * 104729) % 991) / 991 * FH * 2; g += `<circle cx="${rx}" cy="${ry}" r="${fs * .05}" fill="#fff" fill-opacity="${.15 + (i % 5) * .1}"/>`; }
   for (let i = 0; i < near.length; i++) for (let j = i + 1; j < near.length; j++) {
     const a = near[i], b = near[j]; if (MC.navDistance(a, b) <= (J.maxLy ?? 12)) g += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--cy2)" stroke-opacity=".18" stroke-width="${fs * .06}"/>`;
   }
@@ -2327,7 +2420,7 @@ function galaxyMap() {
     if (isCur) g += `<text x="${x}" y="${y - rad - fs * .6}" fill="var(--cy)" font-size="${fs * .65}" text-anchor="middle" font-family="IBM Plex Mono,monospace">VOUS ÊTES ICI</text>`;
     g += `<title>${esc(s.name)}${r.ok ? " · atteignable" : r.why ? " · " + esc(r.why) : ""}</title></g>`;
   }
-  return `<svg viewBox="${x0} ${y0} ${W} ${H}" role="img" aria-label="Carte interstellaire"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--mu)"/></marker></defs>${g}</svg>`;
+  return mapBox("gal", v, `<svg ${svgAttrs(v, "Carte interstellaire")}><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--mu)"/></marker></defs>${g}</svg>`);
 }
 
 PAGE.galaxy = () => {
@@ -2351,7 +2444,8 @@ PAGE.galaxy = () => {
       panel("Règles de saut", "JUMP.ADM", `<div class="f2"><label class="f">Saut maximal (al)<input type="number" id="jr-max" step="0.5" value="${J.maxLy ?? 12}"></label><label class="f">Antimatière par al (g)<input type="number" id="jr-fuel" step="0.05" value="${J.fuelPerLy ?? .5}"></label><label class="f">Durée de base (s)<input type="number" id="jr-base" value="${J.baseSeconds ?? 30}"></label><label class="f">Secondes par al<input type="number" id="jr-per" step="0.5" value="${J.secondsPerLy ?? 6}"></label></div><div class="btns">${btn("Enregistrer", null, { fn: "saveRules", cls: "sm" })}${btn("Nouveau système", null, { fn: "editSystem", arg: "", cls: "sm ghost" })}</div>`) +
       panel("Catalogue", "CAT.JSON", `<p class="note" style="margin-top:0">Systèmes, planètes et champs de météorites au format JSON (même format que le mod). Copiez-le pour le sauvegarder ou collez-en un autre pour le remplacer.</p><div class="btns">${btn("Exporter / importer", null, { fn: "catalogJson", cls: "sm" })}${btn("Catalogue par défaut", { type: "admin.nav.reset" }, { cls: "sm red", confirm: "Remplacer tout le catalogue par celui d’origine ?" })}</div>`);
   }
-  return `${jumpBanner()}<div class="grid g-2b"><div class="stack">${panel("Carte interstellaire", "NAV.GAL", `<div class="svgw">${galaxyMap()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st" style="color:var(--cy)">Vaisseau</span><span class="st ok">Atteignable</span><span class="st gone">Hors de portée</span></div><p class="note" style="text-align:center;margin-inline:auto">Cercle pointillé : saut maximal. Disque vert : portée avec l’antimatière à bord. Les systèmes très lointains sont indiqués au bord de la carte avec leur distance.</p>`)}</div><div class="stack">${side}</div></div>`;
+  queueMicrotask(mapMeasure);
+  return `${jumpBanner()}<div class="grid g-map"><div class="stack">${panel("Carte interstellaire", "NAV.GAL", `${galaxyMap()}<div class="row" style="justify-content:center;gap:16px;margin-top:8px;flex-wrap:wrap"><span class="st" style="color:var(--cy)">Vaisseau</span><span class="st ok">Atteignable</span><span class="st gone">Hors de portée</span></div><p class="note" style="text-align:center;margin-inline:auto">Cercle pointillé : saut maximal. Disque vert : portée avec l’antimatière à bord. Les systèmes très lointains sont indiqués au bord de la carte avec leur distance.</p>`)}</div><div class="stack">${side}</div></div>`;
 };
 
 
