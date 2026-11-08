@@ -264,7 +264,7 @@ const TEAMS = ["jour", "nuit", "aucune"];
 const PAGES = {
   overview: "Vue d’ensemble", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
-  galaxy: "Carte interstellaire", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", admin: "Ordinateur de bord"
+  galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", admin: "Ordinateur de bord"
 };
 /* Pages réservées au poste admin. */
 const ADMIN_PAGES = ["admin", "screens", "craft"];
@@ -279,6 +279,7 @@ const ACTIONS = {
   "room.pressurize":["Pressuriser une pièce", 3, "atmos"],
   "room.vent":      ["Vider l’air d’une pièce", 5, "atmos"],
   "room.alarm":     ["Alarme de pièce", 2, "plan"],
+  "deck.act":       ["Agir sur un pont ou une section d’anneau entière", 5, "plan"],
   "alarm.general":  ["Alerte générale", 5, "overview"],
   "alarm.ack":      ["Acquitter une alarme", 3, "log"],
   "proc.eject":     ["Code d’éjection de section", 4, "procs"],
@@ -697,6 +698,7 @@ function mergeStructure(state, s, now = Date.now()) {
   for (const d of s.decks || []) {
     const old = state.decks.find(x => x.id === d.id);
     const n = { id: d.id, name: d.name || ("Pont " + d.id), kind: d.kind || "hull", order: d.order ?? decks.length, y0: d.y0, y1: d.y1 };
+    if (d.ring) n.ring = d.ring;                       // anneau : axe, centre, rayons, sections (vue de face)
     if (old && old.named) { n.name = old.name; n.named = true; }
     decks.push(n);
   }
@@ -736,6 +738,7 @@ function mergeStructure(state, s, now = Date.now()) {
     const old = state.sections[sec.id];
     state.sections[sec.id] = { id: sec.id, name: (old && old.named) ? old.name : (sec.name || sec.id), named: !!(old && old.named),
       ejectable: old ? old.ejectable : !!sec.ejectable, state: old ? old.state : "attached", fromMod: true };
+    if (sec.ring) { state.sections[sec.id].ring = sec.ring; state.sections[sec.id].index = sec.index | 0; }
     for (const rid of sec.rooms || []) if (state.rooms[rid] && !state.rooms[rid].sectionSet) state.rooms[rid].section = sec.id;
   }
   for (const t of s.terminals || []) {
@@ -786,6 +789,11 @@ function applyTelemetry(state, m, now = Date.now()) {
       if (!wasAlive && p.vitals.alive !== false) { p.vitals.reported = false; log(state, "SYSTÈME", `${p.name} est de nouveau en vie.`, "crew", now); }
     }
     if (m.full) for (const p of Object.values(state.people)) if (!seen.has(p.id) && !p.demo) p.online = false;
+    // Puces : qui porte la puce de qui (visible du poste admin seulement)
+    for (const pl of m.players) if (pl.chip !== undefined && state.people[pl.uuid]) state.people[pl.uuid].chip = pl.chip || null;
+    for (const p of Object.values(state.people)) delete p.carriedBy;
+    for (const p of Object.values(state.people))
+      if (p.online && p.chip && p.chip !== p.id && state.people[p.chip]) state.people[p.chip].carriedBy = p.id;
   }
   if (m.stocks) Object.assign(state.stocks, m.stocks);
 }
@@ -951,6 +959,77 @@ function apply(state, actor, a, ctx = {}) {
         if (f.tags) p.tags = f.tags.map(t => clean(t, 20)).filter(Boolean);
         if (f.name) p.name = clean(f.name, 32);
         L(`affecte ${p.name} : niv. ${p.level}, ${p.job || p.role || "sans poste"}${p.team && p.team !== "aucune" ? ", équipe de " + p.team : ""}.`, "crew"); break;
+      }
+      case "chip.reissue": {
+        need("crew.assign"); const p = person(a.person);
+        cmds.push({ type: "chip.reissue", person: p.id });
+        L(`réémet la puce de ${p.name} ; l’ancienne est invalidée.`, "crew"); break;
+      }
+      /* Actions sur un pont ou une section d'anneau entière */
+      case "group.act": {
+        need("deck.act");
+        let rooms, label;
+        if (a.scope === "deck") {
+          const d = state.decks.find(x => x.id === a.id); if (!d) throw new Error("Pont inconnu.");
+          rooms = Object.values(state.rooms).filter(r => r.deck === d.id); label = d.name;
+        } else if (a.scope === "section") {
+          const sec = state.sections[a.id]; if (!sec) throw new Error("Section inconnue.");
+          rooms = Object.values(state.rooms).filter(r => r.section === sec.id); label = sec.name;
+        } else throw new Error("Portée inconnue.");
+        rooms = rooms.filter(r => roomStatus(state, r) !== "gone");
+        const ids = new Set(rooms.map(r => r.id));
+        const doors = Object.values(state.doors).filter(d => d.rooms.some(x => ids.has(x)) || (a.scope === "deck" && d.deck === a.id));
+        if (!rooms.length && !doors.length) throw new Error("Rien à faire : aucune pièce ni porte connue ici.");
+        const on = !["unlockdown", "unlock", "alarmOff"].includes(a.op);
+        switch (a.op) {
+          case "lockdown": case "unlockdown":
+            need("door.lockdown");
+            for (const d of doors) { d.state.lockdown = on; if (on) d.state.open = false; cmds.push({ type: "door.set", door: d.id, lockdown: on, open: d.state.open }); }
+            L(`${on ? "isole" : "lève l’isolement de"} ${label} (${doors.length} porte(s)).`, on ? "crit" : "door"); break;
+          case "lock": case "unlock":
+            need("door.lock");
+            for (const d of doors) { d.state.locked = on; if (on) d.state.open = false; cmds.push({ type: "door.set", door: d.id, locked: on, open: d.state.open }); }
+            L(`${on ? "verrouille" : "déverrouille"} les ${doors.length} porte(s) de ${label}.`, "door"); break;
+          case "alarm": case "alarmOff":
+            need("room.alarm");
+            for (const r of rooms) { r.alarm = on; cmds.push({ type: "alarm.set", room: r.id, on, level: "4" }); if (!on) state.acks = state.acks.filter(k => k !== "man:" + r.id); }
+            cmds.push(paStateCmd(state));
+            L(`${on ? "déclenche" : "coupe"} l’alarme de ${label} (${rooms.length} pièce(s)).`, "alarm"); break;
+          case "pressurize":
+            need("room.pressurize");
+            for (const r of rooms) { r.mode = "pressurize"; cmds.push({ type: "room.pressurize", room: r.id }); }
+            L(`lance la pressurisation de ${label} (${rooms.length} pièce(s)).`, "atmos"); break;
+          case "vent":
+            need("room.vent");
+            for (const r of rooms) { r.mode = "vent"; cmds.push({ type: "room.vent", room: r.id }); }
+            L(`lance le vidage de l’air de ${label} (${rooms.length} pièce(s)).`, "crit"); break;
+          default: throw new Error("Action inconnue.");
+        }
+        break;
+      }
+      /* Discussion avec l'ordinateur de bord (le staff incarne l'ordinateur) */
+      case "chat.send": {
+        const text = clean(a.text, 500); if (!text) throw new Error("Message vide.");
+        state.chats = state.chats || {}; state.chatUnread = state.chatUnread || {};
+        if (actor.admin && a.to) {
+          const p = person(a.to);
+          (state.chats[p.id] = state.chats[p.id] || []).push({ t: now, from: "ai", text, who: actor.name });
+          state.chatUnread[p.id] = false;
+        } else {
+          (state.chats[actor.id] = state.chats[actor.id] || []).push({ t: now, from: "p", text });
+          state.chatUnread[actor.id] = true;
+          const staff = Object.values(state.people).filter(p => p.notifyAi && !p.demo && p.id !== actor.id).map(p => p.id);
+          if (staff.length) cmds.push({ type: "staff.notify", uuids: staff, title: "ORDINATEUR · " + who, text });
+        }
+        for (const k of Object.keys(state.chats)) if (state.chats[k].length > 200) state.chats[k].splice(0, state.chats[k].length - 200);
+        break;
+      }
+      case "chat.read": { if (!actor.admin) throw new Error("Réservé au staff."); state.chatUnread = state.chatUnread || {}; state.chatUnread[a.to] = false; break; }
+      case "chat.notify": {
+        if (!actor.admin) throw new Error("Réservé au staff.");
+        const p = state.people[actor.id]; if (!p) throw new Error("Identité inconnue.");
+        p.notifyAi = !!a.on;
+        L(`${a.on ? "active" : "coupe"} les notifications de la discussion avec l’ordinateur.`, "admin"); break;
       }
       case "crew.remove": { need("crew.assign"); const p = person(a.person); if (!actor.admin && levelOf(p) >= levelOf(actor)) throw new Error("Vous ne pouvez pas retirer un supérieur."); delete state.people[p.id]; for (const d of Object.values(state.doors)) { d.managers = d.managers.filter(x => x !== p.id); d.grants = d.grants.filter(x => x !== p.id); } L(`retire ${p.name} du registre.`, "crew"); break; }
       /* Admin */
@@ -1175,6 +1254,7 @@ function viewFor(state, actor, term) {
   const perms = Object.fromEntries(Object.keys(ACTIONS).map(k => [k, can(state, actor, k, term)]));
   const termPages = term && state.terminals[term] ? state.terminals[term].pages : Object.keys(PAGES);
   let pages = Object.keys(PAGES).filter(p => adm || (termPages.includes(p) && !ADMIN_PAGES.includes(p)));
+  if (actor && !pages.includes("chat")) pages.push("chat");
   if (!adm && !perms["structure.edit"] && !perms["perms.edit"]) pages = pages.filter(p => p !== "structure");
   if (!adm && !perms["alarm.general"] && !perms["pa.play"]) pages = pages.filter(p => p !== "pa");
   v.alerts = computeAlerts(state, adm);
@@ -1189,6 +1269,9 @@ function viewFor(state, actor, term) {
     }
     delete v.screens;
     delete v.craft;
+    v.chats = { [actor ? actor.id : "_"]: ((state.chats || {})[actor && actor.id] || []).map(m => ({ t: m.t, from: m.from, text: m.text })) };
+    delete v.chatUnread;
+    for (const p of Object.values(v.people)) { delete p.chip; delete p.carriedBy; delete p.notifyAi; }
   }
   v.me = actor ? {
     id: actor.id, name: actor.name, level: actor.level | 0, admin: adm, role: actor.role, job: actor.job, rank: actor.rank, group: actor.group, team: actor.team,
@@ -1216,7 +1299,12 @@ function seedDemo(now = Date.now()) {
   const LEN = 560;
   HULL.forEach(([dname, list], di) => {
     const did = "P" + (di + 1);
-    s.decks.push({ id: did, name: dname, kind: "hull", order: di, y0: 200 - di * 16, y1: 215 - di * 16 });
+    s.decks.push({ id: did, name: dname, kind: "hull", order: di * 2, y0: 200 - di * 16, y1: (di === 1 || di === 4 ? 213 : 215) - di * 16 });
+    if (di === 1 || di === 4) {   // coursives d'entretien entre deux ponts
+      const mid = "C-P" + (di + 2) + "-P" + (di + 1);
+      s.decks.push({ id: mid, name: "Coursives P" + (di + 1) + " / P" + (di + 2), kind: "maintenance", order: di * 2 + 1, y0: 214 - di * 16, y1: 215 - di * 16 });
+      R({ id: mid + "-c", name: "Coursive d’entretien", deck: mid, kind: "room", rects: [[20, 76, LEN - 20, 84]] });
+    }
     R({ id: did + "-cor", name: "Coursive pont " + (di + 1), deck: did, kind: "corridor", rects: [[0, 72, LEN, 88]] });
     for (const side of ["n", "s"]) {
       const items = list.filter(x => x[1] === side), tot = items.reduce((a, x) => a + x[2], 0);
@@ -1237,8 +1325,8 @@ function seedDemo(now = Date.now()) {
   const SIDES = ["Nord", "Est", "Sud", "Ouest"];
   RINGS.forEach(([rk, rname, rooms], ri) => {
     const did = "R" + rk[0];
-    s.decks.push({ id: did, name: rname, kind: "ring", order: 6 + ri });
-    SIDES.forEach((sd, k) => { s.sections[did + "-" + k] = { id: did + "-" + k, name: rk + " " + sd, named: true, ejectable: true, state: "attached" }; });
+    s.decks.push({ id: did, name: rname, kind: "ring", order: 20 + ri, ring: { axis: "x", a0: 180 + ri * 90, a1: 200 + ri * 90, c1: 160, c2: 80, r0: 110 + ri * 12, r1: 128 + ri * 12, sections: 4 } });
+    SIDES.forEach((sd, k) => { s.sections[did + "-" + k] = { id: did + "-" + k, name: rk + " " + sd, named: true, ejectable: true, state: "attached", ring: did, index: k }; });
     rooms.forEach((n, k) => R({ id: did + "-" + k, name: n, deck: did, rects: [RECT[k]], section: did + "-" + Math.floor(k / 2) }));
     rooms.forEach((n, k) => D({ deck: did, x: DOORS[k][0], z: DOORS[k][1], rooms: [did + "-" + k, did + "-" + ((k + 1) % 8)], size: "3×3", name: rk + " " + (k + 1) + "→" + ((k + 1) % 8 + 1) }));
   });
@@ -1432,7 +1520,7 @@ document.addEventListener("scroll", () => { if (MIRROR_KEY) mirrorPush(); }, tru
 { const h = location.hash.replace(/^#/, ""); if (h && MC.PAGES[h]) ui.page = h; }
 let lastHash = "";
 function syncHash() { if (SCREEN || ui.page === lastHash) return; lastHash = ui.page; try { history.replaceState(null, "", location.pathname + location.search + "#" + ui.page); } catch {} }
-function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
+function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; chatWatch(); if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
 
 function act(action, ok) {
   return T.send(action).then(r => { if (r.ok) { if (ok) toast(ok); } else toast(r.error, "err"); return r; });
@@ -1482,7 +1570,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["plan", "02"], ["atmos", "03"], ["doors", "04"], ["crew", "05"], ["procs", "06"], ["pa", "07"], ["starmap", "08"], ["galaxy", "09"], ["log", "10"], ["structure", "11"], ["screens", "12"], ["craft", "13"], ["admin", "14"]];
+const NAV = [["overview", "01"], ["plan", "02"], ["vue3d", "03"], ["atmos", "04"], ["doors", "05"], ["crew", "06"], ["procs", "07"], ["pa", "08"], ["chat", "09"], ["starmap", "10"], ["galaxy", "11"], ["log", "12"], ["structure", "13"], ["screens", "14"], ["craft", "15"], ["admin", "16"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -1507,13 +1595,13 @@ function render() {
   const demoBar = DEMO ? `<div class="demo"><b>MODE DÉMO</b><label class="mu" for="demo-who">Puce</label><select id="demo-who" data-fn="demoWho">${Object.values(DEMO.S.people).map(p => `<option value="${esc(p.id)}"${p.id === DEMO.actor ? " selected" : ""}>${esc(p.name)} · niv. ${p.admin ? "admin" : p.level}</option>`).join("")}</select><label class="mu" for="demo-term">Terminal</label><select id="demo-term" data-fn="demoTerm"><option value="">Aucun (toutes pages)</option>${Object.values(DEMO.S.terminals).map(t => `<option value="${esc(t.id)}"${t.id === DEMO.term ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select><span class="mu">Changez de puce pour tester les niveaux d’accès et les doubles codes.</span></div>` : "";
   const soloBar = !DEMO && V.me.realAdmin ? `<div class="demo"><b>TEST SOLO</b><label class="mu" for="solo-as">Incarner</label><select id="solo-as" data-fn="soloAs"><option value="">Poste admin · toutes permissions</option>${(V.me.roster || []).map(([id, n, lv]) => `<option value="${esc(id)}"${V.me.as === id ? " selected" : ""}>${esc(n)} · niv. ${lv}</option>`).join("")}</select><span class="mu">${V.me.as ? "Vous voyez et agissez exactement comme cette personne." : "Choisissez une personne pour tester ses droits, ou saisir le second code d’une éjection."}</span></div>` : "";
   const navItems = NAV.filter(([k]) => V.me.pages.includes(k)).map(([k, n]) => {
-    const badge = k === "log" && alerts.length ? `<span class="bad">${alerts.length}</span>` : k === "crew" && perm("crew.assign") && people().some(p => !p.level) ? `<span class="bad">${people().filter(p => !p.level).length}</span>` : "";
+    const badge = k === "log" && alerts.length ? `<span class="bad">${alerts.length}</span>` : k === "chat" && V.me.admin && Object.values(V.chatUnread || {}).some(Boolean) ? `<span class="bad">${Object.values(V.chatUnread).filter(Boolean).length}</span>` : k === "crew" && perm("crew.assign") && people().some(p => !p.level) ? `<span class="bad">${people().filter(p => !p.level).length}</span>` : "";
     return `${k === "structure" ? '<div class="navsep">CONFIGURATION</div>' : ""}<a data-go="${k}" ${ui.page === k ? 'aria-current="page"' : ""} tabindex="0"><span class="n">${n}</span>${esc(MC.PAGES[k])}${badge}</a>`;
   }).join("");
   const banners = (V.computer && V.computer.refuse ? `<div class="banner red">Ordinateur de bord · ${esc(V.computer.message || "les commandes de l’équipage sont refusées")}</div>` : "") +
     (V.ship.demo && LINK !== "demo" ? `<div class="banner amb">Vaisseau de démonstration · en attente de la structure envoyée par le mod</div>` : "");
   const tick = V.log.slice(0, 14).map(l => `<span>${fmtT(l.t)} · ${esc(l.who)} : ${esc(l.text)}</span>`).join("");
-  app.innerHTML = `
+  morph(app, `
 <div class="top"><header>
   <div class="brand">MERIDIAN<small>CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : ""}</small></div>
   <div class="hsep"></div>${shipChip}${linkChip}
@@ -1525,8 +1613,45 @@ function render() {
 ${demoBar}${soloBar}${banners}</div>
 <nav aria-label="Pages">${navItems}</nav>
 <main id="main">${PAGE[ui.page] ? PAGE[ui.page]() : ""}</main>
-<footer><span class="tl">JOURNAL &gt;&gt;</span><div class="tk"><div>${tick}${tick}</div></div></footer>`;
+<footer><span class="tl">JOURNAL &gt;&gt;</span><div class="tk"><div>${tick}${tick}</div></div></footer>`);
   restoreForm(snap);
+}
+
+/* Mise à jour sans tout reconstruire : on ne modifie que ce qui a changé. Un élément en cours d'utilisation
+   (liste déroulante ouverte, champ en saisie) n'est jamais touché ; les défilements et animations sont conservés. */
+function morph(target, html) {
+  const tpl = document.createElement("div");
+  tpl.innerHTML = html;
+  patchChildren(target, tpl);
+}
+function patchChildren(a, b) {
+  const an = Array.from(a.childNodes), bn = Array.from(b.childNodes);
+  for (let i = 0; i < bn.length; i++) {
+    if (i >= an.length) a.appendChild(bn[i]);
+    else patchNode(an[i], bn[i]);
+  }
+  for (let i = bn.length; i < an.length; i++) an[i].remove();
+}
+function patchNode(x, y) {
+  if (x.nodeType !== y.nodeType || x.nodeName !== y.nodeName || ((x.id || y.id) && x.id !== y.id)) { x.replaceWith(y); return; }
+  if (x.nodeType === 3 || x.nodeType === 8) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+  if (x.nodeType !== 1) return;
+  const busy = x === document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(x.nodeName);
+  if (busy) return;
+  const oldValueAttr = x.getAttribute("value");
+  for (const at of Array.from(x.attributes)) if (!y.hasAttribute(at.name)) x.removeAttribute(at.name);
+  for (const at of Array.from(y.attributes)) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value);
+  if (x.nodeName === "INPUT") {
+    if ((x.type === "checkbox" || x.type === "radio")) x.checked = y.hasAttribute("checked");
+    else if (y.getAttribute("value") !== oldValueAttr) x.value = y.getAttribute("value") ?? "";
+    return;
+  }
+  if (x.nodeName === "TEXTAREA" || x.hasAttribute("data-keep")) return;
+  patchChildren(x, y);
+  if (x.nodeName === "SELECT") {
+    const sel = Array.from(x.options).findIndex(o => o.hasAttribute("selected"));
+    if (sel >= 0 && x.selectedIndex !== sel) x.selectedIndex = sel;
+  }
 }
 
 /* Conserver la saisie en cours quand l'état se rafraîchit. */
@@ -1539,7 +1664,7 @@ function snapshotForm() {
 function restoreForm(o) {
   for (const [id, v] of Object.entries(o.vals)) { const el = document.getElementById(id); if (!el) continue; if (el.type === "checkbox") el.checked = v; else el.value = v; }
   const m = document.getElementById("main"); if (m) m.scrollTop = o.scroll;
-  if (o.focus) { const el = document.getElementById(o.focus); if (el) { el.focus(); if (o.sel) try { el.setSelectionRange(o.sel[0], o.sel[1]); } catch {} } }
+  if (o.focus) { const el = document.getElementById(o.focus); if (el && el !== document.activeElement) { el.focus(); if (o.sel) try { el.setSelectionRange(o.sel[0], o.sel[1]); } catch {} } }
 }
 
 /* ---------------------------- Forme réelle (scan de coque) ----------------------------
@@ -1715,11 +1840,11 @@ function schematic() {
 }
 
 /* ---------------------------- Plan d'un pont ---------------------------- */
-function deckPlan(did) {
-  const list = roomsOf(did), deck = V.decks.find(d => d.id === did);
+function deckPlan(did, sec) {
+  const list = roomsOf(did).filter(r => !sec || r.section === sec), deck = V.decks.find(d => d.id === did);
   // Coque réelle à la hauteur de ce pont, si le scan la couvre.
-  const hullUrl = HULL && deck && deck.kind !== "ring" && deck.y0 != null && !String(deck.id).includes("/") ? hullDeckUrl(deck.y0, deck.y1) : null;
-  if (!list.length && !hullUrl) return `<p class="empty">Aucune pièce sur ce pont.</p>`;
+  const hullUrl = !sec && HULL && deck && deck.kind !== "ring" && deck.y0 != null && !String(deck.id).includes("/") ? hullDeckUrl(deck.y0, deck.y1) : null;
+  if (!list.length && !hullUrl) return `<p class="empty">${sec ? "Aucune pièce connue dans cette section." : "Aucune pièce sur ce pont."}</p>`;
   const P = HULL ? hullP : (x, z) => [x, z];
   const R = ([a, b, c, d]) => { const p = P(a, b), q = P(c, d); return [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])]; };
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
@@ -1744,7 +1869,8 @@ function deckPlan(did) {
       if (perm("crew.vitals")) { const o = occupants(r.id); o.slice(0, 6).forEach((p, i) => { const dead = p.vitals && p.vitals.alive === false; g += `<circle cx="${cx - (o.length - 1) * fs * .45 + i * fs * .9}" cy="${cz + fs * 1.3}" r="${fs * .28}" fill="${dead ? "var(--red)" : hpCls(p.vitals) ? "var(--amb)" : "var(--ok)"}" pointer-events="none"/>`; }); }
     }
   }
-  for (const d of Object.values(V.doors).filter(x => x.deck === did)) {
+  const inList = new Set(list.map(r => r.id));
+  for (const d of Object.values(V.doors).filter(x => x.deck === did && (!sec || x.rooms.some(id => inList.has(id))))) {
     const c = d.state.lockdown ? "var(--red)" : d.state.locked ? "var(--amb)" : d.state.open ? "var(--cy)" : "var(--mu)", sz = fs * .9, sel = ui.door === d.id, [dx, dz] = P(d.x, d.z);
     g += `<rect class="hit" data-door="${esc(d.id)}" x="${dx - sz / 2}" y="${dz - sz / 2}" width="${sz}" height="${sz}" fill="${d.state.open ? c : "var(--bg)"}" stroke="${sel ? "#fff" : c}" stroke-width="${fs * .18}"><title>Porte ${esc(d.id)} · ${esc(d.name)}</title></rect>`;
     g += `<text x="${dx}" y="${dz - sz * .9}" fill="${c}" font-size="${fs * .62}" text-anchor="middle" font-family="IBM Plex Mono,monospace" pointer-events="none">${esc(d.id)}</text>`;
@@ -1825,15 +1951,6 @@ function procMini(p) {
   return `<div class="al" data-go="procs"><span class="dot" style="background:var(--red)"></span><div><b>Éjection · ${esc(s ? s.name : p.target)}</b><small>${p.status === "countdown" ? `T-<span data-cd="${p.endsAt}">--</span> s` : `code ${p.codes.length}/${p.need} · en attente`}</small></div></div>`;
 }
 
-PAGE.plan = () => {
-  if (!V.decks.length) return panel("Plan", "MAP", `<p class="empty">Aucune structure reçue du mod.</p>`);
-  if (!ui.deck || !V.decks.find(d => d.id === ui.deck)) ui.deck = (ui.room && V.rooms[ui.room]) ? V.rooms[ui.room].deck : V.decks[0].id;
-  const tabs = V.decks.map(d => `<button class="tab" data-deck="${esc(d.id)}" aria-pressed="${d.id === ui.deck}"><span class="s" style="background:${COL[deckStatus(d.id)]}"></span>${esc(d.id)} · ${esc(d.name)}</button>`).join("");
-  const deck = V.decks.find(d => d.id === ui.deck);
-  const legend = `<div class="row mu" style="gap:14px;margin-top:10px;font-size:12px"><span class="st ok">Normal</span><span class="st warn">Alerte</span><span class="st fire">Incendie</span><span class="st vac">Dépressurisation</span><span class="mu">Carré : porte · <span class="cy">ouverte</span> · <span class="amb">verrouillée</span> · <span class="red">scellée</span></span></div>`;
-  return `<div class="tabs" role="group" aria-label="Ponts">${tabs}</div><div class="grid g-2">${panel(deck.name, deck.id + " · " + (deck.kind === "ring" ? "ANNEAU" : "PONT") + (deck.y0 != null ? ` · Y ${deck.y0}–${deck.y1}` : ""), `<div class="svgw">${deckPlan(ui.deck)}</div>${legend}`)}${ui.door && V.doors[ui.door] && V.doors[ui.door].deck === ui.deck && !ui.room ? doorPanel(ui.door) : roomPanel(ui.room && V.rooms[ui.room] && V.rooms[ui.room].deck === ui.deck ? ui.room : null)}</div>`;
-};
-
 PAGE.atmos = () => {
   const list = Object.values(V.rooms).filter(r => r.kind !== "corridor" && (ui.atF === "all" || (ui.atF === "bad" ? rs(r) !== "ok" : r.deck === ui.atF)));
   const filt = `<div class="toolbar"><label class="mu" for="at-f">Afficher</label><select id="at-f" data-fn="atF"><option value="all">Toutes les pièces</option><option value="bad"${ui.atF === "bad" ? " selected" : ""}>Hors norme seulement</option>${V.decks.map(d => `<option value="${esc(d.id)}"${ui.atF === d.id ? " selected" : ""}>${esc(d.id)} · ${esc(d.name)}</option>`).join("")}</select><span class="mu m" style="font-size:12px">${list.length} pièce(s)</span></div>`;
@@ -1897,7 +2014,12 @@ function personPanel(pid) {
   } else if (!vit) b += `<p class="note">Constantes et position réservées (niv. ${need("crew.vitals")}).</p>`;
   const nd = Object.values(V.doors).filter(d => MC.canOpenDoor(V, p, d).ok).length;
   b += kv("Portes accessibles", `${nd} / ${Object.keys(V.doors).length}`);
-  b += `<div class="btns" style="margin-top:14px">${btn("Affecter", null, { perm: "crew.assign", fn: "assign", arg: p.id, cls: p.level ? "" : "solid" })}${btn("Retirer du registre", { type: "crew.remove", person: p.id }, { perm: "crew.assign", cls: "red sm", confirm: `Retirer ${p.name} du registre ? Ses autorisations seront supprimées.` })}${V.me.admin ? btn(p.admin ? "Retirer admin" : "Donner l’accès admin", { type: "admin.setAdmin", person: p.id, on: !p.admin }, { cls: "ghost sm" }) : ""}</div>`;
+  if (V.me.admin) {
+    const nm = (id) => V.people[id] ? esc(V.people[id].name) : esc(String(id).slice(0, 8));
+    b += kv("Puce portée", !p.chip ? `<span class="mu">aucune</span>` : p.chip === p.id ? "la sienne" : `<span class="amb">celle de ${nm(p.chip)}</span>`);
+    if (p.carriedBy && p.carriedBy !== p.id) b += kv("Sa puce est portée par", `<span class="red">${nm(p.carriedBy)}</span>`);
+  }
+  b += `<div class="btns" style="margin-top:14px">${btn("Affecter", null, { perm: "crew.assign", fn: "assign", arg: p.id, cls: p.level ? "" : "solid" })}${btn("Retirer du registre", { type: "crew.remove", person: p.id }, { perm: "crew.assign", cls: "red sm", confirm: `Retirer ${p.name} du registre ? Ses autorisations seront supprimées.` })}${btn("Réémettre la puce", { type: "chip.reissue", person: p.id }, { perm: "crew.assign", cls: "amb sm", confirm: `Réémettre la puce de ${p.name} ? L’ancienne puce (perdue ou volée) ne sera plus reconnue par le vaisseau.` })}${V.me.admin ? btn(p.admin ? "Retirer admin" : "Donner l’accès admin", { type: "admin.setAdmin", person: p.id, on: !p.admin }, { cls: "ghost sm" }) : ""}</div>`;
   return panel("Fiche personnel", p.id.slice(0, 12).toUpperCase(), b);
 }
 
@@ -2311,7 +2433,7 @@ function renderDisplay() {
     const jump = n && n.jump ? (() => { const to = MC.navSystem(n.catalog, n.jump.to), end = n.jump.startAt + MC.JUMP_INTRO_MS + n.jump.seconds * 1000; return `<span class="chip warn">HYPERESPACE → ${esc(to ? to.name : n.jump.to)} · <span data-cd="${end}">${Math.max(0, Math.ceil((end - now()) / 1000))}</span> s</span>`; })() : "";
     body = `<div class="kstat"><div><div class="big">${esc(V.ship.name.toUpperCase())}</div><div class="sub">${sys ? "SYSTÈME " + esc(sys.name.toUpperCase()) : ""}</div></div><div class="clk" data-clock>${fmtT(now())}</div><div class="row">${V.ship.alert ? `<span class="chip crit">ALERTE ${esc(V.ship.alert.toUpperCase())}</span>` : crit.length ? `<span class="chip crit">${crit.length} ALARME(S) CRITIQUE(S)</span>` : alerts.length ? `<span class="chip warn">${alerts.length} ALARME(S)</span>` : `<span class="chip ok">NOMINAL</span>`}${jump}</div>${c.denied ? `<div class="sub" style="font-size:1.8vh">Page non autorisée à ce niveau d’accès</div>` : ""}</div>`;
   }
-  app.innerHTML = `<div class="kio">${c.mode === "page" ? body : (c.mode === "status" ? "" : head) + body}</div>`;
+  morph(app, `<div class="kio">${c.mode === "page" ? body : (c.mode === "status" ? "" : head) + body}</div>`);
   if (c.mode === "page" && c.mirror && MIRROR) { const kb = app.querySelector(".kbody"); if (kb) kb.scrollTop = (MIRROR.scroll || 0) * (kb.scrollHeight - kb.clientHeight); }
 }
 
@@ -2588,6 +2710,382 @@ Object.assign(FN, {
   recPlay() { if (REC.pcm) playIntercom(REC.pcm.i16); }
 });
 
+
+/* =====================================================================
+   Vue de face : ponts et coursives au centre, sections d'anneau autour.
+   C'est de là qu'on agit sur un pont ou une section entière.
+   ===================================================================== */
+const hullAndCorridors = () => V.decks.filter(d => d.kind !== "ring").slice().sort((a, b) => (b.y0 ?? -1e9) - (a.y0 ?? -1e9) || (a.order ?? 0) - (b.order ?? 0));
+const ringDecks = () => V.decks.filter(d => d.kind === "ring");
+const ringSections = (did) => Object.values(V.sections).filter(s => s.ring === did).sort((a, b) => (a.index | 0) - (b.index | 0));
+const roomsOfSection = (sid) => Object.values(V.rooms).filter(r => r.section === sid);
+function worst(list) { return list.map(rs).reduce((a, s) => RANK[s] > RANK[a] ? s : a, "ok"); }
+function sectionStatus(s) { return s.state === "ejected" ? "gone" : worst(roomsOfSection(s.id)); }
+
+function frontView() {
+  const C = 300, rings = ringDecks(), rows = hullAndCorridors();
+  let g = "";
+  let ticks = "";
+  for (let i = 0; i < 120; i++) { const a = i * Math.PI / 60, l = i % 10 === 0 ? 12 : i % 5 === 0 ? 7 : 3; ticks += `<line x1="${C + 288 * Math.cos(a)}" y1="${C + 288 * Math.sin(a)}" x2="${C + (288 - l) * Math.cos(a)}" y2="${C + (288 - l) * Math.sin(a)}" stroke="var(--ln2)" stroke-width="1"/>`; }
+  g += `<g class="spin">${ticks}<circle cx="${C}" cy="${C}" r="272" fill="none" stroke="var(--cyd)" stroke-dasharray="2 9"/></g>`;
+  g += `<line x1="${C}" y1="6" x2="${C}" y2="594" stroke="var(--ln)" stroke-dasharray="3 6"/><line x1="6" y1="${C}" x2="594" y2="${C}" stroke="var(--ln)" stroke-dasharray="3 6"/>`;
+  ["000", "090", "180", "270"].forEach((t, i) => { const a = -Math.PI / 2 + i * Math.PI / 2; g += `<text x="${C + 296 * Math.cos(a) + (i === 1 ? -4 : i === 3 ? 4 : 0)}" y="${C + 296 * Math.sin(a) + (i === 0 ? 10 : i === 2 ? -3 : 3)}" fill="var(--dim)" font-family="IBM Plex Mono,monospace" font-size="9" text-anchor="${i === 1 ? "end" : i === 3 ? "start" : "middle"}">${t}</text>`; });
+  const step = rings.length ? Math.min(48, 128 / rings.length) : 40, band = step * .72;
+  rings.forEach((d, i) => {
+    const r1 = 142 + i * step, r2 = r1 + band, secs = ringSections(d.id), gap = 0.03;
+    g += `<circle cx="${C}" cy="${C}" r="${r2 + 4}" fill="none" stroke="var(--ln)" stroke-width="1"/>`;
+    if (secs.length) {
+      const n = (d.ring && d.ring.sections) || secs.length;
+      secs.forEach(s => {
+        const k = s.index | 0, a0 = -Math.PI / 2 + k * 2 * Math.PI / n + gap, a1 = -Math.PI / 2 + (k + 1) * 2 * Math.PI / n - gap, st = sectionStatus(s), sel = ui.sec === s.id;
+        const am = (a0 + a1) / 2, rm = (r1 + r2) / 2;
+        g += `<path class="hit" data-sec="${esc(s.id)}" d="${arcPath(C, C, r1, r2, a0, a1)}" fill="${COL[st]}" fill-opacity="${st === "gone" ? .1 : st === "ok" ? .3 : .75}" stroke="${sel ? "#fff" : COL[st]}" stroke-width="${sel ? 2.4 : 1}"${st === "gone" ? ' stroke-dasharray="3 4"' : ""}><title>${esc(s.name)} · ${st === "gone" ? "éjectée" : ST[st]} · ${roomsOfSection(s.id).length} pièce(s)</title></path>`;
+        g += `<text x="${C + rm * Math.cos(am)}" y="${C + rm * Math.sin(am) + 3.5}" fill="var(--tx)" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="middle" pointer-events="none">${k + 1}</text>`;
+      });
+    } else {
+      const list = roomsOf(d.id), n = list.length || 1;
+      list.forEach((r, k) => {
+        const a0 = -Math.PI / 2 + k * 2 * Math.PI / n + gap, a1 = -Math.PI / 2 + (k + 1) * 2 * Math.PI / n - gap, s = rs(r);
+        g += `<path class="hit" data-room="${esc(r.id)}" data-deck="${esc(d.id)}" d="${arcPath(C, C, r1, r2, a0, a1)}" fill="${COL[s]}" fill-opacity="${s === "ok" ? .3 : .75}" stroke="${COL[s]}"><title>${esc(r.name)}</title></path>`;
+      });
+    }
+    g += `<text x="${C}" y="${C - r2 - 7}" fill="${ui.deck === d.id && !ui.sec ? "var(--cy)" : "var(--mu)"}" font-size="9.5" letter-spacing="1.5" text-anchor="middle" class="hit" data-deck="${esc(d.id)}">${esc(d.name.toUpperCase().slice(0, 30))}</text>`;
+  });
+  const hr = 124, n = Math.max(1, rows.length), hasM = rows.some(d => d.kind === "maintenance");
+  const unit = Math.min(26, 206 / (rows.filter(d => d.kind !== "maintenance").length + (hasM ? rows.filter(d => d.kind === "maintenance").length * .42 : 0) || 1));
+  g += `<circle cx="${C}" cy="${C}" r="${hr + 8}" fill="var(--bg)" stroke="var(--cy2)" stroke-width="1.5"/><circle cx="${C}" cy="${C}" r="${hr}" fill="var(--pn)" stroke="var(--ln2)"/>`;
+  g += `<defs><pattern id="mhatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ln2)" stroke-width="2"/></pattern></defs>`;
+  g += `<clipPath id="core"><circle cx="${C}" cy="${C}" r="${hr - 4}"/></clipPath><g clip-path="url(#core)">`;
+  const total = rows.reduce((a, d) => a + (d.kind === "maintenance" ? unit * .42 : unit), 0);
+  let y = C - total / 2;
+  for (const d of rows) {
+    const m = d.kind === "maintenance", h = m ? unit * .42 : unit, s = deckStatus(d.id), sel = ui.deck === d.id && !ui.sec;
+    const dy = Math.max(Math.abs(y - C), Math.abs(y + h - C)), hw = Math.max(40, Math.sqrt(Math.max(0, (hr - 6) ** 2 - dy * dy)));
+    g += `<g class="hit" data-deck="${esc(d.id)}"><rect x="${C - hw}" y="${y + .8}" width="${2 * hw}" height="${h - 1.6}" fill="${m ? "url(#mhatch)" : COL[s]}" fill-opacity="${m ? 1 : s === "ok" ? .22 : .6}" stroke="${sel ? "#fff" : m ? "var(--ln2)" : COL[s]}" stroke-width="${sel ? 2 : 1}" stroke-opacity=".9"/>`;
+    const fit = Math.max(4, Math.floor((2 * hw - 52) / 6.4));
+    if (!m) g += `<text x="${C - hw + 8}" y="${y + h / 2 + 4}" fill="var(--tx)" font-size="11" font-weight="600" pointer-events="none" font-family="IBM Plex Mono,monospace">${esc(String(d.id).slice(0, 6))}</text><text x="${C - hw + 42}" y="${y + h / 2 + 4}" fill="var(--tx)" font-size="11" pointer-events="none">${esc(d.name.length > fit ? d.name.slice(0, fit - 1) + "…" : d.name)}</text>`;
+    else if (s !== "ok") g += `<rect x="${C - hw}" y="${y + .8}" width="${2 * hw}" height="${h - 1.6}" fill="${COL[s]}" fill-opacity=".5" pointer-events="none"/>`;
+    g += `<title>${esc(d.name)}${d.y0 != null ? ` · Y ${d.y0}–${d.y1}` : ""}${m ? " · coursives d’entretien" : ""}</title></g>`;
+    y += h;
+  }
+  g += `</g>`;
+  if (!V.decks.length) g += `<text x="${C}" y="${C}" fill="var(--mu)" text-anchor="middle" font-size="13">Aucune structure reçue</text>`;
+  return `<svg viewBox="0 0 600 600" role="img" aria-label="Vue de face : ponts au centre, sections d’anneau autour">${g}</svg>`;
+}
+
+/* Ce qui est sélectionné sur la vue de face : un pont, une coursive ou une section d'anneau. */
+function groupPanel() {
+  const sec = ui.sec && V.sections[ui.sec], deck = V.decks.find(d => d.id === ui.deck);
+  if (!sec && !deck) return panel("Sélection", "—", `<p class="empty">Cliquez un pont, une coursive ou une section d’anneau.</p>`);
+  const scope = sec ? "section" : "deck", id = sec ? sec.id : deck.id;
+  const rooms = (sec ? roomsOfSection(sec.id) : roomsOf(deck.id)).filter(r => rs(r) !== "gone");
+  const ids = new Set(rooms.map(r => r.id));
+  const doors = Object.values(V.doors).filter(d => d.rooms.some(x => ids.has(x)) || (!sec && d.deck === deck.id));
+  const occ = perm("crew.vitals") ? people().filter(p => p.room && ids.has(p.room)) : null;
+  const st = sec ? sectionStatus(sec) : deckStatus(deck.id);
+  const kind = sec ? "Section d’anneau" : deck.kind === "maintenance" ? "Coursives d’entretien" : deck.kind === "ring" ? "Anneau" : "Pont";
+  const locked = doors.some(d => d.state.lockdown), alarm = rooms.some(r => r.alarm);
+  const G = (op) => ({ type: "group.act", scope, id, op });
+  let b = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="st ${st}">${st === "gone" ? "Éjectée" : ST[st]}</span><span class="mu m" style="font-size:12px">${esc(kind)}${!sec && deck.y0 != null ? ` · Y ${deck.y0}–${deck.y1}` : ""}${sec ? " · " + esc(deckName(sec.ring)) : ""}</span></div>`;
+  b += kv("Pièces", rooms.length) + kv("Portes", doors.length) + (occ ? kv("Personnes présentes", `<span class="${occ.length ? "amb" : ""}">${occ.length}</span>`) : "");
+  if (sec && sec.state === "ejected") return panel(sec.name, sec.id, b + `<p class="empty">Section éjectée.</p>`);
+  b += `<div class="lbl">Agir sur tout${sec ? "e la section" : " le " + (deck.kind === "maintenance" ? "niveau" : "pont")}</div><div class="btns">`;
+  b += locked ? btn("Lever l’isolement", G("unlockdown"), { perm: "deck.act", cls: "ghost" }) : btn("Isoler (sceller les portes)", G("lockdown"), { perm: "deck.act", cls: "red", confirm: `Sceller les ${doors.length} portes de ${sec ? sec.name : deck.name} ?` });
+  b += btn("Verrouiller les portes", G("lock"), { perm: "deck.act", cls: "amb" }) + btn("Déverrouiller", G("unlock"), { perm: "deck.act", cls: "ghost" });
+  b += `</div><div class="btns" style="margin-top:8px">`;
+  b += alarm ? btn("Couper l’alarme", G("alarmOff"), { perm: "deck.act", cls: "ghost" }) : btn("Alarme", G("alarm"), { perm: "deck.act", cls: "amb" });
+  b += btn("Pressuriser", G("pressurize"), { perm: "deck.act" }) + btn("Vider l’air", G("vent"), { perm: "deck.act", cls: "red", confirm: `Vider l’air de ${rooms.length} pièce(s) de ${sec ? sec.name : deck.name} ?${occ && occ.length ? " " + occ.length + " personne(s) présente(s)." : ""}` });
+  if (sec && sec.ejectable) b += btn("Éjecter (code 1)", { type: "proc.eject.start", section: sec.id }, { perm: "proc.eject", cls: "red", confirm: `Lancer l’éjection de ${sec.name} ? Un second officier devra confirmer.` });
+  b += `</div>`;
+  b += `<div class="lbl">Pièces</div>` + (rooms.length ? rooms.slice(0, 40).map(r => `<div class="vrow" data-room="${esc(r.id)}" style="cursor:pointer"><span>${esc(r.name)}</span><span class="st ${rs(r)}">${ST[rs(r)]}</span></div>`).join("") : `<p class="empty">Aucune pièce connue ici.${sec ? " Nommez-en avec /rebirth ClRoom dans l’anneau." : ""}</p>`);
+  return panel(sec ? sec.name : deck.name, (sec ? sec.id : deck.id).toUpperCase(), b);
+}
+
+PAGE.plan = () => {
+  if (!V.decks.length) return panel("Plan", "MAP", `<p class="empty">Aucune structure reçue du mod.</p>`);
+  if (ui.sec && !V.sections[ui.sec]) ui.sec = null;
+  if (!ui.deck || !V.decks.find(d => d.id === ui.deck)) ui.deck = (ui.room && V.rooms[ui.room]) ? V.rooms[ui.room].deck : (hullAndCorridors()[0] || V.decks[0]).id;
+  const sec = ui.sec && V.sections[ui.sec];
+  const did = sec ? sec.ring : ui.deck, deck = V.decks.find(d => d.id === did);
+  const legend = `<div class="row mu" style="gap:14px;margin-top:10px;font-size:12px"><span class="st ok">Normal</span><span class="st warn">Alerte</span><span class="st fire">Incendie</span><span class="st vac">Dépressurisation</span><span class="mu">Carré : porte · <span class="cy">ouverte</span> · <span class="amb">verrouillée</span> · <span class="red">scellée</span></span></div>`;
+  const ringNote = deck && deck.kind === "ring" ? `<p class="note">Plan déroulé : la longueur de l’anneau à l’horizontale, le tour de l’anneau (sol, gravité vers l’extérieur) à la verticale.</p>` : "";
+  const title = sec ? sec.name : deck ? deck.name : "Plan";
+  const detail = ui.door && V.doors[ui.door] && V.doors[ui.door].deck === did && !ui.room ? doorPanel(ui.door) : roomPanel(ui.room && V.rooms[ui.room] && V.rooms[ui.room].deck === did ? ui.room : null);
+  return `<div class="grid g-2">${panel("Vue de face · " + V.ship.name, "MAP.FACE", `<div class="svgw">${frontView()}</div><p class="note" style="text-align:center;margin-inline:auto">Au centre, les ponts et les coursives d’entretien (hachurées), du haut vers le bas. Autour, les anneaux découpés en sections. Cliquez pour sélectionner et agir.</p>`)}${groupPanel()}</div>
+<div class="grid g-2" style="margin-top:14px">${panel("Plan scanné · " + title, (did || "") + (deck && deck.kind === "ring" ? " · ANNEAU" : deck && deck.kind === "maintenance" ? " · COURSIVES" : " · PONT") + (deck && deck.y0 != null ? ` · Y ${deck.y0}–${deck.y1}` : ""), `<div class="svgw">${deckPlan(did, sec ? sec.id : null)}</div>${legend}${ringNote}`)}${detail}</div>`;
+};
+
+/* =====================================================================
+   Vue 3D : coque scannée (silhouettes des ponts empilées) et pièces.
+   ===================================================================== */
+const V3 = { yaw: -0.75, pitch: 0.42, dist: 0, tx: 0, ty: 0, tz: 0, sig: "", hideHull: false, pick: [] };
+const HEX = { ok: 0x2fb3c2, warn: 0xf5a83a, fire: 0xff5266, vac: 0xa88dff, gone: 0x405c66 };
+function load3d() {
+  if (window.THREE || V3.loading) return;
+  V3.loading = true;
+  const s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+  s.onload = () => { V3.loading = false; render(); };
+  s.onerror = () => { V3.loading = false; V3.err = "Moteur 3D introuvable (connexion à cdnjs bloquée ?)."; render(); };
+  document.head.appendChild(s);
+}
+PAGE.vue3d = () => {
+  queueMicrotask(mount3d);
+  const sel = ui.room && V.rooms[ui.room] ? roomPanel(ui.room) : ui.sec && V.sections[ui.sec] ? groupPanel() : panel("Sélection", "—", `<p class="empty">Cliquez une pièce ou une section d’anneau dans la vue.</p>`);
+  const views = [["face", "Face"], ["top", "Dessus"], ["side", "Profil"], ["iso", "3/4"]].map(([k, l]) => btn(l, null, { fn: "v3view", arg: k, cls: "sm ghost" })).join("");
+  return `<div class="grid g-2">${panel("Vue 3D · " + V.ship.name, "MAP.3D", `<div id="v3" data-keep style="position:relative;height:min(68vh,620px);background:var(--bg2);border:1px solid var(--ln);overflow:hidden;touch-action:none;cursor:grab"></div>
+<div class="btns" style="margin-top:10px">${views}${btn(V3.hideHull ? "Afficher la coque" : "Masquer la coque", null, { fn: "v3hull", cls: "sm" })}</div>
+<p class="note">Glisser : tourner · molette : zoom · clic droit ou Maj + glisser : déplacer · clic : sélectionner. ${HULL ? `Coque d’après le scan du ${esc(new Date(HULL.at || Date.now()).toLocaleDateString("fr-FR"))}.` : "Pas encore de scan de coque : /meridian coque scan."}</p>`)}${sel}</div>`;
+};
+function mount3d() {
+  const host = document.getElementById("v3");
+  if (!host) return;
+  if (!window.THREE) {
+    if (V3.err) host.innerHTML = `<p class="empty" style="padding:16px">${esc(V3.err)}</p>`;
+    else { if (!host.firstChild) host.innerHTML = `<p class="empty" style="padding:16px">Chargement du moteur 3D…</p>`; load3d(); }
+    return;
+  }
+  if (!V3.renderer || V3.host !== host) init3d(host);
+  const sig = JSON.stringify([V.decks.map(d => d.id + d.y0 + d.y1), Object.keys(V.rooms).length, Object.keys(V.sections).length, HULL && HULL.at, V3.hideHull]);
+  if (sig !== V3.sig) { V3.sig = sig; build3d(); }
+  recolor3d();
+}
+function init3d(host) {
+  const T = window.THREE;
+  if (V3.renderer) { V3.renderer.dispose(); }
+  host.innerHTML = "";
+  const r = new T.WebGLRenderer({ antialias: true, alpha: false });
+  r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  r.setClearColor(0x06121a);
+  host.appendChild(r.domElement);
+  const tip = document.createElement("div");
+  tip.style.cssText = "position:absolute;left:10px;top:8px;font:12px IBM Plex Mono,monospace;color:#d3ebef;pointer-events:none;text-shadow:0 0 4px #000";
+  host.appendChild(tip);
+  const scene = new T.Scene();
+  scene.add(new T.AmbientLight(0xffffff, 0.62));
+  const sun = new T.DirectionalLight(0xffffff, 0.55); sun.position.set(0.6, 1, 0.4); scene.add(sun);
+  const cam = new T.PerspectiveCamera(42, 1, 1, 100000);
+  Object.assign(V3, { renderer: r, scene, cam, host, tip, group: null });
+  const size = () => { const w = host.clientWidth, h = host.clientHeight; r.setSize(w, h); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); V3.dirty = true; };
+  new ResizeObserver(size).observe(host); size();
+  let drag = null;
+  const el = r.domElement;
+  el.addEventListener("contextmenu", e => e.preventDefault());
+  el.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey, moved: 0 }; el.setPointerCapture(e.pointerId); host.style.cursor = "grabbing"; });
+  el.addEventListener("pointermove", e => {
+    if (!drag) { hover3d(e); return; }
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+    if (drag.pan) {
+      const k = V3.dist / 700, s = Math.sin(V3.yaw), c = Math.cos(V3.yaw);
+      V3.tx -= (dx * c) * k; V3.tz += (dx * s) * k; V3.ty += dy * k;
+    } else { V3.yaw -= dx * 0.008; V3.pitch = Math.max(-1.5, Math.min(1.5, V3.pitch + dy * 0.008)); }
+    V3.dirty = true;
+  });
+  el.addEventListener("pointerup", e => { host.style.cursor = "grab"; if (drag && drag.moved < 5) click3d(e); drag = null; });
+  el.addEventListener("wheel", e => { e.preventDefault(); V3.dist *= Math.exp(e.deltaY * 0.0012); V3.dirty = true; }, { passive: false });
+  const loop = () => {
+    if (!host.isConnected) { r.dispose(); V3.renderer = null; return; }
+    if (V3.dirty) { place3d(); r.render(scene, cam); V3.dirty = false; }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+function place3d() {
+  const c = V3.cam, cp = Math.cos(V3.pitch);
+  c.position.set(V3.tx + V3.dist * cp * Math.sin(V3.yaw), V3.ty + V3.dist * Math.sin(V3.pitch), V3.tz + V3.dist * cp * Math.cos(V3.yaw));
+  c.near = Math.max(0.5, V3.dist / 500); c.far = V3.dist * 20; c.updateProjectionMatrix();
+  c.lookAt(V3.tx, V3.ty, V3.tz);
+}
+/* Point monde d'une position déroulée dans un anneau (axe, arc) à un rayon donné. */
+function ringPoint(g, a, s, rad) {
+  const th = s / g.r1, u = rad * Math.sin(th), v = rad * Math.cos(th);
+  return g.axis === "z" ? [g.c2 + u, g.c1 + v, a] : [a, g.c1 + v, g.c2 + u];
+}
+function sectorMesh(T, g, a0, a1, th0, th1, mat) {
+  const seg = Math.max(2, Math.ceil((th1 - th0) / 0.08)), pos = [], idx = [];
+  const P = (a, th, rad) => { const u = rad * Math.sin(th), v = rad * Math.cos(th); return g.axis === "z" ? [g.c2 + u, g.c1 + v, a] : [a, g.c1 + v, g.c2 + u]; };
+  for (let i = 0; i <= seg; i++) {
+    const th = th0 + (th1 - th0) * i / seg;
+    for (const a of [a0, a1]) for (const rad of [g.r0, g.r1]) pos.push(...P(a, th, rad));
+  }
+  const q = (i, a, r) => i * 4 + a * 2 + r;
+  for (let i = 0; i < seg; i++) {
+    for (const [a, r1, r2] of [[0, 0, 1], [1, 0, 1]]) idx.push(q(i, a, r1), q(i + 1, a, r1), q(i + 1, a, r2), q(i, a, r1), q(i + 1, a, r2), q(i, a, r2));
+    for (const r of [0, 1]) idx.push(q(i, 0, r), q(i + 1, 0, r), q(i + 1, 1, r), q(i, 0, r), q(i + 1, 1, r), q(i, 1, r));
+  }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return new T.Mesh(geo, mat);
+}
+function build3d() {
+  const T = window.THREE, S = V3.scene;
+  if (V3.group) { S.remove(V3.group); V3.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+  const grp = new T.Group(); V3.group = grp; V3.pick = [];
+  const box = new T.Box3();
+  // Coque : surfaces des silhouettes de ponts empilées (cases de bord seulement).
+  if (HULL && !V3.hideHull) {
+    const H = HULL, n = H.w * H.d, bands = H.dk.slice().sort((a, b) => a.y0 - b.y0);
+    for (const b of bands) if (!b.m) b.m = unrle(b.occ, n);
+    let count = 0;
+    const cells = [];
+    bands.forEach((b, k) => {
+      const below = bands[k - 1], above = bands[k + 1];
+      for (let i = 0; i < n; i++) {
+        if (!b.m[i]) continue;
+        const x = i % H.w, z = (i / H.w) | 0;
+        const edge = x === 0 || z === 0 || x === H.w - 1 || z === H.d - 1 || !b.m[i - 1] || !b.m[i + 1] || !b.m[i - H.w] || !b.m[i + H.w]
+          || !below || !below.m[i] || !above || !above.m[i];
+        if (edge) { cells.push(x, z, b.y0, b.y1); count++; }
+      }
+    });
+    const lim = Math.min(count, 160000);
+    const mesh = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0x8aa3ad, transparent: true, opacity: 0.16, depthWrite: false }), lim);
+    const m4 = new T.Matrix4(), q = new T.Quaternion(), sc = new T.Vector3(), p = new T.Vector3();
+    for (let j = 0; j < lim; j++) {
+      const x = cells[j * 4], z = cells[j * 4 + 1], y0 = cells[j * 4 + 2], y1 = cells[j * 4 + 3];
+      p.set(H.x0 + (x + 0.5) * H.r, (y0 + y1 + 1) / 2, H.z0 + (z + 0.5) * H.r); sc.set(H.r, y1 - y0 + 1, H.r);
+      m4.compose(p, q, sc); mesh.setMatrixAt(j, m4);
+    }
+    mesh.renderOrder = 2;
+    grp.add(mesh);
+    box.expandByPoint(new T.Vector3(H.x0, H.y0, H.z0)); box.expandByPoint(new T.Vector3(H.x0 + H.w * H.r, H.y1 + 1, H.z0 + H.d * H.r));
+  }
+  // Pièces des ponts et coursives : empreinte extrudée sur la hauteur du pont.
+  for (const r of Object.values(V.rooms)) {
+    const d = V.decks.find(x => x.id === r.deck);
+    if (!d || !r.rects || !r.rects.length) continue;
+    if (d.kind === "ring") {
+      const g = d.ring; if (!g) continue;
+      for (const q of r.rects) {
+        const a0 = Math.min(q[0], q[2]), a1 = Math.max(q[0], q[2]), t0 = Math.min(q[1], q[3]) / g.r1, t1 = Math.max(q[1], q[3]) / g.r1;
+        const m = sectorMesh(T, Object.assign({}, g, { r0: g.r0 + 1, r1: g.r1 - 1 }), a0 + .3, a1 - .3, t0 + .002, t1 - .002, new T.MeshLambertMaterial({ color: HEX.ok, transparent: true, opacity: .55, side: T.DoubleSide }));
+        m.userData = { room: r.id }; grp.add(m); V3.pick.push(m);
+      }
+      continue;
+    }
+    if (d.y0 == null) continue;
+    for (const q of r.rects) {
+      const x0 = Math.min(q[0], q[2]), x1 = Math.max(q[0], q[2]), z0 = Math.min(q[1], q[3]), z1 = Math.max(q[1], q[3]);
+      const m = new T.Mesh(new T.BoxGeometry(Math.max(.5, x1 - x0 - .4), Math.max(.5, d.y1 - d.y0 + 1 - .6), Math.max(.5, z1 - z0 - .4)), new T.MeshLambertMaterial({ color: HEX.ok, transparent: true, opacity: .55 }));
+      m.position.set((x0 + x1) / 2, (d.y0 + d.y1 + 1) / 2, (z0 + z1) / 2);
+      m.userData = { room: r.id }; grp.add(m); V3.pick.push(m);
+      box.expandByPoint(new T.Vector3(x0, d.y0, z0)); box.expandByPoint(new T.Vector3(x1, d.y1 + 1, z1));
+    }
+  }
+  // Anneaux : sections (enveloppe), même sans pièce connue.
+  for (const d of ringDecks()) {
+    const g = d.ring; if (!g) continue;
+    const n = g.sections || 1;
+    for (const s of ringSections(d.id)) {
+      const k = s.index | 0, m = sectorMesh(T, g, g.a0, g.a1 + 1, k * 2 * Math.PI / n + .01, (k + 1) * 2 * Math.PI / n - .01, new T.MeshLambertMaterial({ color: HEX.ok, transparent: true, opacity: .14, side: T.DoubleSide, depthWrite: false }));
+      m.userData = { sec: s.id }; m.renderOrder = 1; grp.add(m); V3.pick.push(m);
+    }
+    const ax = g.axis === "z" ? [g.c2, g.c1, g.a0] : [g.a0, g.c1, g.c2], bx = g.axis === "z" ? [g.c2, g.c1, g.a1] : [g.a1, g.c1, g.c2];
+    box.expandByPoint(new T.Vector3(ax[0] - g.r1, ax[1] - g.r1, ax[2] - g.r1)); box.expandByPoint(new T.Vector3(bx[0] + g.r1, bx[1] + g.r1, bx[2] + g.r1));
+  }
+  V3.scene.add(grp);
+  if (!box.isEmpty() && !V3.framed) {
+    const c = new T.Vector3(); box.getCenter(c); const sz = new T.Vector3(); box.getSize(sz);
+    Object.assign(V3, { tx: c.x, ty: c.y, tz: c.z, dist: Math.max(sz.x, sz.y, sz.z) * 1.35 || 200, framed: true, span: Math.max(sz.x, sz.y, sz.z) });
+  }
+  V3.dirty = true;
+}
+function recolor3d() {
+  for (const m of V3.pick) {
+    const ud = m.userData;
+    let st = "ok", selected = false;
+    if (ud.room) { const r = V.rooms[ud.room]; if (!r) continue; st = rs(r); selected = ui.room === ud.room; }
+    else if (ud.sec) { const s = V.sections[ud.sec]; if (!s) continue; st = sectionStatus(s); selected = ui.sec === ud.sec; }
+    m.material.color.setHex(selected ? 0xffffff : HEX[st] || HEX.ok);
+    m.material.opacity = ud.sec ? (selected ? .4 : st === "ok" ? .14 : .45) : (selected ? .9 : st === "ok" ? .45 : .85);
+  }
+  V3.dirty = true;
+}
+function ray3d(e) {
+  const T = window.THREE, rect = V3.renderer.domElement.getBoundingClientRect();
+  const v = new T.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  const rc = new T.Raycaster(); rc.setFromCamera(v, V3.cam);
+  const hits = rc.intersectObjects(V3.pick, false);
+  return hits.find(h => h.object.userData.room) || hits[0] || null;
+}
+function hover3d(e) {
+  if (!V3.pick.length) return;
+  const h = ray3d(e), ud = h && h.object.userData;
+  V3.tip.textContent = !ud ? "" : ud.room && V.rooms[ud.room] ? V.rooms[ud.room].name + " · " + deckName(V.rooms[ud.room].deck) : ud.sec && V.sections[ud.sec] ? V.sections[ud.sec].name : "";
+}
+function click3d(e) {
+  const h = ray3d(e), ud = h && h.object.userData;
+  if (!ud) return;
+  if (ud.room) { ui.room = ud.room; ui.sec = null; ui.door = null; ui.deck = V.rooms[ud.room] ? V.rooms[ud.room].deck : ui.deck; }
+  else if (ud.sec) { ui.sec = ud.sec; ui.room = null; ui.deck = V.sections[ud.sec] ? V.sections[ud.sec].ring : ui.deck; }
+  render();
+}
+FN.v3view = (el) => {
+  const k = el.dataset.arg;
+  const ax = (HULL && HULL.axis === "z") || (ringDecks()[0] && ringDecks()[0].ring && ringDecks()[0].ring.axis === "z");
+  const along = ax ? 0 : Math.PI / 2;
+  if (k === "face") { V3.yaw = along; V3.pitch = 0.02; }
+  if (k === "side") { V3.yaw = along + Math.PI / 2; V3.pitch = 0.02; }
+  if (k === "top") { V3.pitch = 1.49; }
+  if (k === "iso") { V3.yaw = along + 0.8; V3.pitch = 0.42; }
+  V3.dirty = true;
+};
+FN.v3hull = () => { V3.hideHull = !V3.hideHull; render(); };
+
+/* =====================================================================
+   Discussion avec l'ordinateur de bord. Le staff incarne l'ordinateur ;
+   chaque membre du staff peut se faire notifier (en jeu et sur ce navigateur).
+   ===================================================================== */
+const CHAT = { seen: null, to: null };
+PAGE.chat = () => {
+  const chats = V.chats || {};
+  const bubble = (m, mine, who) => `<div style="display:flex;justify-content:${mine ? "flex-end" : "flex-start"};margin:6px 0"><div style="max-width:78%;padding:7px 10px;border:1px solid ${mine ? "var(--cy2)" : "var(--ln2)"};background:${mine ? "rgba(98,230,242,.08)" : "rgba(3,8,12,.5)"}"><div class="m" style="font-size:10.5px;color:${m.from === "ai" ? "var(--cy)" : "var(--mu)"};letter-spacing:.08em">${esc(who)} · ${fmtT(m.t)}</div><div style="white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div></div></div>`;
+  const box = (ph) => `<div class="row" style="margin-top:10px;align-items:stretch"><textarea id="chat-in" rows="2" maxlength="500" placeholder="${esc(ph)}" style="flex:1;min-width:0;resize:vertical"></textarea>${btn("Envoyer", null, { fn: "chatSend", cls: "solid" })}</div>`;
+  if (!V.me.admin) {
+    const list = chats[V.me.id] || [];
+    return panel("Ordinateur de bord", "AI.LINK", `<p class="note" style="margin-top:0">Parlez à l’ordinateur du Meridian. Il vous répondra ici.</p><div id="chat-log" style="max-height:52vh;overflow:auto;padding-right:4px">${list.length ? list.map(m => bubble(m, m.from === "p", m.from === "ai" ? "ORDINATEUR" : V.me.name)).join("") : `<p class="empty">Aucun échange. Écrivez votre premier message.</p>`}</div>${box("Votre message à l’ordinateur…")}`);
+  }
+  const me = V.people[V.me.id] || {};
+  const threads = Object.entries(chats).filter(([, l]) => l.length).map(([pid, l]) => ({ pid, l, last: l[l.length - 1], unread: (V.chatUnread || {})[pid] })).sort((a, b) => b.last.t - a.last.t);
+  if (!CHAT.to || !chats[CHAT.to]) CHAT.to = threads[0] ? threads[0].pid : null;
+  const nm = (pid) => V.people[pid] ? V.people[pid].name : pid.slice(0, 8);
+  const left = `<div class="vrow" style="border:0"><span>Me notifier des nouveaux messages<div class="mu" style="font-size:12px">En jeu (si vous êtes connecté) et sur ce navigateur.</div></span><button class="sw" role="switch" aria-checked="${!!me.notifyAi}" data-fn="chatNotify" aria-label="Notifications"></button></div>
+<div class="lbl">Conversations</div>${threads.length ? threads.map(t => `<div class="vrow" data-fn="chatTo" data-arg="${esc(t.pid)}" style="cursor:pointer;${CHAT.to === t.pid ? "background:rgba(98,230,242,.08)" : ""}"><span style="min-width:0"><b style="font-weight:600">${esc(nm(t.pid))}</b>${t.unread ? ` <span class="pill amb">nouveau</span>` : ""}<div class="mu" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.last.text)}</div></span><span class="m dim" style="font-size:11px">${fmtT(t.last.t)}</span></div>`).join("") : `<p class="empty">Aucune conversation.</p>`}`;
+  const cur = CHAT.to ? chats[CHAT.to] : null;
+  const right = cur ? `<div id="chat-log" style="max-height:52vh;overflow:auto;padding-right:4px">${cur.map(m => bubble(m, m.from === "ai", m.from === "ai" ? "ORDINATEUR" + (m.who ? " (" + m.who + ")" : "") : nm(CHAT.to))).join("")}</div>${box("Répondre en tant qu’ordinateur de bord…")}` : `<p class="empty">Sélectionnez une conversation.</p>`;
+  if (CHAT.to && (V.chatUnread || {})[CHAT.to] && CHAT.reading !== CHAT.to) { CHAT.reading = CHAT.to; const to = CHAT.to; queueMicrotask(() => act({ type: "chat.read", to }).finally(() => { CHAT.reading = null; })); }
+  return `<div class="grid g-2">${panel("Discussion · " + (CHAT.to ? nm(CHAT.to) : "—"), "AI.LINK", right)}${panel("Ordinateur de bord · staff", "AI.STAFF", left)}</div>`;
+};
+FN.chatSend = () => {
+  const el = document.getElementById("chat-in"), text = el ? el.value.trim() : "";
+  if (!text) return;
+  const a = { type: "chat.send", text };
+  if (V.me.admin && CHAT.to) a.to = CHAT.to;
+  act(a).then(r => { if (r.ok && el) { el.value = ""; } });
+};
+FN.chatTo = (el) => { CHAT.to = el.dataset.arg; render(); };
+FN.chatNotify = () => {
+  const me = V.people[V.me.id] || {}, on = !me.notifyAi;
+  if (on && "Notification" in window && Notification.permission === "default") try { Notification.requestPermission(); } catch {}
+  act({ type: "chat.notify", on }, on ? "Notifications activées." : "Notifications coupées.");
+};
+/* Nouveau message d'un joueur : avertir le staff qui a activé le réglage. */
+function chatWatch() {
+  if (!V || !V.me || !V.me.admin) return;
+  let n = 0, last = null;
+  for (const [pid, l] of Object.entries(V.chats || {})) for (const m of l) if (m.from === "p") { n++; if (!last || m.t > last.t) last = Object.assign({ pid }, m); }
+  if (CHAT.seen !== null && n > CHAT.seen && last) {
+    const me = V.people[V.me.id] || {}, who = V.people[last.pid] ? V.people[last.pid].name : "Quelqu’un";
+    if (me.notifyAi) {
+      toast("Message pour l’ordinateur · " + who + " : " + last.text.slice(0, 80));
+      try { if ("Notification" in window && Notification.permission === "granted" && document.visibilityState !== "visible") new Notification("MERIDIAN · " + who, { body: last.text.slice(0, 160) }); } catch {}
+    }
+  }
+  CHAT.seen = n;
+}
+
 /* =====================================================================
    Événements
    ===================================================================== */
@@ -2601,7 +3099,7 @@ document.addEventListener("click", (e) => {
   const cra = e.target.closest("#modal [data-cr]");
   if (cra) { readCraft(); FN.crEdit2(cra.dataset.cr, cra.dataset.i); return; }
   if (e.target.id === "modal") return closeModal();
-  const el = e.target.closest("[data-cmd],[data-fn],[data-go],[data-room],[data-door],[data-person],[data-deck]");
+  const el = e.target.closest("[data-cmd],[data-fn],[data-go],[data-room],[data-door],[data-person],[data-deck],[data-sec]");
   if (!el || el.disabled) return;
   if (el.tagName === "SELECT" || el.tagName === "INPUT") return;
   if (el.dataset.cmd) {
@@ -2610,9 +3108,10 @@ document.addEventListener("click", (e) => {
     return act(a);
   }
   if (el.dataset.fn && FN[el.dataset.fn]) { FN[el.dataset.fn](el); if (el.dataset.fn !== "sec") return; }
-  if (el.dataset.room) { ui.room = el.dataset.room; ui.door = null; if (V.rooms[ui.room]) ui.deck = V.rooms[ui.room].deck; }
+  if (el.dataset.room) { ui.room = el.dataset.room; ui.door = null; const r = V.rooms[ui.room]; if (r) { ui.deck = r.deck; if (ui.sec && r.section !== ui.sec) ui.sec = null; } }
   else if (el.dataset.door) { ui.door = el.dataset.door; if (ui.page === "plan") ui.room = null; }
-  else if (el.dataset.deck) { if (ui.deck !== el.dataset.deck) { ui.room = null; ui.door = null; } ui.deck = el.dataset.deck; if (ui.page !== "plan") ui.page = "plan"; }
+  else if (el.dataset.sec) { ui.sec = el.dataset.sec; ui.room = null; ui.door = null; if (V.sections[ui.sec] && V.sections[ui.sec].ring) ui.deck = V.sections[ui.sec].ring; if (ui.page !== "plan" && ui.page !== "vue3d") ui.page = "plan"; }
+  else if (el.dataset.deck) { if (ui.deck !== el.dataset.deck || ui.sec) { ui.room = null; ui.door = null; } ui.sec = null; ui.deck = el.dataset.deck; if (ui.page !== "plan" && ui.page !== "vue3d") ui.page = "plan"; }
   if (el.dataset.person) ui.person = el.dataset.person;
   if (el.dataset.go) ui.page = el.dataset.go;
   else if (el.dataset.room && ui.page === "overview") ui.page = "plan";
