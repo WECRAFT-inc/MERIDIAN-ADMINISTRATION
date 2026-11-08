@@ -86,6 +86,20 @@ footer .tk span{margin-right:42px}
 .g-ov{grid-template-columns:minmax(240px,1fr) minmax(360px,1.7fr) minmax(260px,1fr)}
 .g-2{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr)}
 .g-2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.login-ov{position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:radial-gradient(ellipse at center,#06141c 0%,#020507 75%);transition:opacity .45s;padding:16px}
+.login-ov.out{opacity:0;pointer-events:none}
+.login-box{width:min(420px,100%);text-align:left}
+.login-box svg{display:block;margin:0 auto 10px}
+.login-brand{text-align:center;font:600 26px/1 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:.42em;color:var(--tx);padding-left:.42em}
+.login-sub{text-align:center;font:11px "IBM Plex Mono",monospace;letter-spacing:.2em;color:var(--mu);margin:10px 0 28px}
+.login-l{display:block;font-size:12px;color:var(--mu);margin:12px 0 5px;letter-spacing:.06em}
+.login-f{min-height:38px;padding:9px 11px;border:1px solid var(--ln2);background:var(--bg2);color:var(--cy);font-size:14px;word-break:break-all}
+.login-f.on::after{content:"▍";animation:blink 1s steps(2) infinite;color:var(--cy)}
+.login-bar{height:2px;background:var(--ln);margin:22px 0 10px}.login-bar i{display:block;height:100%;width:0;background:var(--cy);transition:width .3s}
+.login-st{font-size:12px;color:var(--mu);letter-spacing:.06em;min-height:1.4em}
+.intrus-b{margin:0 0 14px;padding:8px 12px;border:1px solid var(--red);color:var(--red);font:600 12px "IBM Plex Mono",monospace;letter-spacing:.16em;background:rgba(255,82,102,.08);animation:blink 1.6s steps(2) infinite}
+.brand-board{display:flex;justify-content:center;background:repeating-conic-gradient(var(--ln) 0 25%,transparent 0 50%) 0 0/18px 18px;border-radius:6px;padding:12px}.brand-board svg{max-width:100%;height:auto;max-height:360px}.brand-board.wide svg{width:100%}
+.man-body{max-width:78ch;line-height:1.6}.man-body p{margin:.5em 0}ul.man,ol.man{margin:.4em 0 .8em;padding-left:1.4em}ul.man li,ol.man li{margin:.25em 0}.man-warn{border-left:3px solid var(--red);padding:6px 10px;background:rgba(255,82,102,.08);color:var(--tx)}.schema svg{min-width:640px;width:100%;height:auto}
 .planwide svg{max-height:72vh;display:block;margin-inline:auto}
 .g-map{grid-template-columns:minmax(0,1fr) minmax(300px,380px)}
 @media (max-width:1100px){.g-map{grid-template-columns:1fr}}
@@ -273,12 +287,12 @@ const TEAMS = ["jour", "nuit", "aucune"];
 
 /* Pages de la console. Un terminal (bloc en jeu) n'ouvre que ses pages. */
 const PAGES = {
-  overview: "Vue d’ensemble", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
+  overview: "Vue d’ensemble", alerts: "Alertes", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
-  galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", admin: "Ordinateur de bord"
+  galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", branding: "Identité visuelle", admin: "Ordinateur de bord"
 };
 /* Pages réservées au poste admin. */
-const ADMIN_PAGES = ["admin", "screens", "craft"];
+const ADMIN_PAGES = ["admin", "screens", "craft", "branding"];
 
 /* action : [libellé, niveau minimum par défaut, page qui porte l'action] */
 const ACTIONS = {
@@ -287,7 +301,7 @@ const ACTIONS = {
   "door.lockdown":  ["Sceller une porte (confinement)", 5, "doors"],
   "access.edit":    ["Modifier les règles d’accès", 5, "doors"],
   "valve.set":      ["Manœuvrer une vanne", 4, "atmos"],
-  "room.pressurize":["Pressuriser une pièce (débit d’O₂ accru)", 3, "atmos"],
+  "room.pressurize":["Pressuriser une pièce", 3, "atmos"],
   "room.suppress":  ["Déclencher l’extinction à l’azote d’une pièce", 3, "atmos"],
   "room.vent":      ["Vider l’air d’une pièce", 5, "atmos"],
   "room.alarm":     ["Alarme de pièce", 2, "plan"],
@@ -296,6 +310,7 @@ const ACTIONS = {
   "alarm.ack":      ["Acquitter une alarme", 3, "log"],
   "proc.eject":     ["Code d’éjection de section", 4, "procs"],
   "crew.vitals":    ["Voir la santé et la position", 3, "crew"],
+  "grades.edit":    ["Créer et organiser les grades", 6, "crew"],
   "crew.assign":    ["Affecter le personnel", 5, "crew"],
   "structure.edit": ["Nommer ponts, pièces et sections", 5, "structure"],
   "perms.edit":     ["Changer les niveaux requis", 7, "structure"],
@@ -668,7 +683,7 @@ function compileAcl(state) {
       allow: people.filter(p => !p.admin && canOpenDoor(state, p, d).ok).map(p => p.id)
     };
   }
-  return { type: "acl", admins: people.filter(p => p.admin).map(p => p.id), doors, craft: compileCraft(state) };
+  return { type: "acl", admins: people.filter(p => p.admin).map(p => p.id), doors, craft: compileCraft(state), uniforms: compileUniforms(state) };
 }
 
 /* ------------------------------ Alertes ----------------------------- */
@@ -701,8 +716,137 @@ function computeAlerts(state, withSilent = false) {
     out.push({ key: "f:" + f.id, lvl: "warn", text: FAULT_INDEX[f.key]?.name || f.key, room: null, door: f.target.id });
   for (const p of Object.values(state.people)) if (p.vitals && p.vitals.alive === false && !p.vitals.reported)
     out.push({ key: "dead:" + p.id, lvl: "crit", text: "Signal vital perdu · " + p.name, room: p.room || null });
+  for (const r of (state.security && state.security.intrusions) || []) if (r.detected && (r.status === "running" || (r.ended && Date.now() - r.ended < 600000)))
+    out.push({ key: "intr:" + r.id, lvl: "crit", text: r.status === "running" ? "Intrusion informatique en cours" : "Intrusion informatique", room: r.room || null });
   out.forEach(a => a.ack = state.acks.includes(a.key));
   return out;
+}
+
+/* =========================== Grades et uniformes ===========================
+   Chaque grade a une catégorie, un insigne (barrettes, chevrons, étoiles) et un modèle d'uniforme.
+   Le mod dessine l'uniforme par-dessus le skin et à la place des armures ; un seul détail (la ceinture)
+   prend la couleur de l'armure portée. */
+const UNIFORM_TEMPLATES = {
+  equipage: "Équipage", officier: "Officier d’équipage", armee: "Armée", armee_officier: "Officier de l’armée", securite: "Sécurité",
+  colon: "Colon", ingenieur: "Ingénieur", medecin: "Médecin", pilote: "Pilote", explorateur: "Explorateur", scientifique: "Scientifique", civil: "Tenue civile (aucun uniforme)"
+};
+/* Couleurs de chaque uniforme (identiques aux textures du mod). sleeves : "full" ou "short" (avant-bras nus). */
+const UNIFORM_LOOK = {
+  equipage:       { main: "#2a3b55", trim: "#9fb3c8", accent: "#62e6f2", pants: "#232f44", boots: "#16181c", belt: "#3a4150", sleeves: "full" },
+  officier:       { main: "#1b2638", trim: "#e0b94a", accent: "#f2f4f6", pants: "#151d2b", boots: "#0f1012", belt: "#2a2f3a", sleeves: "full" },
+  armee:          { main: "#3d4a35", trim: "#2b3326", accent: "#8a9a6a", pants: "#353f2f", boots: "#1d1f19", belt: "#2b2f25", sleeves: "full" },
+  armee_officier: { main: "#2f3a2a", trim: "#e0b94a", accent: "#7a1f2b", pants: "#283223", boots: "#141510", belt: "#22261d", sleeves: "full" },
+  securite:       { main: "#25272b", trim: "#c8333f", accent: "#c8333f", pants: "#1d1f22", boots: "#0e0e10", belt: "#141518", sleeves: "full" },
+  colon:          { main: "#8a7354", trim: "#5f4d36", accent: "#c9b48a", pants: "#5a4a35", boots: "#3a2c1f", belt: "#3f3122", sleeves: "short" },
+  ingenieur:      { main: "#c8681e", trim: "#d9e04a", accent: "#2b2b2b", pants: "#b45c19", boots: "#2a2420", belt: "#3a3a3a", sleeves: "full" },
+  medecin:        { main: "#e8eef0", trim: "#2fb3c2", accent: "#d23a3a", pants: "#cfd8dc", boots: "#d6dde0", belt: "#9aa7ad", sleeves: "full" },
+  pilote:         { main: "#55605a", trim: "#e07a2a", accent: "#2b2b2b", pants: "#4a5450", boots: "#1c1d1c", belt: "#2b2b2b", sleeves: "full" },
+  explorateur:    { main: "#b8bec2", trim: "#e07a2a", accent: "#4d5a63", pants: "#a2a9ad", boots: "#3b3f42", belt: "#4d5a63", sleeves: "full" },
+  scientifique:   { main: "#eef3f6", trim: "#4aa3ff", accent: "#4aa3ff", pants: "#3a4a5e", boots: "#1c2026", belt: "#c3ccd2", sleeves: "full" },
+};
+/* Couleur de la ceinture selon l'armure portée : le seul détail qui trahit l'armure. */
+const ARMOR_TIERS = { none: ["Sans armure", null], leather: ["Cuir", "#7a4a2a"], chainmail: ["Mailles", "#9a9a9a"], iron: ["Fer", "#dcdcdc"], gold: ["Or", "#e8c04a"], diamond: ["Diamant", "#4ee0e0"], netherite: ["Netherite", "#5a4a63"], turtle: ["Carapace", "#3fa34a"] };
+const GRADE_CATEGORIES = { equipage: "Équipage", armee: "Armée", colon: "Colons", civil: "Civils" };
+const INSIGNIA_KINDS = { none: "Aucun", bar: "Barrettes", chevron: "Chevrons", star: "Étoiles" };
+function gradesDefault() {
+  const g = (id, name, abbr, category, level, template, kind, count, color) => ({ id, name, abbr, category, level, template, insignia: { kind, count, color } });
+  const SILVER = "#c9d3d8", GOLD = "#e0b94a";
+  return [
+    g("matelot", "Matelot", "MAT", "equipage", 1, "equipage", "bar", 1, SILVER),
+    g("qm", "Quartier-maître", "QM", "equipage", 2, "equipage", "bar", 2, SILVER),
+    g("enseigne", "Enseigne", "ENS", "equipage", 3, "officier", "bar", 1, GOLD),
+    g("lieutenant", "Lieutenant", "LT", "equipage", 4, "officier", "bar", 2, GOLD),
+    g("capcorvette", "Capitaine de corvette", "CC", "equipage", 5, "officier", "bar", 3, GOLD),
+    g("second", "Second", "2ND", "equipage", 6, "officier", "star", 1, GOLD),
+    g("capitaine", "Capitaine", "CPT", "equipage", 7, "officier", "star", 2, GOLD),
+    g("soldat", "Soldat", "SDT", "armee", 2, "armee", "none", 0, SILVER),
+    g("caporal", "Caporal", "CPL", "armee", 2, "armee", "chevron", 1, SILVER),
+    g("sergent", "Sergent", "SGT", "armee", 3, "armee", "chevron", 2, SILVER),
+    g("adjudant", "Adjudant", "ADJ", "armee", 3, "armee", "chevron", 3, GOLD),
+    g("souslt", "Sous-lieutenant", "SLT", "armee", 4, "armee_officier", "bar", 1, GOLD),
+    g("capitaine_armee", "Capitaine (armée)", "CNE", "armee", 5, "armee_officier", "bar", 3, GOLD),
+    g("commandant_armee", "Commandant (armée)", "CDT", "armee", 6, "armee_officier", "star", 1, GOLD),
+    g("colon", "Colon", "COL", "colon", 1, "colon", "none", 0, SILVER),
+    g("chef_equipe", "Chef d’équipe", "CHF", "colon", 2, "colon", "bar", 1, SILVER),
+  ].map((x, i) => Object.assign(x, { order: i }));
+}
+function gradesOf(state) {
+  if (!Array.isArray(state.grades)) state.grades = gradesDefault();
+  return state.grades.slice().sort((a, b) => (a.order | 0) - (b.order | 0));
+}
+function cleanGrade(g, old) {
+  const ins = g.insignia || {};
+  return {
+    id: old ? old.id : clean(g.id || String(g.name || "grade").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24) + "_" + Math.random().toString(36).slice(2, 5), 40),
+    name: clean(g.name, 40) || "Grade", abbr: clean(g.abbr, 6).toUpperCase(),
+    category: GRADE_CATEGORIES[g.category] ? g.category : "equipage", level: Math.max(0, Math.min(7, g.level | 0)),
+    template: UNIFORM_TEMPLATES[g.template] ? g.template : "equipage",
+    insignia: { kind: INSIGNIA_KINDS[ins.kind] ? ins.kind : "none", count: Math.max(0, Math.min(4, ins.count | 0)), color: /^#[0-9a-f]{6}$/i.test(ins.color || "") ? ins.color : "#c9d3d8" },
+    order: old ? old.order : 999
+  };
+}
+/* Ce que le mod doit dessiner sur chaque personne : { uuid: { t, k, n, c, g } } */
+function compileUniforms(state) {
+  const grades = Object.fromEntries(gradesOf(state).map(g => [g.id, g])), out = {};
+  for (const p of Object.values(state.people)) {
+    if (p.demo || p.id === "admin" || p.id === "intrus") continue;
+    const g = p.grade && grades[p.grade];
+    const t = p.outfit || (g ? g.template : null);
+    if (!t || t === "civil") continue;
+    out[p.id] = { t, k: g ? g.insignia.kind : "none", n: g ? g.insignia.count : 0, c: g ? g.insignia.color : "#c9d3d8", g: g ? g.abbr : "" };
+  }
+  return out;
+}
+
+/* =========================== Sécurité informatique ===========================
+   Intrusion par boîtier : durée et risque d'être repéré selon le pare-feu réglé par l'admin. */
+const FIREWALL = { "1": ["Faible", 120, 0.25], "2": ["Standard", 240, 0.5], "3": ["Renforcé", 420, 0.85] };
+function securityOf(state) {
+  const s = state.security || (state.security = {});
+  if (!s.firewall) s.firewall = "2";
+  if (!s.hackLevel) s.hackLevel = 4;
+  if (!Array.isArray(s.intrusions)) s.intrusions = [];
+  return s;
+}
+function intrusionStart(state, b, now = Date.now()) {
+  const sec = securityOf(state), fw = FIREWALL[sec.firewall] || FIREWALL["2"];
+  const seconds = fw[1], spotted = Math.random() < fw[2];
+  const rec = { id: "INT-" + Math.random().toString(16).slice(2, 6).toUpperCase(), uuid: String(b.uuid || ""), name: clean(b.name, 40), room: b.room && state.rooms[b.room] ? b.room : null,
+    pos: [b.x | 0, b.y | 0, b.z | 0], start: now, end: now + seconds * 1000, status: "running", detectAt: spotted ? now + Math.round((0.25 + Math.random() * 0.7) * seconds * 1000) : null, detected: false };
+  sec.intrusions.unshift(rec);
+  sec.intrusions = sec.intrusions.slice(0, 40);
+  return { id: rec.id, seconds };
+}
+/* À chaque télémétrie : l'ordinateur repère-t-il une intrusion en cours ? */
+function intrusionCheck(state, now = Date.now()) {
+  const sec = state.security; if (!sec || !sec.intrusions) return false;
+  let hit = false;
+  for (const r of sec.intrusions) if (r.status === "running" && !r.detected && r.detectAt && now >= r.detectAt) {
+    r.detected = true; r.detectedAt = now; hit = true;
+    const room = r.room && state.rooms[r.room];
+    log(state, "SYSTÈME", `Intrusion détectée sur un ordinateur de bord${room ? " (" + room.name + ")" : ""}. Origine inconnue.`, "crit", now);
+  }
+  return hit;
+}
+function intrusionEnd(state, id, op, now = Date.now()) {
+  const sec = securityOf(state), r = sec.intrusions.find(x => x.id === id);
+  if (!r || r.status !== "running") return null;
+  r.status = op === "done" ? "done" : "aborted"; r.ended = now;
+  if (r.detected) log(state, "SYSTÈME", op === "done" ? "L’intrusion repérée a abouti : des données ont été copiées." : "L’intrusion repérée s’est interrompue.", "crit", now);
+  return r;
+}
+/* Fragment de données : ce que le boîtier a pu copier (registre, journal récent, accès). */
+function hackDump(state, now = Date.now()) {
+  const ref = Math.random().toString(16).slice(2, 6).toUpperCase(), pages = [];
+  const page = (t) => { pages.push(t.length > 1000 ? t.slice(0, 997) + "…" : t); };
+  page(`DONNÉES MERIDIAN\nExtrait ${ref}\n${new Date(now).toISOString().slice(0, 16).replace("T", " ")}\n\nRegistre de l’équipage\nJournal de bord\nRègles d’accès\n\nSource : ordinateur de bord, accès non autorisé.`);
+  const people = Object.values(state.people).filter(p => !p.demo && p.id !== "admin").sort((a, b) => (b.level | 0) - (a.level | 0));
+  for (let i = 0; i < people.length; i += 6) page("REGISTRE\n\n" + people.slice(i, i + 6).map(p => `${p.name}\nniv. ${p.level | 0} · ${p.rank || p.role || "—"}${p.job ? " · " + p.job : ""}`).join("\n\n"));
+  const logs = state.log.slice(0, 24);
+  for (let i = 0; i < logs.length; i += 6) page("JOURNAL\n\n" + logs.slice(i, i + 6).map(l => `${new Date(l.t).toISOString().slice(11, 16)} ${l.who} : ${l.text}`).join("\n"));
+  const doors = Object.values(state.doors).filter(d => { const r = effectiveRule(state, d); return r && r.any && r.any.length; }).slice(0, 30);
+  for (let i = 0; i < doors.length; i += 8) page("ACCÈS RESTREINTS\n\n" + doors.slice(i, i + 8).map(d => { const r = effectiveRule(state, d); return `${d.name} : ${ruleText(state, r)}`; }).join("\n"));
+  return { ref, title: "Données Meridian " + ref, pages: pages.slice(0, 60) };
 }
 
 /* ------------------------- Données du mod --------------------------- */
@@ -804,10 +948,12 @@ function resetPerson(state, uuid, now = Date.now()) {
 
 /* telemetry : { rooms:{id:{p,o2,co2,t,g,power,fire,breach}}, doors:{id:{open}}, players:[{uuid,name,room,vitals}], stocks:{} , full:true } */
 function applyTelemetry(state, m, now = Date.now()) {
+  const cmds = [], fired = [];
   for (const [id, e] of Object.entries(m.rooms || {})) {
     const r = state.rooms[id]; if (!r) continue;
     const { fire, breach, ...env } = e;
     Object.assign(r.env, env);
+    if (fire && !r.flags.fire) fired.push(r);
     if (fire !== undefined) r.flags.fire = !!fire;
     if (breach !== undefined) r.flags.breach = !!breach;
     if (r.mode === "pressurize" && r.env.p >= 100) r.mode = null;
@@ -832,6 +978,17 @@ function applyTelemetry(state, m, now = Date.now()) {
       if (p.online && p.chip && p.chip !== p.id && state.people[p.chip]) state.people[p.chip].carriedBy = p.id;
   }
   if (m.stocks) Object.assign(state.stocks, m.stocks);
+  /* Détecteur incendie : l'alarme de toute la section (ou de la pièce seule) se déclenche, l'alerte apparaît à la passerelle. */
+  for (const r of fired) {
+    const sec = r.section && state.sections[r.section];
+    const zone = sec ? Object.values(state.rooms).filter(x => x.section === sec.id) : [r];
+    for (const x of zone) if (!x.alarm) { x.alarm = true; x.alarmBy = "fire"; cmds.push({ type: "alarm.set", room: x.id, on: true, level: "4" }); }
+    state.acks = state.acks.filter(k => k !== "fire:" + r.id);
+    log(state, "SYSTÈME", `Détecteur incendie : ${r.name}. Alarme ${sec ? "de la section " + sec.name : "de la pièce"} déclenchée.`, "crit", now);
+  }
+  if (fired.length) cmds.push(paStateCmd(state));
+  intrusionCheck(state, now);
+  return cmds;
 }
 
 /* ------------------------------ Actions ----------------------------- */
@@ -899,7 +1056,7 @@ function apply(state, actor, a, ctx = {}) {
         v.open = !!a.open; cmds.push({ type: "valve.set", valve: v.id, open: v.open });
         L(`${v.open ? "ouvre" : "ferme"} la vanne ${v.name} (${state.rooms[v.room].name}).`, "atmos"); break;
       }
-      case "room.pressurize": { need("room.pressurize"); const r = room(a.room); r.mode = "pressurize"; r.modeForce = !!actor.admin; cmds.push({ type: "room.pressurize", room: r.id, force: !!actor.admin }); L(actor.admin ? `remplit d’air ${r.name}.` : `accélère la production d’O₂ de ${r.name}.`, "atmos"); break; }
+      case "room.pressurize": { need("room.pressurize"); const r = room(a.room); r.mode = "pressurize"; r.modeForce = !!actor.admin; cmds.push({ type: "room.pressurize", room: r.id, force: !!actor.admin }); L(actor.admin ? `remplit d’air ${r.name}.` : `lance la pressurisation de ${r.name} (production d’O₂ accrue).`, "atmos"); break; }
       case "room.vent": { need("room.vent"); const r = room(a.room); r.mode = "vent"; cmds.push({ type: "room.vent", room: r.id }); L(`lance le vidage de l’air de ${r.name}.`, "crit"); break; }
       case "room.suppress": { need("room.suppress"); const r = room(a.room); r.suppressUntil = now + 60000; cmds.push({ type: "room.suppress", room: r.id }); L(`déclenche l’extinction à l’azote de ${r.name}.`, "atmos"); break; }
       case "room.stop": { const r = room(a.room); need(r.mode === "vent" ? "room.vent" : "room.pressurize"); r.mode = null; cmds.push({ type: "room.stop", room: r.id }); L(`arrête le cycle d’air de ${r.name}.`, "atmos"); break; }
@@ -993,6 +1150,12 @@ function apply(state, actor, a, ctx = {}) {
         if (!actor.admin && p.id !== actor.id && levelOf(p) >= levelOf(actor)) throw new Error("Vous ne pouvez pas modifier un supérieur ou un égal.");
         if (f.level !== undefined) { const lv = Math.max(0, Math.min(7, f.level | 0)); if (!actor.admin && (lv >= levelOf(actor) || p.id === actor.id)) throw new Error("Niveau au-delà de vos droits."); p.level = lv; }
         for (const k of ["rank", "job", "role", "group", "team"]) if (f[k] !== undefined) p[k] = clean(f[k], 40);
+        if (f.grade !== undefined) {
+          const g = gradesOf(state).find(x => x.id === f.grade);
+          p.grade = g ? g.id : null;
+          if (g) p.rank = g.name;
+        }
+        if (f.outfit !== undefined) p.outfit = UNIFORM_TEMPLATES[f.outfit] ? f.outfit : null;
         if (f.tags) p.tags = f.tags.map(t => clean(t, 20)).filter(Boolean);
         if (f.name) p.name = clean(f.name, 32);
         L(`affecte ${p.name} : niv. ${p.level}, ${p.job || p.role || "sans poste"}${p.team && p.team !== "aucune" ? ", équipe de " + p.team : ""}.`, "crew"); break;
@@ -1001,6 +1164,42 @@ function apply(state, actor, a, ctx = {}) {
         need("crew.assign"); const p = person(a.person);
         cmds.push({ type: "chip.reissue", person: p.id });
         L(`réémet la puce de ${p.name} ; l’ancienne est invalidée.`, "crew"); break;
+      }
+      case "grade.save": {
+        need("grades.edit"); gradesOf(state);
+        const old = a.grade && a.grade.id ? state.grades.find(g => g.id === a.grade.id) : null;
+        const g = cleanGrade(a.grade || {}, old);
+        if (old) Object.assign(old, g); else { g.order = state.grades.length; state.grades.push(g); }
+        for (const p of Object.values(state.people)) if (p.grade === g.id) p.rank = g.name;
+        L(`${old ? "modifie" : "crée"} le grade « ${g.name} ».`, "crew"); break;
+      }
+      case "grade.delete": {
+        need("grades.edit"); gradesOf(state);
+        const g = state.grades.find(x => x.id === a.id); if (!g) throw new Error("Grade inconnu.");
+        state.grades = state.grades.filter(x => x.id !== a.id);
+        for (const p of Object.values(state.people)) if (p.grade === a.id) p.grade = null;
+        L(`supprime le grade « ${g.name} ».`, "crew"); break;
+      }
+      case "grade.move": {
+        need("grades.edit");
+        const list = gradesOf(state), i = list.findIndex(x => x.id === a.id), j = i + (a.dir < 0 ? -1 : 1);
+        if (i < 0 || j < 0 || j >= list.length) break;
+        [list[i], list[j]] = [list[j], list[i]];
+        list.forEach((g, k) => { state.grades.find(x => x.id === g.id).order = k; });
+        break;
+      }
+      case "brand.save": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const b = state.branding || (state.branding = {});
+        for (const [k, n] of [["mission", 28], ["code", 16], ["motto", 40], ["tagline", 40], ["crew", 200]]) if (typeof a[k] === "string") b[k] = clean(a[k], n);
+        L("met à jour l’identité visuelle de la mission.", "admin"); break;
+      }
+      case "admin.security": {
+        if (!actor.admin) throw new Error("Réservé au poste admin.");
+        const sec = securityOf(state);
+        if (a.firewall && FIREWALL[a.firewall]) sec.firewall = a.firewall;
+        if (a.hackLevel !== undefined) sec.hackLevel = Math.max(1, Math.min(6, a.hackLevel | 0));
+        L(`règle le pare-feu sur « ${FIREWALL[sec.firewall][0]} » (session d’intrusion : niv. ${sec.hackLevel}).`, "admin"); break;
       }
       case "admin.player.reset": {
         if (!actor.admin) throw new Error("Réservé au poste admin.");
@@ -1314,12 +1513,13 @@ function viewFor(state, actor, term) {
     }
     delete v.screens;
     delete v.craft;
+    delete v.security;
     v.chats = { [actor ? actor.id : "_"]: ((state.chats || {})[actor && actor.id] || []).map(m => ({ t: m.t, from: m.from, text: m.text })) };
     delete v.chatUnread;
     for (const p of Object.values(v.people)) { delete p.chip; delete p.carriedBy; delete p.notifyAi; }
   }
   v.me = actor ? {
-    id: actor.id, name: actor.name, level: actor.level | 0, admin: adm, role: actor.role, job: actor.job, rank: actor.rank, group: actor.group, team: actor.team,
+    id: actor.id, name: actor.name, level: actor.level | 0, admin: adm, intrus: !!actor.intrus, role: actor.role, job: actor.job, rank: actor.rank, group: actor.group, team: actor.team,
     perms, pages, term: term || null,
     doors: Object.values(state.doors).filter(d => canOpenDoor(state, actor, d).ok).map(d => d.id),
     manages: Object.values(state.doors).filter(d => (d.managers || []).includes(actor.id)).map(d => d.id)
@@ -1462,11 +1662,461 @@ function seedDemo(now = Date.now()) {
   L(600000, "Cdt Vasseur", "annonce : « Relève de nuit dans trente minutes. »", "announce");
   L(900000, "SYSTÈME", "Mode démonstration : aucun mod connecté.", "sys");
   for (const id of Object.values(s.doors).filter(d => d.rooms[0] === byName("Cuisine")).map(d => d.id)) s.doors[id].state.lockdown = true;
+  // Grades et tenues de démonstration
+  s.grades = gradesDefault();
+  const byLv = { 7: "capitaine", 6: "second", 5: "capcorvette", 4: "lieutenant", 3: "sergent", 2: "qm", 1: "colon" };
+  for (const p of Object.values(s.people)) {
+    if (p.admin) continue;
+    const job = (p.job || "").toLowerCase();
+    p.grade = byLv[p.level] || null;
+    if (/m[ée]dec|infirm/.test(job)) p.outfit = "medecin";
+    else if (/ing|tech|m[ée]can/.test(job)) p.outfit = "ingenieur";
+    else if (/pilot|navig/.test(job)) p.outfit = "pilote";
+    else if (/s[ée]cur|garde/.test(job)) p.outfit = "securite";
+    const g = s.grades.find(x => x.id === p.grade); if (g) p.rank = g.name;
+  }
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
+/* Manuel de bord du Meridian III : explications des systèmes, par rôle.
+   Mise en forme : « # » titre, « - » puce, « 1. » étape, « ! » danger, « > » note, « [[schema:id]] » schéma. */
+const MANUAL_ROLES = [
+  ["equipage", "Tout l’équipage"], ["colon", "Colon"], ["ingenieur", "Ingénieur · technicien"], ["medecin", "Médecin"],
+  ["pilote", "Pilote · navigation"], ["explorateur", "Explorateur"], ["militaire", "Militaire · sécurité"], ["commandement", "Commandement"]
+];
+/* Rôle par défaut selon le métier ou le rôle inscrit au registre. */
+function manualRoleOf(p) {
+  const s = ((p && (p.job + " " + p.role + " " + p.group)) || "").toLowerCase();
+  if (/ing[ée]n|tech|m[ée]can|maintenance/.test(s)) return "ingenieur";
+  if (/m[ée]dec|infirm|soin|chirurg|sant/.test(s)) return "medecin";
+  if (/pilot|navig|timon/.test(s)) return "pilote";
+  if (/explor|[ée]claireur|g[ée]olog/.test(s)) return "explorateur";
+  if (/milit|s[ée]curit|soldat|garde|arm[ée]/.test(s)) return "militaire";
+  if (/colon|civil|agricult|cuisin/.test(s)) return "colon";
+  if (p && p.level >= 5) return "commandement";
+  return "equipage";
+}
+const MANUAL = {
+equipage: [
+["Uniformes et grades", `Votre tenue vient de l’ordinateur de bord : le commandement vous donne un grade (page Équipage), et ce grade porte un modèle d’uniforme et des insignes.
+- L’uniforme se dessine par-dessus votre peau et remplace l’apparence de toute armure : on ne voit pas ce que vous portez dessous.
+- Un seul détail le trahit : la ceinture et sa boucle prennent la couleur du matériau de votre armure (cuir, mailles, fer, or, diamant, netherite, carapace).
+- Les insignes sont sur les épaules : barrettes, chevrons ou étoiles, en nombre et en couleur selon le grade.
+- Écusson de mission à gauche de la poitrine ; tenues de métier (ingénieur, médecin, pilote, explorateur, sciences), colons en manches courtes.
+- Commande /uniforme : passer en tenue civile, ou remettre l’uniforme.
+> Reconnaître un grade d’un coup d’œil évite bien des malentendus dans un couloir enfumé.`],
+["Votre puce d’identité", `Votre puce est votre identité pour le vaisseau. Les portes, les consoles et l’ordinateur de bord ne connaissent que la puce que vous portez.
+- Elle est remise par le bureau du personnel (RH) à votre arrivée, puis portée par clic droit.
+- Touche N : votre puce, vos présentations, vos gestes et la demande d’aide.
+- Sans puce : portes fermées, consoles refusées.
+! Une puce perdue ou volée donne vos accès à quelqu’un d’autre. Signalez-la : le RH peut la réémettre, l’ancienne devient alors inutilisable.`],
+["Se présenter", `Personne ne connaît votre nom tant que vous ne vous êtes pas présenté. Au-dessus de votre tête, les autres voient « Inconnu ».
+- N › Se présenter : la personne visée apprend le nom de votre puce. Elle accepte avec la touche Y.
+- Se présenter à tous : toutes les personnes proches.
+- Pseudonyme : vous pouvez vous présenter sous un autre nom. Vous pourrez révéler votre vraie identité plus tard.
+> Les commandes /identite presenter, /identite pseudo et /identite reveler font la même chose.`],
+["Les alertes du vaisseau", `Les haut-parleurs diffusent cinq niveaux d’alerte générale. Le son tourne jusqu’à la levée de l’alerte.
+- Niveau 1 : rassemblement.
+- Niveau 2 : dépressurisation ou manœuvre technique.
+- Niveau 3 : pressurisation non garantie, verrouillage des portes imminent.
+- Niveau 4 : incendie ou brèche, évacuez.
+- Niveau 5 : évacuation vers une zone sécurisée.
+> Une alarme de pièce ou de section ne sonne que sur les haut-parleurs de cette zone : c’est là que se trouve le danger.`],
+["Respirer à bord", `L’air d’une pièce est mesuré en pressions : 101 kPa au total, dont 21 kPa d’oxygène. Le petit affichage en haut à gauche vous les donne en permanence.
+- Moins de 16 kPa d’O₂ : vous ralentissez. Moins de 10 kPa : vous vous blessez. Moins de 6 kPa : asphyxie.
+- Moins de 50 kPa au total : basse pression. Moins de 20 kPa : décompression.
+- Plus de 2 kPa de CO₂ : faiblesse. Plus de 5 kPa : intoxication.
+- Le lifepack (n’importe où dans l’inventaire) prend le relais dès que l’air devient irrespirable : environ 13 minutes.
+! Gardez toujours un lifepack chargé sur vous.`],
+["Décompression et brèche", `Quand une pièce s’ouvre sur le vide, tout l’air s’en échappe en quelques secondes et emporte ce qui n’est pas attaché.
+1. Accrochez-vous : câble SAFELINE sur une poignée (6 blocs de longueur).
+2. Votre lifepack prend le relais.
+3. Sortez par une porte étanche et refermez-la derrière vous.
+> Une pièce percée ferme ses clapets d’air : le reste du vaisseau ne se vide pas avec elle.`],
+["En cas d’incendie", `Le feu brûle l’oxygène de la pièce et rejette du CO₂ ; il s’étend sur n’importe quel sol, même sans bois.
+1. Donnez l’alerte (le détecteur incendie le fait s’il y en a un).
+2. Si le foyer est petit : extincteur, clic droit maintenu vers les flammes.
+3. Sinon, évacuez et fermez les portes : l’équipe de sécurité noiera la pièce à l’azote ou la videra de son air.
+! Un feu qui dure perce la coque : la pièce se dépressurise ensuite.`],
+["Demander de l’aide", `- N › Demander de l’aide : une question, un souci de rôle, un bug ou une urgence. Vous pouvez rester anonyme.
+- La page Discussion de la console : écrire à l’ordinateur de bord, qui vous répond.
+> Les demandes d’aide arrivent au staff, pas aux autres joueurs.`],
+["Gestes et tenue", `- G : salut militaire. H : garde-à-vous (on le rompt en bougeant). U : marche au pas.
+- Les mêmes gestes sont dans le menu N.
+- /repos arrête le garde-à-vous ou la marche.`],
+],
+colon: [
+["La vie à bord", `Le Meridian III emmène une colonie : chacun y a un métier, un niveau d’accès et des règles.
+- Votre niveau (0 à 7) décide des portes et des actions de console autorisées. Les colons sont au niveau 1.
+- Les portes s’ouvrent par clic droit avec votre puce : refusé = pas le droit, ou porte verrouillée.
+- Certaines fabrications sont réservées à des métiers : si une recette ne donne rien, elle ne vous est pas autorisée.`],
+["Où aller en cas d’alerte", `- Niveau 1 : rejoignez le point de rassemblement de votre section.
+- Niveaux 2 à 4 : éloignez-vous de la zone en alarme, fermez les portes derrière vous.
+- Niveau 5 : zone sécurisée la plus proche, lifepack à la ceinture.
+> Suivez les ordres de l’équipage : ils voient le vaisseau entier sur la console.`],
+["Les consoles", `Les terminaux ouvrent la console de bord avec vos droits. Un terminal n’affiche que les pages prévues pour son poste.
+- Plan du vaisseau : où vous êtes, l’état des pièces.
+- Discussion : écrire à l’ordinateur de bord.
+- Les pages que vous ne pouvez pas voir n’apparaissent pas.`],
+],
+ingenieur: [
+["Le circuit de l’air", `L’air n’est pas fabriqué à partir de rien : chaque atome passe par une machine, et chaque transformation coûte de l’énergie.
+[[schema:chaine-gaz]]
+- Électrolyseur : 2 H₂O → 2 H₂ + O₂. ≈ 14 kW à plein régime, de quoi faire respirer 1,7 personne.
+- Filtreur à CO₂ : capte le CO₂ de l’air (≈ 1,5 personne) et l’envoie au séparateur.
+- Séparateur : CO₂ → C + O₂, rendement 80 %. Il use une cartouche filtrante (≈ 3 h 20 à plein régime).
+- Catalyseur à méthane : C + 2 H₂ → CH₄. Il consomme l’hydrogène de l’électrolyseur.
+- Centrifugeuse : nettoie les cartouches encrassées et rend leur carbone.
+! Ne reliez jamais le réseau d’O₂ et celui d’H₂.`],
+["Distribution centralisée", `Une salle des machines produit et recycle l’air de tout le vaisseau ; des tuyaux le distribuent aux pièces.
+[[schema:distribution]]
+- Chaque pièce : une bouche en SOUFFLAGE (arrivée) et une bouche en REPRISE (retour). Accroupi + clic droit sur la bouche pour changer.
+- Soufflage : le gaz n’entre que jusqu’à 101,3 kPa et 21,2 kPa d’O₂ (détendeur intégré).
+- Reprise : l’air vicié ne fait que sortir, vers le filtreur central.
+- Retour de l’air propre : un tuyau directionnel ALIMENTÉ (pompe) du réseau de reprise vers le réseau de soufflage.
+- Une brèche ferme les deux clapets de la pièce : le reste du réseau tient.
+! Une bouche en mode LIBRE sur un réseau commun mélange les pièces et vide tout le réseau en cas de brèche.`],
+["Tuyaux, ports et cuves", `- Tuyau : passif. Les pressions s’égalisent (400 mol/s au plus), les compositions se mélangent.
+- Tuyau directionnel : clapet anti-retour sans énergie, pompe jusqu’à 40 mol/s avec du FE.
+- Ports des machines : entrée à l’arrière (bleu), sortie au-dessus (orange), sortie secondaire sur le côté. Chaque port contient 1 m³ et s’arrête à 1 000 kPa.
+- Cuve de gaz : 2 m³, six faces, vanne au-dessus (accroupi + clic droit).
+- Compresseur : jusqu’à 20 MPa, au prix du travail de compression réel.
+> Clic droit sur un tuyau : tous les volumes reliés, avec leur pression et leur composition.`],
+["Pressuriser une pièce", `Depuis la console, « Pressuriser » ne crée pas d’air : les électrolyseurs qui desservent la pièce passent à 4 fois leur débit pendant 10 minutes (et consomment 4 fois plus d’eau et d’énergie).
+- Électrolyseurs pris en compte : collés à la pièce, ou reliés à ses bouches par les tuyaux, les cuves et les tuyaux directionnels.
+- Une pièce vidée a perdu son azote : sans cuve de N₂ sur le réseau de soufflage, elle ne remonte qu’en O₂ et la pression totale reste basse.
+> Seul le poste admin remplit une pièce instantanément.`],
+["Énergie", `- Toutes les machines consomment des FE. 1 FE/t = 50 W.
+- L’énergie suit la chimie réelle : décomposer l’eau ou le CO₂ coûte cher. Prévoyez la production avant d’ajouter des machines.
+- Une machine sans énergie s’arrête simplement : clic droit pour voir son état et la cause.`],
+["Gravité", `- Le générateur de gravité agit sur le compartiment qu’il touche : il en faut un par pièce, ce n’est pas centralisable.
+- Consigne de 0 à 6 g (accroupi + clic droit), montée de 0,1 g/s. La plus forte consigne l’emporte.
+- Au-delà de 1 g : faim accrue ; 1,5 g : lenteur ; 2,5 g : faiblesse ; 4 g : voile gris ; 6 g : perte de connaissance.`],
+["Portes pressurisées", `- Fermée : étanche, elle sépare deux compartiments. Ouverte : les deux pièces partagent leur air.
+- Redstone sur une de ses cases : ouvre ou ferme.
+- Verrouillée : plus d’ouverture à la main. Scellée : fermée, même la redstone ne l’ouvre plus.
+- Elle ne se referme pas sur quelqu’un, sauf scellé d’urgence.`],
+["Sécurité incendie", `[[schema:incendie]]
+- Détecteur incendie : au plafond, rayon de 10 blocs. Il bipe, donne un signal redstone et prévient l’ordinateur de bord, qui déclenche l’alarme de la section.
+- Diffuseur anti-incendie : au plafond, raccordé par l’arrière à un réseau d’azote. Il s’ouvre sur redstone ou sur ordre de la console (60 s).
+- Le feu meurt sous 10 kPa d’O₂ ou 15 % d’O₂ dans l’air.
+! Le détecteur ne déclenche pas l’extinction : il prévient. Câblez-le vous-même au diffuseur si vous voulez une extinction automatique.`],
+["Réparer une brèche", `1. Pièce isolée : fermez et faites sceller les portes voisines.
+2. Équipe en lifepack, attachée par SAFELINE.
+3. Rebouchez le trou : la pièce redevient étanche… mais vide.
+4. Repressurisez : azote depuis la cuve de N₂, O₂ depuis le soufflage, ou ordre « Pressuriser ».
+> Un bloc de coque remplacé repart à froid : il ne garde pas la fatigue due au feu.`],
+["Dépannage rapide", `- Machine à l’arrêt : énergie, sortie pleine (1 000 kPa) ou entrée vide.
+- Électrolyseur : plus d’eau, hydrogène non évacué, ou pièce déjà à 21 kPa d’O₂.
+- Filtreur : CO₂ déjà au niveau naturel, ou bouche non raccordée.
+- Séparateur : cartouche absente ou encrassée.
+- Réseau inactif : une bouche ne se raccorde que par l’arrière ; une pièce « Analyse en cours » n’échange pas encore.`],
+],
+medecin: [
+["Lire les signes vitaux", `La console (page Équipage) donne pour chaque personne : santé, faim, réserve du lifepack, pièce occupée.
+- « Signal vital perdu » apparaît dans les alertes et le journal à chaque décès.
+- La pièce occupée permet de remonter à la cause : air, feu, décompression.`],
+["Hypoxie", `Manque d’oxygène, mesuré en pression partielle d’O₂.
+- Sous 16 kPa : lenteur, gestes ralentis.
+- Sous 10 kPa : faiblesse, nausée, blessures.
+- Sous 6 kPa : asphyxie.
+> Traitement : air respirable ou lifepack. Une pièce noyée à l’azote reste dangereuse même quand le feu est éteint.`],
+["Décompression", `- Sous 50 kPa : basse pression, lenteur.
+- Sous 20 kPa : décompression, blessures importantes.
+- Une décompression explosive projette les victimes vers la brèche : cherchez-les près du trou ou dehors.
+! Le lifepack protège de l’asphyxie et de la décompression tant qu’il reste de l’oxygène (≈ 13 minutes).`],
+["Intoxication au CO₂", `- Au-dessus de 2 kPa : faiblesse. Au-dessus de 5 kPa : intoxication et blessures.
+- Causes : filtreur à l’arrêt, pièce surpeuplée, incendie, extincteur vidé dans un petit local.
+> Traitement : quitter la pièce, faire relancer le filtreur.`],
+["Brûlures", `- Marcher dans un foyer enflamme et blesse.
+- L’extincteur éteint aussi une personne en feu : visez-la.`],
+["Gravité et organisme", `- Au-dessus de 1 g : faim accrue. 1,5 g : lenteur. 2,5 g : faiblesse. 4 g : voile gris et blessures légères. 6 g : perte de connaissance.
+- Sur les planètes, la gravité change (Kepler-442b : 1,5 g ; Néo-Titan : 0,14 g).`],
+],
+pilote: [
+["Sauter d’un système à l’autre", `Le vaisseau saute par l’hyperespace. Les planètes du départ disparaissent, celles de l’arrivée apparaissent à la sortie.
+- Portée : 12 années-lumière par saut au plus.
+- Carburant : 0,5 g d’antimatière par année-lumière, prélevés dans toutes les cuves.
+- Durée : 5 min + 2 min par année-lumière, 1 h au plus. Un saut de 10 al dure environ 25 minutes.
+- Lancement : carte interstellaire de la console, les systèmes atteignables sont en surbrillance.
+> Un saut en cours à la fin d’une session reprend à la session suivante.`],
+["La région", `- Rex Magna 1 est le carrefour : Kepler-442, Gliese 581, TRAPPIST-1 et Kronos sont à un saut.
+- Jovia-2 et HD 188753 : deux sauts.
+- Alpha Centauri (Proxima b) : six sauts au moins, par une chaîne de systèmes relais.
+- Le système solaire est à environ 3 000 al, hors de portée.`],
+["Antimatière", `- Chaque Cuve à Antimatière Pressurisée contient 10 g ; la somme des cuves donne le carburant du vaisseau.
+- Une capsule ajoute 2 g. Il n’y a pas de production à bord : c’est une ressource rare.
+> Avant un saut, vérifiez qu’il restera assez d’antimatière pour revenir.`],
+["Étoiles", `Le vaisseau n’est jamais au centre d’un système : il arrive quelque part sur son orbite.
+- À 4 rayons de l’étoile : alerte de proximité.
+- À 2,5 rayons : alerte rouge.
+- À 1,6 rayon : on brûle, et au bout de 5 secondes on explose, navette comprise.`],
+["Carte stellaire", `- Planètes, champs de météorites, navettes équipées d’une liaison com, position du vaisseau.
+- Molette pour zoomer, glisser pour déplacer, bouton VAISSEAU pour recentrer.`],
+],
+explorateur: [
+["Descendre sur une planète", `- Entrez dans l’atmosphère (les couches translucides) : vous passez sur la planète.
+- Une navette passe entière avec ses passagers.
+- Chaque planète a sa gravité et son air : respirable sur Proxima b ou à l’équateur de Gliese 581 c, mortel ailleurs sans lifepack.
+- Pour repartir : montez tout en haut, vous ressortez dans l’espace au-dessus de la planète.`],
+["Rethium", `Beaucoup de planètes non habitables ont une atmosphère chargée de Rethium, un gaz qui ronge les coques.
+! 15 secondes après l’arrivée, la navette explose avec ses passagers. Ressortez avant.`],
+["Si le vaisseau part sans vous", `- Vous ressortez dans l’espace profond : les planètes et l’étoile du système, sans le vaisseau.
+- De là, on peut redescendre sur n’importe quelle planète du système.
+- Au retour du vaisseau, tout ce qui attend dans l’espace profond est ramené près de lui.
+! L’espace profond est le vide : lifepack ou navette pressurisée obligatoires.`],
+["Sortie dans le vide (EVA)", `1. Entrez dans le sas, fermez la porte intérieure.
+2. Attachez-vous à une poignée SAFELINE, lifepack chargé.
+3. Videz le sas (dépressuriseur), puis ouvrez la porte extérieure.
+4. Au retour : porte extérieure fermée, sas repressurisé, puis porte intérieure.`],
+["Liaison com", `Posée sur une navette, la balise affiche sa position en direct sur la carte stellaire, même sur une planète. Nommez-la sur une enclume avant de la poser.`],
+],
+militaire: [
+["Contrôle des accès", `Les portes appliquent les règles de la console.
+- Niveau minimum, niveaux précis, personnes nommées, rôle, métier, groupe, équipe ou étiquette (#armurerie…).
+- Groupes d’autorisation : une règle commune à plusieurs portes.
+- Verrouiller : plus d’ouverture à la main. Isoler (sceller) : fermée et bloquée, même par redstone.
+- Plan du vaisseau : un pont ou une section entière se verrouille ou s’isole d’un clic.`],
+["Puces volées, fausses identités", `- Une puce ramassée sur un mort donne ses accès à celui qui la porte. Sur la console, le poste admin voit qui porte la puce de qui.
+- Réémettre la puce (fiche personnel) : l’ancienne devient inutilisable, une nouvelle est remise au propriétaire.
+- Un pseudonyme ne change pas la puce : seuls les noms connus changent.
+> Tout passage de porte est journalisé avec le nom de la puce portée.`],
+["Intrusion informatique", `Un terminal peut être piraté avec un boîtier d’intrusion : l’opération prend plusieurs minutes, sur place.
+- L’ordinateur de bord peut repérer l’intrusion avant la fin : alerte « Intrusion détectée » et emplacement du terminal.
+- Réagissez vite : l’intrus doit rester près du terminal jusqu’au bout.`],
+["Éjection d’une section", `Pour larguer une section en dernier recours :
+1. Un premier officier saisit son code (page Procédures).
+2. Un second officier, une autre personne, saisit le sien.
+3. Un compte à rebours de 15 s démarre ; il peut encore être annulé.
+! La console indique combien de personnes se trouvent dans la section. Évacuez avant.`],
+["Incendie : intervention", `- L’alarme de toute la section sonne quand un détecteur voit un feu, et l’alerte apparaît à la passerelle.
+- Évacuez la section, fermez les portes.
+- Petit foyer : extincteurs. Feu installé : « Extinction à l’azote » sur la fiche de la pièce (il faut un diffuseur), ou vider la pièce.
+! L’azote et le vide tuent aussi l’équipage resté dans la pièce.`],
+["Gestes et ordre", `- G : salut. H : garde-à-vous. U : marche au pas (allure réduite, pas de course).
+- Le garde-à-vous se rompt en bougeant.`],
+],
+commandement: [
+["Niveaux et permissions", `- 0 non assigné, 1 colon, 2 travailleur, 3 technicien ou militaire, 4 officier, 5 chef de service, 6 second, 7 capitaine.
+- Chaque action de la console exige un niveau minimum, réglable sur la page Structure.
+- On ne peut pas donner un niveau égal ou supérieur au sien, ni modifier un supérieur.`],
+["Alertes générales", `- Page Diffusion : alerte niveaux 1 à 5 sur tous les haut-parleurs, un groupe ou une pièce.
+- Signaux : changement de quart, début et fin de communication.
+- La page Alertes est faite pour l’écran de la passerelle : tout ce qui est en cours, en grand.`],
+["Ponts et sections", `- Une section est un groupe de pièces d’un pont (ou une section d’anneau). L’alarme incendie et les actions groupées s’appliquent à toute la section.
+- Plan du vaisseau : vue de face des ponts et des anneaux. On isole, verrouille, met en alarme, pressurise ou vide un pont ou une section entière.`],
+["Le Meridian", `[[schema:meridian]]
+- L’ordinateur de bord fait autorité : registre, règles d’accès, journal.
+- Le vaisseau (le mod) mesure et applique : air, portes, alarmes, navigation.
+- Liaison coupée : les portes et la fabrication gardent les dernières règles reçues.`],
+],
+};
+
+/* =========================== Identité visuelle ===========================
+   Alterra (la compagnie) et la mission Meridian III (E-M-03). Dessins originaux en SVG, paramétrés par les réglages
+   de la page Branding (nom de mission, indicatif, devise, noms d'équipage). Couleurs fixes : les fichiers exportés
+   doivent rendre pareil partout, hors de la console. */
+const BRAND_PAL = {
+  night: "#0b1320", navy: "#13233b", horizon: "#1f4e8c", sky: "#5fa8d9", ivory: "#f3efe4",
+  ochre: "#c8813a", sand: "#e3b977", signal: "#62e6f2", ember: "#e2593a"
+};
+const BRAND_FONT = "'Chakra Petch', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif";
+const BRAND_DEFAULT = { mission: "MERIDIAN III", code: "E-M-03", motto: "AD NOVAS TERRAS", crew: "", tagline: "Au-delà de l’horizon" };
+const brandOf = (b) => Object.assign({}, BRAND_DEFAULT, b || {});
+
+function brandRng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+function brandStars(n, w, h, seed, max = 1.6, fill = BRAND_PAL.ivory) {
+  const r = brandRng(seed); let g = "";
+  for (let i = 0; i < n; i++) { const a = r(); g += `<circle cx="${(r() * w).toFixed(1)}" cy="${(r() * h).toFixed(1)}" r="${(0.3 + a * a * max).toFixed(2)}" fill="${fill}" opacity="${(0.35 + r() * 0.65).toFixed(2)}"/>`; }
+  return g;
+}
+const brandEsc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+/* Étoile à quatre branches (l'éclat de l'arrivée). */
+const brandSpark = (x, y, r, fill) => `<path d="M${x} ${y - r} Q${x + r * .16} ${y - r * .16} ${x + r} ${y} Q${x + r * .16} ${y + r * .16} ${x} ${y + r} Q${x - r * .16} ${y + r * .16} ${x - r} ${y} Q${x - r * .16} ${y - r * .16} ${x} ${y - r}Z" fill="${fill}"/>`;
+
+/* Le vaisseau vu de profil : épine dorsale, trois anneaux tournants, bouclier avant, propulsion. */
+function brandShip(x, y, s, col = BRAND_PAL.ivory, glow = BRAND_PAL.signal) {
+  const k = (v) => (v * s).toFixed(2);
+  return `<g transform="translate(${x} ${y}) rotate(-14)">
+<ellipse cx="${k(-58)}" cy="0" rx="${k(26)}" ry="${k(5)}" fill="${glow}" opacity=".35"/><ellipse cx="${k(-50)}" cy="0" rx="${k(12)}" ry="${k(2.6)}" fill="${glow}"/>
+<rect x="${k(-44)}" y="${k(-2)}" width="${k(84)}" height="${k(4)}" rx="${k(1)}" fill="${col}"/>
+<path d="M${k(-44)} ${k(-7)} L${k(-34)} ${k(-5)} L${k(-34)} ${k(5)} L${k(-44)} ${k(7)} Z" fill="${col}"/>
+${[-18, -2, 14].map(cx => `<ellipse cx="${k(cx)}" cy="0" rx="${k(3.2)}" ry="${k(13)}" fill="none" stroke="${col}" stroke-width="${k(2.2)}"/>`).join("")}
+<path d="M${k(40)} ${k(-6)} Q${k(52)} 0 ${k(40)} ${k(6)} Z" fill="${col}"/>
+</g>`;
+}
+
+/* ---------- Alterra : le symbole ----------
+   Un globe dont la moitié basse est une terre (le sol qu'on quitte), traversé par un méridien, et l'éclat d'une
+   nouvelle étoile qui se lève à l'horizon. */
+function alterraMark(size = 120, opts = {}) {
+  const fg = opts.fg || BRAND_PAL.ivory, land = opts.land || BRAND_PAL.ochre, star = opts.star || BRAND_PAL.signal, id = "am" + Math.random().toString(36).slice(2, 7);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="${size}" height="${size}" role="img" aria-label="Symbole Alterra">
+<defs><clipPath id="${id}"><circle cx="60" cy="60" r="44"/></clipPath></defs>
+<g clip-path="url(#${id})"><rect x="0" y="66" width="120" height="60" fill="${land}"/><path d="M0 66 Q60 58 120 66" fill="${land}"/></g>
+<circle cx="60" cy="60" r="44" fill="none" stroke="${fg}" stroke-width="5"/>
+<ellipse cx="60" cy="60" rx="17" ry="44" fill="none" stroke="${fg}" stroke-width="3"/>
+<path d="M16 66 Q60 58 104 66" fill="none" stroke="${fg}" stroke-width="3"/>
+${brandSpark(84, 40, 12, star)}
+</svg>`;
+}
+
+function alterraLockup(opts = {}) {
+  const dark = opts.dark !== false, B = brandOf(opts.brand);
+  const bg = dark ? BRAND_PAL.night : BRAND_PAL.ivory, fg = dark ? BRAND_PAL.ivory : BRAND_PAL.night, sub = dark ? BRAND_PAL.sand : BRAND_PAL.horizon;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" role="img" aria-label="Alterra, logotype horizontal">
+<rect width="640" height="200" fill="${bg}"/>
+<g transform="translate(36 30)">${alterraMark(140, { fg, land: BRAND_PAL.ochre, star: dark ? BRAND_PAL.signal : BRAND_PAL.horizon }).replace(/<svg[^>]*>|<\/svg>/g, "")}</g>
+<text x="196" y="112" font-family="${BRAND_FONT}" font-weight="600" font-size="62" letter-spacing="13" fill="${fg}">ALTERRA</text>
+<rect x="198" y="128" width="404" height="2" fill="${sub}"/>
+<text x="198" y="158" font-family="${BRAND_FONT}" font-size="19" letter-spacing="6" fill="${sub}">${brandEsc(B.tagline.toUpperCase())}</text>
+</svg>`;
+}
+
+function alterraStacked(opts = {}) {
+  const B = brandOf(opts.brand);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Alterra, logotype vertical">
+<rect width="400" height="400" fill="${BRAND_PAL.horizon}"/>
+<g transform="translate(110 54)">${alterraMark(180, { fg: BRAND_PAL.ivory, land: BRAND_PAL.ochre, star: BRAND_PAL.signal }).replace(/<svg[^>]*>|<\/svg>/g, "")}</g>
+<text x="200" y="300" text-anchor="middle" font-family="${BRAND_FONT}" font-weight="600" font-size="52" letter-spacing="13" fill="${BRAND_PAL.ivory}">ALTERRA</text>
+<text x="200" y="336" text-anchor="middle" font-family="${BRAND_FONT}" font-size="14" letter-spacing="5" fill="${BRAND_PAL.sand}">${brandEsc(B.tagline.toUpperCase())}</text>
+</svg>`;
+}
+
+/* ---------- Écusson de mission ----------
+   Dans l'esprit des écussons Apollo et Artemis : un disque brodé, l'indicatif en couronne, une scène au centre.
+   La trajectoire part du Soleil (petit disque à gauche), coupe le méridien et file vers l'étoile d'arrivée ;
+   les trois étoiles comptent la troisième expédition. */
+function missionPatch(opts = {}) {
+  const B = brandOf(opts.brand), id = "mp" + Math.random().toString(36).slice(2, 7);
+  const crew = String(B.crew || "").split(/[,;\n]/).map(s => s.trim()).filter(Boolean).slice(0, 6);
+  const bottom = crew.length ? crew.join(" · ").toUpperCase() : B.code + " · ALTERRA";
+  const P = BRAND_PAL;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Écusson de la mission ${brandEsc(B.mission)}">
+<defs>
+<radialGradient id="${id}s" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#1b3358"/><stop offset=".7" stop-color="${P.night}"/></radialGradient>
+<linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sand}"/><stop offset=".25" stop-color="${P.ochre}"/><stop offset="1" stop-color="#7a4520"/></linearGradient>
+<clipPath id="${id}c"><circle cx="200" cy="200" r="132"/></clipPath>
+<path id="${id}t" d="M 52 200 A 148 148 0 0 1 348 200"/>
+<path id="${id}b" d="M 32 200 A 168 168 0 0 0 368 200"/>
+</defs>
+<circle cx="200" cy="200" r="196" fill="${P.ivory}"/>
+<circle cx="200" cy="200" r="188" fill="${P.navy}"/>
+<circle cx="200" cy="200" r="138" fill="${P.ivory}"/>
+<g clip-path="url(#${id}c)">
+<rect width="400" height="400" fill="url(#${id}s)"/>
+${brandStars(90, 400, 400, 303, 1.4)}
+<ellipse cx="200" cy="200" rx="58" ry="132" fill="none" stroke="${P.sky}" stroke-width="1.6" stroke-dasharray="3 5" opacity=".7"/>
+<circle cx="200" cy="470" r="200" fill="url(#${id}p)"/>
+<path d="M0 290 Q200 262 400 290" fill="none" stroke="${P.sand}" stroke-width="2" opacity=".6"/>
+<circle cx="98" cy="150" r="13" fill="${P.sand}"/><circle cx="98" cy="150" r="20" fill="${P.sand}" opacity=".18"/>
+<path d="M110 158 C170 190 230 150 286 112" fill="none" stroke="${P.signal}" stroke-width="2.4" stroke-dasharray="1 7" stroke-linecap="round"/>
+${brandShip(214, 156, 1.05)}
+${brandSpark(296, 104, 22, P.signal)}${brandSpark(264, 78, 6, P.ivory)}${brandSpark(312, 140, 5, P.ivory)}${brandSpark(326, 92, 4, P.ivory)}
+<text x="200" y="302" text-anchor="middle" font-family="${BRAND_FONT}" font-size="${Math.min(13, Math.max(8, (170 / Math.max(1, B.motto.length) - 2.5) / 0.66)).toFixed(1)}" font-weight="700" letter-spacing="2.5" fill="${P.night}">${brandEsc(B.motto.toUpperCase())}</text>
+</g>
+<text font-family="${BRAND_FONT}" font-weight="700" font-size="${Math.min(34, Math.max(14, (360 / Math.max(1, B.mission.length) - 5) / 0.68)).toFixed(1)}" letter-spacing="6" fill="${P.ivory}"><textPath href="#${id}t" startOffset="50%" text-anchor="middle">${brandEsc(B.mission.toUpperCase())}</textPath></text>
+<text font-family="${BRAND_FONT}" font-weight="600" font-size="${Math.min(19, Math.max(9, (400 / Math.max(1, bottom.length) - 3) / 0.64)).toFixed(1)}" letter-spacing="3" fill="${P.sand}"><textPath href="#${id}b" startOffset="50%" text-anchor="middle">${brandEsc(bottom)}</textPath></text>
+${brandSpark(30, 200, 8, P.signal)}${brandSpark(370, 200, 8, P.signal)}
+</svg>`;
+}
+
+/* ---------- Écussons d'épaule par service ---------- */
+const BRAND_SERVICES = [
+  ["commandement", "Commandement", "CMD", "#e0b94a"],
+  ["ingenierie", "Ingénierie", "ING", "#e07a2a"],
+  ["medical", "Médical", "MED", "#d23a3a"],
+  ["pilotage", "Pilotage", "NAV", "#62e6f2"],
+  ["exploration", "Exploration", "EXP", "#8fd07a"],
+  ["securite", "Sécurité et armée", "SEC", "#c8333f"],
+  ["colons", "Colons", "COL", "#c9b48a"],
+  ["sciences", "Sciences", "SCI", "#4aa3ff"]
+];
+function serviceIcon(k, c) {
+  switch (k) {
+    case "commandement": return brandSpark(60, 62, 22, c) + `<ellipse cx="60" cy="62" rx="9" ry="22" fill="none" stroke="${c}" stroke-width="2.5"/>`;
+    case "ingenierie": {
+      let t = ""; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; t += `<rect x="56" y="36" width="8" height="10" fill="${c}" transform="rotate(${i * 45} 60 62)"/>`; void a; }
+      return t + `<circle cx="60" cy="62" r="18" fill="${c}"/><circle cx="60" cy="62" r="8" fill="${BRAND_PAL.navy}"/>`;
+    }
+    case "medical": return `<path d="M52 40h16v14h14v16H68v14H52V70H38V54h14z" fill="${c}"/>`;
+    case "pilotage": return `<path d="M60 40 L84 80 L60 70 L36 80 Z" fill="${c}"/><path d="M28 60 H46 M74 60 H92" stroke="${c}" stroke-width="3"/>`;
+    case "exploration": return `<circle cx="60" cy="62" r="22" fill="none" stroke="${c}" stroke-width="2.5"/><path d="M60 38 L66 62 L60 86 L54 62Z" fill="${c}"/><path d="M36 62 L60 57 L84 62 L60 67Z" fill="${c}" opacity=".55"/>`;
+    case "securite": return `<path d="M60 38 L82 46 V62 Q82 80 60 88 Q38 80 38 62 V46 Z" fill="none" stroke="${c}" stroke-width="3"/>` + brandSpark(60, 62, 12, c);
+    case "colons": return `<path d="M60 86 V58" stroke="${c}" stroke-width="3.5"/><path d="M60 62 Q40 60 38 42 Q56 42 60 62Z M60 56 Q78 52 82 36 Q64 36 60 56Z" fill="${c}"/><path d="M36 86 H84" stroke="${c}" stroke-width="3"/>`;
+    case "sciences": return `<ellipse cx="60" cy="62" rx="24" ry="9" fill="none" stroke="${c}" stroke-width="2.5"/><ellipse cx="60" cy="62" rx="24" ry="9" fill="none" stroke="${c}" stroke-width="2.5" transform="rotate(60 60 62)"/><ellipse cx="60" cy="62" rx="24" ry="9" fill="none" stroke="${c}" stroke-width="2.5" transform="rotate(-60 60 62)"/><circle cx="60" cy="62" r="5" fill="${c}"/>`;
+  }
+  return "";
+}
+function servicePatch(k, opts = {}) {
+  const s = BRAND_SERVICES.find(x => x[0] === k) || BRAND_SERVICES[0], B = brandOf(opts.brand), P = BRAND_PAL;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150" role="img" aria-label="Écusson ${brandEsc(s[1])}">
+<path d="M6 8 H114 V92 Q114 128 60 146 Q6 128 6 92 Z" fill="${P.ivory}"/>
+<path d="M12 14 H108 V90 Q108 122 60 139 Q12 122 12 90 Z" fill="${P.navy}"/>
+<rect x="12" y="14" width="96" height="16" fill="${s[3]}"/>
+<text x="60" y="26.5" text-anchor="middle" font-family="${BRAND_FONT}" font-weight="700" font-size="11" letter-spacing="3" fill="${P.night}">${brandEsc(B.code)}</text>
+${serviceIcon(s[0], s[3])}
+<text x="60" y="110" text-anchor="middle" font-family="${BRAND_FONT}" font-weight="700" font-size="15" letter-spacing="4" fill="${P.ivory}">${s[2]}</text>
+</svg>`;
+}
+
+/* ---------- Bannière de mission (format large) ---------- */
+function missionBanner(opts = {}) {
+  const B = brandOf(opts.brand), P = BRAND_PAL, id = "mb" + Math.random().toString(36).slice(2, 7);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" role="img" aria-label="Bannière ${brandEsc(B.mission)}">
+<defs>
+<linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.night}"/><stop offset=".75" stop-color="#14284a"/><stop offset="1" stop-color="#1f3d66"/></linearGradient>
+<radialGradient id="${id}h" cx="50%" cy="100%" r="60%"><stop offset="0" stop-color="${P.sky}" stop-opacity=".45"/><stop offset="1" stop-color="${P.sky}" stop-opacity="0"/></radialGradient>
+<linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sand}"/><stop offset=".2" stop-color="${P.ochre}"/><stop offset="1" stop-color="#4a2a14"/></linearGradient>
+</defs>
+<rect width="1500" height="500" fill="url(#${id}g)"/>
+${brandStars(320, 1500, 420, 77, 1.7)}
+<ellipse cx="1100" cy="250" rx="140" ry="420" fill="none" stroke="${P.sky}" stroke-width="1.4" stroke-dasharray="3 7" opacity=".5"/>
+<rect y="300" width="1500" height="200" fill="url(#${id}h)"/>
+<ellipse cx="1100" cy="1180" rx="1050" ry="760" fill="url(#${id}p)"/>
+<path d="M60 380 C560 350 900 280 1330 128" fill="none" stroke="${P.signal}" stroke-width="2.5" stroke-dasharray="1 9" stroke-linecap="round"/>
+${brandShip(1170, 196, 2.1)}
+${brandSpark(1352, 112, 34, P.signal)}${brandSpark(1410, 64, 8, P.ivory)}${brandSpark(1290, 58, 6, P.ivory)}${brandSpark(1440, 160, 7, P.ivory)}
+<g transform="translate(70 72) scale(.62)">${alterraMark(120, {}).replace(/<svg[^>]*>|<\/svg>/g, "")}</g>
+<text x="160" y="118" font-family="${BRAND_FONT}" font-size="22" font-weight="600" letter-spacing="9" fill="${P.ivory}">ALTERRA · PROGRAMME D’EXPÉDITION</text>
+<text x="66" y="248" font-family="${BRAND_FONT}" font-size="${Math.min(110, 820 / Math.max(1, B.mission.length) / 0.72).toFixed(0)}" font-weight="700" letter-spacing="10" fill="${P.ivory}">${brandEsc(B.mission.toUpperCase())}</text>
+<rect x="70" y="276" width="96" height="6" fill="${P.signal}"/>
+<text x="186" y="286" font-family="${BRAND_FONT}" font-size="30" font-weight="600" letter-spacing="10" fill="${P.sand}">MISSION ${brandEsc(B.code)}</text>
+<text x="70" y="456" font-family="${BRAND_FONT}" font-size="20" letter-spacing="8" fill="${P.ivory}" opacity=".8">${brandEsc(B.motto.toUpperCase())}</text>
+</svg>`;
+}
+
+/* ---------- Oriflamme verticale (couloirs, hangar, écrans portrait) ---------- */
+function missionPennant(opts = {}) {
+  const B = brandOf(opts.brand), P = BRAND_PAL;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 800" role="img" aria-label="Oriflamme ${brandEsc(B.mission)}">
+<path d="M0 0 H300 V720 L150 800 L0 720 Z" fill="${P.navy}"/>
+<path d="M0 0 H300 V22 H0Z" fill="${P.ochre}"/>
+${brandStars(70, 300, 700, 9, 1.3)}
+<g transform="translate(40 70) scale(1.83)">${alterraMark(120).replace(/<svg[^>]*>|<\/svg>/g, "")}</g>
+<text x="150" y="350" text-anchor="middle" font-family="${BRAND_FONT}" font-size="28" font-weight="600" letter-spacing="9" fill="${P.ivory}">ALTERRA</text>
+<rect x="110" y="372" width="80" height="3" fill="${P.signal}"/>
+<text x="150" y="440" text-anchor="middle" font-family="${BRAND_FONT}" font-size="38" font-weight="700" letter-spacing="5" fill="${P.ivory}">${brandEsc(B.mission.toUpperCase().split(" ")[0])}</text>
+<text x="150" y="500" text-anchor="middle" font-family="${BRAND_FONT}" font-size="54" font-weight="700" letter-spacing="6" fill="${P.sand}">${brandEsc(B.mission.toUpperCase().split(" ").slice(1).join(" ") || "")}</text>
+<text x="150" y="560" text-anchor="middle" font-family="${BRAND_FONT}" font-size="22" letter-spacing="8" fill="${P.signal}">${brandEsc(B.code)}</text>
+<path d="M150 600 V690" stroke="${P.ivory}" stroke-width="1.5" opacity=".5"/>${brandSpark(150, 700, 14, P.signal)}
+</svg>`;
+}
+
+/* Les planches de la page Branding : [clé, titre, usage, fonction de dessin, ratio d'export]. */
+const BRAND_BOARDS = [
+  ["patch", "Écusson de mission", "Épaule gauche des uniformes, écrans d’accueil, documents officiels de la mission.", (b) => missionPatch({ brand: b })],
+  ["banner", "Bannière de mission", "Écran du hangar, page d’accueil, en-tête de communiqué.", (b) => missionBanner({ brand: b })],
+  ["lockup", "Alterra · logotype horizontal", "En-tête des documents de la compagnie, écrans des terminaux.", (b) => alterraLockup({ brand: b })],
+  ["lockup-light", "Alterra · version claire", "Impression, fonds clairs.", (b) => alterraLockup({ brand: b, dark: false })],
+  ["stacked", "Alterra · logotype vertical", "Avatar, icône, tampon.", (b) => alterraStacked({ brand: b })],
+  ["pennant", "Oriflamme", "Couloirs, hangar, écrans en portrait.", (b) => missionPennant({ brand: b })],
+  ["mark", "Alterra · symbole seul", "Petits formats, gravure sur les portes et les caisses.", () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Symbole Alterra"><rect width="400" height="400" fill="${BRAND_PAL.night}"/><g transform="translate(50 50) scale(2.5)">${alterraMark(120).replace(/<svg[^>]*>|<\/svg>/g, "")}</g></svg>`]
+];
+
+const DIAGRAMS = {"chaine-gaz":"<svg viewBox=\"0 0 990 660\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Boucle de survie : chaîne des gaz\"><style>.dt{font:600 13px \"IBM Plex Sans\",system-ui,sans-serif;fill:var(--tx,#d3ebef)}.ds{font:11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--mu,#7f9fa9)}.dl{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace}.dh{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--cy,#62e6f2);letter-spacing:.14em}</style><defs><marker id=\"m-air\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--tx,#d3ebef)\"/></marker><marker id=\"m-c\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--mu,#7f9fa9)\"/></marker><marker id=\"m-ch4\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"#7fdc6a\"/></marker><marker id=\"m-co2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--amb,#f5a83a)\"/></marker><marker id=\"m-eau\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"#4aa3ff\"/></marker><marker id=\"m-h2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--vio,#a88dff)\"/></marker><marker id=\"m-n2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"#8fb3c9\"/></marker><marker id=\"m-o2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--cy,#62e6f2)\"/></marker></defs><text x=\"20\" y=\"26\" text-anchor=\"start\" class=\"dh\">SALLE DES MACHINES · CHAÎNE DES GAZ</text><line x1=\"30\" y1=\"56\" x2=\"52\" y2=\"56\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2.5\"/><text x=\"60\" y=\"60\" text-anchor=\"start\" class=\"ds\">O₂</text><line x1=\"30\" y1=\"72\" x2=\"52\" y2=\"72\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2.5\"/><text x=\"60\" y=\"76\" text-anchor=\"start\" class=\"ds\">CO₂ / air vicié</text><line x1=\"30\" y1=\"88\" x2=\"52\" y2=\"88\" stroke=\"var(--vio,#a88dff)\" stroke-width=\"2.5\"/><text x=\"60\" y=\"92\" text-anchor=\"start\" class=\"ds\">H₂</text><line x1=\"30\" y1=\"104\" x2=\"52\" y2=\"104\" stroke=\"#7fdc6a\" stroke-width=\"2.5\"/><text x=\"60\" y=\"108\" text-anchor=\"start\" class=\"ds\">CH₄</text><line x1=\"30\" y1=\"120\" x2=\"52\" y2=\"120\" stroke=\"#8fb3c9\" stroke-width=\"2.5\"/><text x=\"60\" y=\"124\" text-anchor=\"start\" class=\"ds\">N₂</text><line x1=\"30\" y1=\"136\" x2=\"52\" y2=\"136\" stroke=\"var(--mu,#7f9fa9)\" stroke-width=\"2.5\"/><text x=\"60\" y=\"140\" text-anchor=\"start\" class=\"ds\">carbone</text><rect x=\"500\" y=\"40\" width=\"200\" height=\"56\" rx=\"3\" fill=\"var(--bg2,#06121a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"600.0\" y=\"64.0\" text-anchor=\"middle\" class=\"dt\">Cuve d&#x27;azote (N₂)</text><text x=\"600.0\" y=\"80.0\" text-anchor=\"middle\" class=\"ds\">repressuriser une pièce vidée</text><rect x=\"30\" y=\"170\" width=\"140\" height=\"50\" rx=\"3\" fill=\"var(--bg2,#06121a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"100.0\" y=\"191.0\" text-anchor=\"middle\" class=\"dt\">Eau</text><text x=\"100.0\" y=\"207.0\" text-anchor=\"middle\" class=\"ds\">tuyaux à fluides</text><rect x=\"230\" y=\"160\" width=\"190\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"325.0\" y=\"185.0\" text-anchor=\"middle\" class=\"dt\">Électrolyseur</text><text x=\"325.0\" y=\"201.0\" text-anchor=\"middle\" class=\"ds\">2 H₂O → 2 H₂ + O₂</text><text x=\"325.0\" y=\"215.0\" text-anchor=\"middle\" class=\"ds\">≈ 14 kW</text><rect x=\"500\" y=\"160\" width=\"200\" height=\"70\" rx=\"3\" fill=\"var(--bg2,#06121a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"600.0\" y=\"191.0\" text-anchor=\"middle\" class=\"dt\">Réseau de soufflage</text><text x=\"600.0\" y=\"207.0\" text-anchor=\"middle\" class=\"ds\">O₂ + air recyclé + N₂</text><rect x=\"780\" y=\"150\" width=\"190\" height=\"90\" rx=\"3\" fill=\"rgba(98,230,242,.06)\" stroke=\"var(--cy2,#2fb3c2)\" stroke-width=\"1.3\"/><text x=\"875.0\" y=\"185.0\" text-anchor=\"middle\" class=\"dt\">Pièces habitées</text><text x=\"875.0\" y=\"201.0\" text-anchor=\"middle\" class=\"ds\">équipage : O₂ → CO₂</text><text x=\"875.0\" y=\"215.0\" text-anchor=\"middle\" class=\"ds\">bouches soufflage/reprise</text><rect x=\"780\" y=\"320\" width=\"190\" height=\"60\" rx=\"3\" fill=\"var(--bg2,#06121a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"875.0\" y=\"346.0\" text-anchor=\"middle\" class=\"dt\">Réseau de reprise</text><text x=\"875.0\" y=\"362.0\" text-anchor=\"middle\" class=\"ds\">air vicié</text><rect x=\"500\" y=\"310\" width=\"200\" height=\"80\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"600.0\" y=\"340.0\" text-anchor=\"middle\" class=\"dt\">Filtreur à CO₂</text><text x=\"600.0\" y=\"356.0\" text-anchor=\"middle\" class=\"ds\">capte le CO₂</text><text x=\"600.0\" y=\"370.0\" text-anchor=\"middle\" class=\"ds\">air propre → pompe</text><rect x=\"230\" y=\"320\" width=\"190\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"325.0\" y=\"345.0\" text-anchor=\"middle\" class=\"dt\">Séparateur</text><text x=\"325.0\" y=\"361.0\" text-anchor=\"middle\" class=\"ds\">CO₂ → C + O₂ (80 %)</text><text x=\"325.0\" y=\"375.0\" text-anchor=\"middle\" class=\"ds\">cartouche filtrante</text><rect x=\"20\" y=\"470\" width=\"170\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"105.0\" y=\"495.0\" text-anchor=\"middle\" class=\"dt\">Centrifugeuse</text><text x=\"105.0\" y=\"511.0\" text-anchor=\"middle\" class=\"ds\">cartouche encrassée</text><text x=\"105.0\" y=\"525.0\" text-anchor=\"middle\" class=\"ds\">→ propre + carbone</text><rect x=\"240\" y=\"470\" width=\"190\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"335.0\" y=\"501.0\" text-anchor=\"middle\" class=\"dt\">Catalyseur à méthane</text><text x=\"335.0\" y=\"517.0\" text-anchor=\"middle\" class=\"ds\">C + 2 H₂ → CH₄</text><rect x=\"480\" y=\"470\" width=\"170\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"565.0\" y=\"495.0\" text-anchor=\"middle\" class=\"dt\">Compresseur</text><text x=\"565.0\" y=\"511.0\" text-anchor=\"middle\" class=\"ds\">→ cuve de gaz</text><text x=\"565.0\" y=\"525.0\" text-anchor=\"middle\" class=\"ds\">jusqu&#x27;à 20 MPa</text><rect x=\"700\" y=\"470\" width=\"170\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"785.0\" y=\"501.0\" text-anchor=\"middle\" class=\"dt\">Condenseur</text><text x=\"785.0\" y=\"517.0\" text-anchor=\"middle\" class=\"ds\">CH₄ / O₂ / N₂ liquides</text><rect x=\"700\" y=\"590\" width=\"170\" height=\"56\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"785.0\" y=\"614.0\" text-anchor=\"middle\" class=\"dt\">Catalyseur à ergol</text><text x=\"785.0\" y=\"630.0\" text-anchor=\"middle\" class=\"ds\">CH₄ liq. + 2 O₂ liq.</text><path d=\"M600 96 L600 158\" fill=\"none\" stroke=\"#8fb3c9\" stroke-width=\"2\" marker-end=\"url(#m-n2)\"/><text x=\"608\" y=\"132\" text-anchor=\"start\" class=\"dl\" fill=\"#8fb3c9\">N₂</text><path d=\"M170 195 L228 195\" fill=\"none\" stroke=\"#4aa3ff\" stroke-width=\"2\" marker-end=\"url(#m-eau)\"/><text x=\"199.0\" y=\"189.0\" text-anchor=\"middle\" class=\"dl\" fill=\"#4aa3ff\">H₂O</text><path d=\"M420 185 L498 185\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><text x=\"459.0\" y=\"179.0\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--cy,#62e6f2)\">O₂</text><path d=\"M700 185 L778 185\" fill=\"none\" stroke=\"var(--tx,#d3ebef)\" stroke-width=\"2\" marker-end=\"url(#m-air)\"/><text x=\"739\" y=\"177\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--tx,#d3ebef)\">soufflage</text><path d=\"M875 240 L875 318\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><text x=\"883\" y=\"284\" text-anchor=\"start\" class=\"dl\" fill=\"var(--amb,#f5a83a)\">reprise</text><path d=\"M780 350 L702 350\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><text x=\"741\" y=\"342\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--amb,#f5a83a)\">air + CO₂</text><path d=\"M650 310 L650 232\" fill=\"none\" stroke=\"var(--tx,#d3ebef)\" stroke-width=\"2\" marker-end=\"url(#m-air)\"/><text x=\"658\" y=\"276\" text-anchor=\"start\" class=\"dl\" fill=\"var(--tx,#d3ebef)\">pompe (tuyau dir. + FE)</text><path d=\"M500 360 L422 360\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><text x=\"461\" y=\"352\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--amb,#f5a83a)\">CO₂</text><path d=\"M330 320 L330 275 L550 275 L550 232\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><text x=\"440\" y=\"268\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--cy,#62e6f2)\">O₂ récupéré</text><path d=\"M380 390 L380 468\" fill=\"none\" stroke=\"var(--mu,#7f9fa9)\" stroke-width=\"2\" marker-end=\"url(#m-c)\"/><text x=\"388\" y=\"435\" text-anchor=\"start\" class=\"dl\" fill=\"var(--mu,#7f9fa9)\">carbone</text><path d=\"M230 375 L105 375 L105 468\" fill=\"none\" stroke=\"var(--mu,#7f9fa9)\" stroke-width=\"2\" marker-end=\"url(#m-c)\"/><text x=\"160\" y=\"368\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--mu,#7f9fa9)\">cartouche encrassée</text><path d=\"M190 505 L238 505\" fill=\"none\" stroke=\"var(--mu,#7f9fa9)\" stroke-width=\"2\" marker-end=\"url(#m-c)\"/><text x=\"214\" y=\"497\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--mu,#7f9fa9)\">C</text><path d=\"M230 215 L212 215 L212 440 L275 440 L275 468\" fill=\"none\" stroke=\"var(--vio,#a88dff)\" stroke-width=\"2\" marker-end=\"url(#m-h2)\"/><text x=\"218\" y=\"300\" text-anchor=\"start\" class=\"dl\" fill=\"var(--vio,#a88dff)\">H₂</text><path d=\"M430 505 L478 505\" fill=\"none\" stroke=\"#7fdc6a\" stroke-width=\"2\" marker-end=\"url(#m-ch4)\"/><text x=\"454\" y=\"497\" text-anchor=\"middle\" class=\"dl\" fill=\"#7fdc6a\">CH₄</text><path d=\"M650 505 L698 505\" fill=\"none\" stroke=\"#7fdc6a\" stroke-width=\"2\" marker-end=\"url(#m-ch4)\"/><path d=\"M785 540 L785 588\" fill=\"none\" stroke=\"#7fdc6a\" stroke-width=\"2\" marker-end=\"url(#m-ch4)\"/><text x=\"793\" y=\"570\" text-anchor=\"start\" class=\"dl\" fill=\"#7fdc6a\">liquides</text><text x=\"20\" y=\"600\" text-anchor=\"start\" class=\"ds\">Lifepacks : compresseur LIFEPACK branché sur le réseau d&#x27;O₂.</text><text x=\"20\" y=\"618\" text-anchor=\"start\" class=\"ds\">Pas encore de production d&#x27;azote à bord : la cuve de N₂ est un stock.</text></svg>","distribution":"<svg viewBox=\"0 0 980 575\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Distribution centralisée de l&#x27;air\"><style>.dt{font:600 13px \"IBM Plex Sans\",system-ui,sans-serif;fill:var(--tx,#d3ebef)}.ds{font:11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--mu,#7f9fa9)}.dl{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace}.dh{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--cy,#62e6f2);letter-spacing:.14em}</style><defs><marker id=\"m-air\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--tx,#d3ebef)\"/></marker><marker id=\"m-co2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--amb,#f5a83a)\"/></marker><marker id=\"m-n2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"#8fb3c9\"/></marker><marker id=\"m-o2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--cy,#62e6f2)\"/></marker></defs><text x=\"20\" y=\"26\" text-anchor=\"start\" class=\"dh\">DISTRIBUTION CENTRALISÉE · UNE SALLE DES MACHINES, DES TUYAUX, DES BOUCHES</text><rect x=\"30\" y=\"60\" width=\"260\" height=\"440\" rx=\"3\" fill=\"transparent\" stroke=\"var(--ln,#14303b)\" stroke-width=\"1.3\" stroke-dasharray=\"4 4\"/><text x=\"160.0\" y=\"284.0\" text-anchor=\"middle\" class=\"dt\"></text><text x=\"160\" y=\"84\" text-anchor=\"middle\" class=\"dh\">SALLE DES MACHINES</text><rect x=\"55\" y=\"105\" width=\"210\" height=\"60\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"131.0\" text-anchor=\"middle\" class=\"dt\">Électrolyseur central</text><text x=\"160.0\" y=\"147.0\" text-anchor=\"middle\" class=\"ds\">port O₂ (dessus) raccordé</text><rect x=\"55\" y=\"190\" width=\"210\" height=\"60\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"216.0\" text-anchor=\"middle\" class=\"dt\">Séparateur</text><text x=\"160.0\" y=\"232.0\" text-anchor=\"middle\" class=\"ds\">O₂ récupéré</text><rect x=\"55\" y=\"275\" width=\"210\" height=\"60\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"301.0\" text-anchor=\"middle\" class=\"dt\">Cuve d&#x27;azote</text><text x=\"160.0\" y=\"317.0\" text-anchor=\"middle\" class=\"ds\">vanne ouverte</text><rect x=\"55\" y=\"360\" width=\"210\" height=\"60\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"386.0\" text-anchor=\"middle\" class=\"dt\">Filtreur à CO₂</text><text x=\"160.0\" y=\"402.0\" text-anchor=\"middle\" class=\"ds\">port arrière ← reprise</text><rect x=\"55\" y=\"435\" width=\"210\" height=\"50\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"456.0\" text-anchor=\"middle\" class=\"dt\">Pompe</text><text x=\"160.0\" y=\"472.0\" text-anchor=\"middle\" class=\"ds\">tuyau directionnel + FE</text><rect x=\"330\" y=\"120\" width=\"14\" height=\"300\" fill=\"rgba(98,230,242,.14)\" stroke=\"var(--cy2,#2fb3c2)\"/><text x=\"337\" y=\"112\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--cy,#62e6f2)\">SOUFFLAGE</text><rect x=\"380\" y=\"160\" width=\"14\" height=\"330\" fill=\"rgba(245,168,58,.12)\" stroke=\"var(--amb,#f5a83a)\"/><text x=\"387\" y=\"505\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--amb,#f5a83a)\">REPRISE</text><path d=\"M265 135 L328 135\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><path d=\"M265 220 L328 220\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><path d=\"M265 305 L328 305\" fill=\"none\" stroke=\"#8fb3c9\" stroke-width=\"2\" marker-end=\"url(#m-n2)\"/><path d=\"M378 390 L267 390\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><path d=\"M265 460 L300 460 L300 410 L328 410\" fill=\"none\" stroke=\"var(--tx,#d3ebef)\" stroke-width=\"2\" marker-end=\"url(#m-air)\"/><text x=\"304\" y=\"452\" text-anchor=\"start\" class=\"dl\" fill=\"var(--tx,#d3ebef)\">air propre</text><rect x=\"560\" y=\"100\" width=\"400\" height=\"115\" rx=\"3\" fill=\"rgba(98,230,242,.06)\" stroke=\"var(--cy2,#2fb3c2)\" stroke-width=\"1.3\"/><text x=\"760.0\" y=\"161.5\" text-anchor=\"middle\" class=\"dt\"></text><text x=\"580\" y=\"124\" text-anchor=\"start\" class=\"dt\">Cabines · pont 2</text><rect x=\"560\" y=\"138\" width=\"10\" height=\"18\" fill=\"var(--cy,#62e6f2)\"/><rect x=\"560\" y=\"178\" width=\"10\" height=\"18\" fill=\"var(--amb,#f5a83a)\"/><text x=\"580\" y=\"151\" text-anchor=\"start\" class=\"ds\">SOUFFLAGE : entre jusqu&#x27;à 101,3 kPa et 21,2 kPa d&#x27;O₂</text><text x=\"580\" y=\"191\" text-anchor=\"start\" class=\"ds\">REPRISE : l&#x27;air vicié repart vers le filtreur</text><path d=\"M344 147 L558 147\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><path d=\"M558 187 L396 187\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><rect x=\"560\" y=\"235\" width=\"400\" height=\"115\" rx=\"3\" fill=\"rgba(98,230,242,.06)\" stroke=\"var(--cy2,#2fb3c2)\" stroke-width=\"1.3\"/><text x=\"760.0\" y=\"296.5\" text-anchor=\"middle\" class=\"dt\"></text><text x=\"580\" y=\"259\" text-anchor=\"start\" class=\"dt\">Réfectoire · pont 3</text><rect x=\"560\" y=\"273\" width=\"10\" height=\"18\" fill=\"var(--cy,#62e6f2)\"/><rect x=\"560\" y=\"313\" width=\"10\" height=\"18\" fill=\"var(--amb,#f5a83a)\"/><text x=\"580\" y=\"286\" text-anchor=\"start\" class=\"ds\">SOUFFLAGE : entre jusqu&#x27;à 101,3 kPa et 21,2 kPa d&#x27;O₂</text><text x=\"580\" y=\"326\" text-anchor=\"start\" class=\"ds\">REPRISE : l&#x27;air vicié repart vers le filtreur</text><path d=\"M344 282 L558 282\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><path d=\"M558 322 L396 322\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><rect x=\"560\" y=\"370\" width=\"400\" height=\"115\" rx=\"3\" fill=\"rgba(98,230,242,.06)\" stroke=\"var(--cy2,#2fb3c2)\" stroke-width=\"1.3\"/><text x=\"760.0\" y=\"431.5\" text-anchor=\"middle\" class=\"dt\"></text><text x=\"580\" y=\"394\" text-anchor=\"start\" class=\"dt\">Infirmerie · pont 4</text><rect x=\"560\" y=\"408\" width=\"10\" height=\"18\" fill=\"var(--cy,#62e6f2)\"/><rect x=\"560\" y=\"448\" width=\"10\" height=\"18\" fill=\"var(--amb,#f5a83a)\"/><text x=\"580\" y=\"421\" text-anchor=\"start\" class=\"ds\">SOUFFLAGE : entre jusqu&#x27;à 101,3 kPa et 21,2 kPa d&#x27;O₂</text><text x=\"580\" y=\"461\" text-anchor=\"start\" class=\"ds\">REPRISE : l&#x27;air vicié repart vers le filtreur</text><path d=\"M344 417 L558 417\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><path d=\"M558 457 L396 457\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><text x=\"30\" y=\"540\" text-anchor=\"start\" class=\"ds\" fill=\"var(--red,#ff5266)\">Brèche dans une pièce : ses deux clapets se ferment, le reste du réseau ne se vide pas.</text><text x=\"30\" y=\"558\" text-anchor=\"start\" class=\"ds\">Restent dans chaque pièce : générateur de gravité, détecteur incendie, diffuseur (N₂ par tuyau), haut-parleur.</text></svg>","incendie":"<svg viewBox=\"0 0 990 500\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Sécurité incendie\"><style>.dt{font:600 13px \"IBM Plex Sans\",system-ui,sans-serif;fill:var(--tx,#d3ebef)}.ds{font:11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--mu,#7f9fa9)}.dl{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace}.dh{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--cy,#62e6f2);letter-spacing:.14em}</style><defs><marker id=\"m-n2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"#8fb3c9\"/></marker><marker id=\"m-sig\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--red,#ff5266)\"/></marker></defs><text x=\"20\" y=\"26\" text-anchor=\"start\" class=\"dh\">SÉCURITÉ INCENDIE · DÉTECTER, ALERTER, ÉTEINDRE</text><rect x=\"30\" y=\"60\" width=\"220\" height=\"90\" rx=\"3\" fill=\"rgba(255,82,102,.08)\" stroke=\"var(--red,#ff5266)\" stroke-width=\"1.3\"/><text x=\"140.0\" y=\"95.0\" text-anchor=\"middle\" class=\"dt\">Foyer d&#x27;incendie</text><text x=\"140.0\" y=\"111.0\" text-anchor=\"middle\" class=\"ds\">brûle 0,45 mol O₂/s → CO₂</text><text x=\"140.0\" y=\"125.0\" text-anchor=\"middle\" class=\"ds\">s&#x27;étend · chauffe la coque</text><rect x=\"30\" y=\"200\" width=\"220\" height=\"70\" rx=\"3\" fill=\"rgba(255,82,102,.08)\" stroke=\"var(--red,#ff5266)\" stroke-width=\"1.3\"/><text x=\"140.0\" y=\"225.0\" text-anchor=\"middle\" class=\"dt\">Coque extérieure</text><text x=\"140.0\" y=\"241.0\" text-anchor=\"middle\" class=\"ds\">~2 min 30 au contact</text><text x=\"140.0\" y=\"255.0\" text-anchor=\"middle\" class=\"ds\">→ fissure puis brèche</text><rect x=\"330\" y=\"60\" width=\"200\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"430.0\" y=\"91.0\" text-anchor=\"middle\" class=\"dt\">Détecteur incendie</text><text x=\"430.0\" y=\"107.0\" text-anchor=\"middle\" class=\"ds\">rayon 10 blocs, bip, redstone</text><rect x=\"610\" y=\"50\" width=\"340\" height=\"90\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"780.0\" y=\"85.0\" text-anchor=\"middle\" class=\"dt\">Ordinateur de bord (Meridian)</text><text x=\"780.0\" y=\"101.0\" text-anchor=\"middle\" class=\"ds\">pièce en « Incendie »</text><text x=\"780.0\" y=\"115.0\" text-anchor=\"middle\" class=\"ds\">alarme de toute la SECTION + écran Alertes</text><rect x=\"610\" y=\"190\" width=\"160\" height=\"60\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"690.0\" y=\"216.0\" text-anchor=\"middle\" class=\"dt\">Haut-parleurs</text><text x=\"690.0\" y=\"232.0\" text-anchor=\"middle\" class=\"ds\">alarme niveau 4</text><rect x=\"790\" y=\"190\" width=\"160\" height=\"60\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"870.0\" y=\"216.0\" text-anchor=\"middle\" class=\"dt\">Passerelle</text><text x=\"870.0\" y=\"232.0\" text-anchor=\"middle\" class=\"ds\">page Alertes</text><rect x=\"330\" y=\"330\" width=\"200\" height=\"80\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"430.0\" y=\"360.0\" text-anchor=\"middle\" class=\"dt\">Diffuseur anti-incendie</text><text x=\"430.0\" y=\"376.0\" text-anchor=\"middle\" class=\"ds\">redstone ou ordre Meridian</text><text x=\"430.0\" y=\"390.0\" text-anchor=\"middle\" class=\"ds\">ouvre le réseau N₂ (60 s)</text><rect x=\"610\" y=\"330\" width=\"160\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"690.0\" y=\"361.0\" text-anchor=\"middle\" class=\"dt\">Extincteur à CO₂</text><text x=\"690.0\" y=\"377.0\" text-anchor=\"middle\" class=\"ds\">jet de 5 blocs, 8 s</text><rect x=\"790\" y=\"330\" width=\"180\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"880.0\" y=\"361.0\" text-anchor=\"middle\" class=\"dt\">Vider la pièce</text><text x=\"880.0\" y=\"377.0\" text-anchor=\"middle\" class=\"ds\">dépressuriseur, Meridian</text><rect x=\"30\" y=\"330\" width=\"220\" height=\"80\" rx=\"3\" fill=\"var(--bg2,#06121a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"140.0\" y=\"366.0\" text-anchor=\"middle\" class=\"dt\">Cuve d&#x27;azote</text><text x=\"140.0\" y=\"382.0\" text-anchor=\"middle\" class=\"ds\">réseau N₂ → diffuseurs</text><path d=\"M140 150 L140 198\" fill=\"none\" stroke=\"var(--red,#ff5266)\" stroke-width=\"2\" marker-end=\"url(#m-sig)\"/><text x=\"148\" y=\"180\" text-anchor=\"start\" class=\"dl\" fill=\"var(--red,#ff5266)\">chaleur</text><path d=\"M250 95 L328 95\" fill=\"none\" stroke=\"var(--red,#ff5266)\" stroke-width=\"2\" marker-end=\"url(#m-sig)\"/><text x=\"289.0\" y=\"89.0\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--red,#ff5266)\">voit</text><path d=\"M530 95 L608 95\" fill=\"none\" stroke=\"var(--red,#ff5266)\" stroke-width=\"2\" marker-end=\"url(#m-sig)\"/><text x=\"569.0\" y=\"89.0\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--red,#ff5266)\">alerte</text><path d=\"M690 140 L690 188\" fill=\"none\" stroke=\"var(--red,#ff5266)\" stroke-width=\"2\" marker-end=\"url(#m-sig)\"/><path d=\"M870 140 L870 188\" fill=\"none\" stroke=\"var(--red,#ff5266)\" stroke-width=\"2\" marker-end=\"url(#m-sig)\"/><path d=\"M250 370 L328 370\" fill=\"none\" stroke=\"#8fb3c9\" stroke-width=\"2\" marker-end=\"url(#m-n2)\"/><text x=\"289.0\" y=\"364.0\" text-anchor=\"middle\" class=\"dl\" fill=\"#8fb3c9\">N₂</text><path d=\"M780 140 L780 300 L440 300 L440 328\" fill=\"none\" stroke=\"var(--red,#ff5266)\" stroke-width=\"2\" stroke-dasharray=\"5 5\" marker-end=\"url(#m-sig)\"/><text x=\"600\" y=\"293\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--red,#ff5266)\">« Extinction à l&#x27;azote » (équipage)</text><text x=\"610\" y=\"322\" text-anchor=\"start\" class=\"dh\">ÉTEINDRE À LA MAIN</text><text x=\"30\" y=\"460\" text-anchor=\"start\" class=\"ds\">Le feu meurt sous 10 kPa d&#x27;O₂ ou 15 % d&#x27;O₂ dans l&#x27;air. Le détecteur ne déclenche PAS l&#x27;extinction : l&#x27;équipage décide.</text><text x=\"30\" y=\"478\" text-anchor=\"start\" class=\"ds\" fill=\"var(--red,#ff5266)\">Azote et vidage étouffent le feu… et l&#x27;équipage : évacuez avant.</text></svg>","meridian":"<svg viewBox=\"0 0 980 430\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Liaisons du Meridian\"><style>.dt{font:600 13px \"IBM Plex Sans\",system-ui,sans-serif;fill:var(--tx,#d3ebef)}.ds{font:11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--mu,#7f9fa9)}.dl{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace}.dh{font:600 11px \"IBM Plex Mono\",ui-monospace,monospace;fill:var(--cy,#62e6f2);letter-spacing:.14em}</style><defs><marker id=\"m-co2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--amb,#f5a83a)\"/></marker><marker id=\"m-o2\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10z\" fill=\"var(--cy,#62e6f2)\"/></marker></defs><text x=\"20\" y=\"26\" text-anchor=\"start\" class=\"dh\">LE MERIDIAN · QUI PARLE À QUI</text><rect x=\"30\" y=\"70\" width=\"260\" height=\"280\" rx=\"3\" fill=\"transparent\" stroke=\"var(--ln,#14303b)\" stroke-width=\"1.3\" stroke-dasharray=\"4 4\"/><text x=\"160.0\" y=\"214.0\" text-anchor=\"middle\" class=\"dt\"></text><text x=\"160\" y=\"94\" text-anchor=\"middle\" class=\"dh\">SERVEUR MINECRAFT (MOD)</text><rect x=\"50\" y=\"110\" width=\"220\" height=\"48\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"130.0\" text-anchor=\"middle\" class=\"dt\">Physique</text><text x=\"160.0\" y=\"146.0\" text-anchor=\"middle\" class=\"ds\">air, pression, feu, portes</text><rect x=\"50\" y=\"168\" width=\"220\" height=\"48\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"188.0\" text-anchor=\"middle\" class=\"dt\">Équipage</text><text x=\"160.0\" y=\"204.0\" text-anchor=\"middle\" class=\"ds\">puces, vitaux, position</text><rect x=\"50\" y=\"226\" width=\"220\" height=\"48\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"246.0\" text-anchor=\"middle\" class=\"dt\">Diffusion</text><text x=\"160.0\" y=\"262.0\" text-anchor=\"middle\" class=\"ds\">haut-parleurs, micros</text><rect x=\"50\" y=\"284\" width=\"220\" height=\"48\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"160.0\" y=\"304.0\" text-anchor=\"middle\" class=\"dt\">Navigation</text><text x=\"160.0\" y=\"320.0\" text-anchor=\"middle\" class=\"ds\">sauts, planètes</text><rect x=\"380\" y=\"140\" width=\"230\" height=\"120\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"495.0\" y=\"190.0\" text-anchor=\"middle\" class=\"dt\">Ordinateur de bord</text><text x=\"495.0\" y=\"206.0\" text-anchor=\"middle\" class=\"ds\">Cloudflare (autorité)</text><text x=\"495.0\" y=\"220.0\" text-anchor=\"middle\" class=\"ds\">état, règles, journal, droits</text><rect x=\"700\" y=\"70\" width=\"250\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"825.0\" y=\"101.0\" text-anchor=\"middle\" class=\"dt\">Consoles en jeu</text><text x=\"825.0\" y=\"117.0\" text-anchor=\"middle\" class=\"ds\">terminaux, ordinateurs</text><rect x=\"700\" y=\"170\" width=\"250\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"825.0\" y=\"201.0\" text-anchor=\"middle\" class=\"dt\">Poste admin (navigateur)</text><text x=\"825.0\" y=\"217.0\" text-anchor=\"middle\" class=\"ds\">…/?connexion</text><rect x=\"700\" y=\"270\" width=\"250\" height=\"70\" rx=\"3\" fill=\"var(--pn2,#0b1f2a)\" stroke=\"var(--ln2,#22505e)\" stroke-width=\"1.3\"/><text x=\"825.0\" y=\"301.0\" text-anchor=\"middle\" class=\"dt\">Écrans du vaisseau</text><text x=\"825.0\" y=\"317.0\" text-anchor=\"middle\" class=\"ds\">pages, alertes, recopie</text><path d=\"M270 170 L378 170\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><text x=\"324\" y=\"162\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--cy,#62e6f2)\">télémétrie, structure</text><path d=\"M378 230 L272 230\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><text x=\"324\" y=\"248\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--amb,#f5a83a)\">ordres : portes, alarmes…</text><path d=\"M610 170 L698 110\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><path d=\"M698 205 L612 205\" fill=\"none\" stroke=\"var(--amb,#f5a83a)\" stroke-width=\"2\" marker-end=\"url(#m-co2)\"/><text x=\"655\" y=\"198\" text-anchor=\"middle\" class=\"dl\" fill=\"var(--amb,#f5a83a)\">actions</text><path d=\"M610 240 L698 300\" fill=\"none\" stroke=\"var(--cy,#62e6f2)\" stroke-width=\"2\" marker-end=\"url(#m-o2)\"/><text x=\"30\" y=\"390\" text-anchor=\"start\" class=\"ds\">Liaison coupée : le mod garde les dernières règles (portes, fabrication) et rattrape les ordres en attente à la reconnexion.</text></svg>"};
 </script>
 <script>
 "use strict";
@@ -1593,7 +2243,7 @@ document.addEventListener("scroll", () => { if (MIRROR_KEY) mirrorPush(); }, tru
 { const h = location.hash.replace(/^#/, ""); if (h && MC.PAGES[h]) ui.page = h; }
 let lastHash = "";
 function syncHash() { if (SCREEN || ui.page === lastHash) return; lastHash = ui.page; try { history.replaceState(null, "", location.pathname + location.search + "#" + ui.page); } catch {} }
-function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; chatWatch(); if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
+function update(state, serverNow) { OFF = (serverNow || Date.now()) - Date.now(); V = state; chatWatch(); if (!LOGIN.done && V.me && !SCREEN && !MIRROR_KEY) loginAnim(); if (V.me && !V.me.pages.includes(ui.page)) ui.page = V.me.pages[0] || "overview"; render(); }
 
 function act(action, ok) {
   return T.send(action).then(r => { if (r.ok) { if (ok) toast(ok); } else toast(r.error, "err"); return r; });
@@ -1643,7 +2293,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["plan", "02"], ["vue3d", "03"], ["atmos", "04"], ["doors", "05"], ["crew", "06"], ["procs", "07"], ["pa", "08"], ["chat", "09"], ["starmap", "10"], ["galaxy", "11"], ["log", "12"], ["structure", "13"], ["screens", "14"], ["craft", "15"], ["admin", "16"]];
+const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["doors", "06"], ["crew", "07"], ["procs", "08"], ["pa", "09"], ["chat", "10"], ["starmap", "11"], ["galaxy", "12"], ["log", "13"], ["structure", "14"], ["screens", "15"], ["craft", "16"], ["branding", "17"], ["admin", "18"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -1685,7 +2335,7 @@ function render() {
 </header>
 ${demoBar}${soloBar}${banners}</div>
 <nav aria-label="Pages">${navItems}</nav>
-<main id="main">${PAGE[ui.page] ? PAGE[ui.page]() : ""}</main>
+<main id="main">${V.me && V.me.intrus ? `<div class="intrus-b">SESSION NON AUTORISÉE · ACCÈS INCONNU · niv. ${V.me.level}</div>` : ""}${PAGE[ui.page] ? PAGE[ui.page]() : ""}</main>
 <footer><span class="tl">JOURNAL &gt;&gt;</span><div class="tk"><div>${tick}${tick}</div></div></footer>`);
   restoreForm(snap);
 }
@@ -1973,7 +2623,7 @@ function roomPanel(rid) {
   let b = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="st ${s}">${ST[s]}${r.mode ? " · " + (r.mode === "vent" ? "vidage" : "pressurisation") : ""}</span><span class="mu m" style="font-size:12px">${esc(deckName(r.deck))}${sec ? " · " + esc(sec.name) : ""}</span></div>`;
   if (gone) return panel(r.name, r.id, b + `<p class="empty">Section éjectée. Plus aucune donnée.</p>`);
   b += `<div class="gauge"><div><span>Pression</span><b class="${envCls("p", e.p)}">${n1(e.p)}</b> <small class="mu">kPa</small></div><div><span>Oxygène</span><b class="${envCls("o2", e.o2)}">${n1(e.o2)}</b> <small class="mu">%</small></div><div><span>CO₂</span><b class="${envCls("co2", e.co2)}">${(+e.co2 || 0).toFixed(2).replace(".", ",")}</b> <small class="mu">%</small></div><div><span>Temp.</span><b class="${envCls("t", e.t)}">${n0(e.t)}</b> <small class="mu">°C</small></div><div><span>Gravité</span><b class="${envCls("g", e.g)}">${n1(e.g)}</b> <small class="mu">g</small></div><div><span>Énergie</span><b class="${e.power === false ? "crit" : ""}">${e.power === false ? "COUPÉE" : "OK"}</b></div></div>`;
-  b += `<div class="btns">${btn(V.me.admin ? "Pressuriser (admin)" : "Accélérer l’O₂", { type: "room.pressurize", room: r.id }, { perm: "room.pressurize" })}${btn("Vider l’air", { type: "room.vent", room: r.id }, { perm: "room.vent", cls: "red", confirm: `Vider l’air de ${r.name} ? ${occ.length ? occ.length + " personne(s) présente(s)." : ""}` })}${btn("Extinction à l’azote", { type: "room.suppress", room: r.id }, { perm: "room.suppress", cls: r.flags && r.flags.fire ? "red" : "ghost", confirm: `Noyer ${r.name} à l’azote pendant 60 s ? L’oxygène de la pièce va chuter.` })}${r.mode ? btn("Arrêter le cycle", { type: "room.stop", room: r.id }, { perm: r.mode === "vent" ? "room.vent" : "room.pressurize", cls: "ghost" }) : ""}</div>`;
+  b += `<div class="btns">${btn("Pressuriser", { type: "room.pressurize", room: r.id }, { perm: "room.pressurize" })}${btn("Vider l’air", { type: "room.vent", room: r.id }, { perm: "room.vent", cls: "red", confirm: `Vider l’air de ${r.name} ? ${occ.length ? occ.length + " personne(s) présente(s)." : ""}` })}${btn("Extinction à l’azote", { type: "room.suppress", room: r.id }, { perm: "room.suppress", cls: r.flags && r.flags.fire ? "red" : "ghost", confirm: `Noyer ${r.name} à l’azote pendant 60 s ? L’oxygène de la pièce va chuter.` })}${r.mode ? btn("Arrêter le cycle", { type: "room.stop", room: r.id }, { perm: r.mode === "vent" ? "room.vent" : "room.pressurize", cls: "ghost" }) : ""}</div>`;
   b += `<div class="btns" style="margin-top:8px">${btn(r.alarm ? "Couper l’alarme" : "Alarme de pièce", { type: "room.alarm", room: r.id, on: !r.alarm }, { perm: "room.alarm", cls: "amb" })}${btn("Sceller les portes", { type: "door.lockdown", room: r.id, on: true }, { perm: "door.lockdown", cls: "red", confirm: `Sceller toutes les portes de ${r.name} ?` })}${doors.some(d => d.state.lockdown) ? btn("Lever le scellé", { type: "door.lockdown", room: r.id, on: false }, { perm: "door.lockdown", cls: "ghost" }) : ""}</div>`;
   b += `<div class="lbl">Vannes</div>` + (valves.length ? valves.map(v => `<div class="vrow"><span>${esc(v.name)} <span class="dim m" style="font-size:11px">${esc(v.kind)}</span></span>${sw(v.open, { type: "valve.set", valve: v.id, open: !v.open }, "valve.set")}</div>`).join("") : `<p class="empty">Aucune vanne reliée.</p>`);
   b += `<div class="lbl">Portes</div>` + doors.map(d => `<div class="vrow"><a data-door="${esc(d.id)}" data-go="doors" style="cursor:pointer"><span class="m cy">${esc(d.id)}</span> ${esc(d.name)}</a><span class="row" style="gap:6px">${doorState(d)}</span></div>`).join("");
@@ -2072,13 +2722,55 @@ PAGE.crew = () => {
   const list = people().filter(F[ui.crewF]).filter(p => !q || (p.name + " " + p.job + " " + p.role + " " + p.group).toLowerCase().includes(q)).sort((a, b) => (b.level - a.level) || a.name.localeCompare(b.name));
   const tabs = [["all", "Tous"], ["on", "En ligne"], ["new", "Non assignés"], ["hurt", "Blessés"], ["lost", "Signal perdu"]].filter(([k]) => vit || k === "all" || k === "on" || k === "new").map(([k, l]) => `<button class="tab" data-fn="crewF" data-arg="${k}" aria-pressed="${ui.crewF === k}">${l} · ${people().filter(F[k]).length}</button>`).join("");
   const rows = list.map(p => `<tr data-person="${esc(p.id)}" class="${ui.person === p.id ? "sel" : ""}"><td><b style="font-weight:600">${esc(p.name)}</b>${!p.level ? ` <span class="pill amb">à affecter</span>` : ""}<div class="mu" style="font-size:12px">${esc([p.rank, p.job || p.role].filter(Boolean).join(" · ") || "—")}</div></td><td class="m">${p.level}</td><td>${esc(p.group || "—")}</td><td>${esc(p.team === "aucune" ? "—" : p.team)}</td>${vit ? `<td>${p.vitals ? `<span class="hp ${hpCls(p.vitals)}"><i style="width:${p.vitals.alive === false ? 0 : (p.vitals.hp / (p.vitals.maxHp || 20) * 100)}%"></i></span>` : "—"}</td><td>${vitalState(p)}</td><td style="font-size:12.5px">${esc(roomName(p.room))}</td>` : ""}<td>${p.online ? `<span class="st ok">En ligne</span>` : `<span class="st gone">Hors ligne</span>`}</td></tr>`).join("");
-  return `<div class="grid g-2">${panel("Registre du personnel", "CREW." + people().length, `<div class="tabs">${tabs}</div><div class="toolbar"><input type="search" id="q-crew" data-fn="q" data-arg="crew" placeholder="Rechercher un nom, un métier, un groupe" aria-label="Rechercher une personne"></div><div class="tbl"><table><thead><tr><th>Personne</th><th>Niv.</th><th>Groupe</th><th>Équipe</th>${vit ? "<th>Santé</th><th>État</th><th>Position</th>" : ""}<th>Liaison</th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="empty">Personne.</td></tr>`}</tbody></table></div><p class="note">Le mod demande son nom à chaque joueur à la première connexion. Il apparaît ici « à affecter » jusqu’à ce qu’un responsable lui donne son grade, son métier et son niveau.</p>`)}${personPanel(ui.person)}</div>`;
+  if (ui.crewView === "grades") return `<div class="tabs" style="margin-bottom:14px"><button class="b sm ghost" data-fn="crewView" data-arg="">Registre</button><button class="b sm solid" data-fn="crewView" data-arg="grades">Grades et uniformes</button></div><div class="grid g-2">${gradesPanel()}${panel("Uniformes", "UNI", `<div style="display:flex;flex-wrap:wrap;gap:14px">${Object.keys(MC.UNIFORM_LOOK).map(t => `<figure style="margin:0;text-align:center">${uniformSvg(t, null, "none", 70)}<figcaption class="mu" style="font-size:11.5px;max-width:90px">${esc(MC.UNIFORM_TEMPLATES[t])}</figcaption></figure>`).join("")}</div><div class="lbl">Ceinture selon l’armure</div><div style="display:flex;flex-wrap:wrap;gap:10px">${Object.entries(MC.ARMOR_TIERS).map(([k, [n]]) => `<figure style="margin:0;text-align:center">${uniformSvg("equipage", null, k, 46)}<figcaption class="mu" style="font-size:11px">${esc(n)}</figcaption></figure>`).join("")}</div>`)}</div>`;
+  return `<div class="tabs" style="margin-bottom:14px"><button class="b sm solid" data-fn="crewView" data-arg="">Registre</button><button class="b sm ghost" data-fn="crewView" data-arg="grades">Grades et uniformes</button></div><div class="grid g-2">${panel("Registre du personnel", "CREW." + people().length, `<div class="tabs">${tabs}</div><div class="toolbar"><input type="search" id="q-crew" data-fn="q" data-arg="crew" placeholder="Rechercher un nom, un métier, un groupe" aria-label="Rechercher une personne"></div><div class="tbl"><table><thead><tr><th>Personne</th><th>Niv.</th><th>Groupe</th><th>Équipe</th>${vit ? "<th>Santé</th><th>État</th><th>Position</th>" : ""}<th>Liaison</th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="empty">Personne.</td></tr>`}</tbody></table></div><p class="note">Le mod demande son nom à chaque joueur à la première connexion. Il apparaît ici « à affecter » jusqu’à ce qu’un responsable lui donne son grade, son métier et son niveau.</p>`)}${personPanel(ui.person)}</div>`;
 };
+/* ---------------------------- Uniformes (aperçu) ---------------------------- */
+function insigniaSvg(ins, x, y, s = 1) {
+  if (!ins || ins.kind === "none" || !ins.count) return "";
+  let g = "";
+  for (let i = 0; i < ins.count; i++) {
+    const yy = y + i * 4 * s;
+    if (ins.kind === "bar") g += `<rect x="${x}" y="${yy}" width="${8 * s}" height="${2 * s}" fill="${ins.color}"/>`;
+    else if (ins.kind === "chevron") g += `<path d="M${x} ${yy} l${4 * s} ${3 * s} l${4 * s} ${-3 * s}" fill="none" stroke="${ins.color}" stroke-width="${1.6 * s}"/>`;
+    else g += `<path d="M${x + 4 * s + i * 0} ${yy - 1 * s} l${1.2 * s} ${2.4 * s} l${2.6 * s} 0 l${-2.1 * s} ${1.6 * s} l${0.8 * s} ${2.6 * s} l${-2.5 * s} ${-1.6 * s} l${-2.5 * s} ${1.6 * s} l${0.8 * s} ${-2.6 * s} l${-2.1 * s} ${-1.6 * s} l${2.6 * s} 0z" fill="${ins.color}"/>`;
+  }
+  return g;
+}
+/* Silhouette de face : tête (skin), uniforme, insignes aux épaules, ceinture à la couleur de l'armure. */
+function uniformSvg(t, ins, tier = "iron", w = 120) {
+  const L = MC.UNIFORM_LOOK[t];
+  if (!L) return `<svg viewBox="0 0 64 128" style="width:${w}px"><rect x="20" y="4" width="24" height="24" fill="#c99a7a"/><rect x="18" y="30" width="28" height="40" fill="#556" opacity=".4"/><text x="32" y="110" font-size="8" text-anchor="middle" fill="var(--mu)">civil</text></svg>`;
+  const belt = (MC.ARMOR_TIERS[tier] || [])[1] || L.belt;
+  const arm = (x) => L.sleeves === "short" ? `<rect x="${x}" y="30" width="10" height="16" fill="${L.main}"/><rect x="${x}" y="46" width="10" height="20" fill="#c99a7a"/>` : `<rect x="${x}" y="30" width="10" height="36" fill="${L.main}"/><rect x="${x}" y="62" width="10" height="4" fill="${L.trim}"/>`;
+  return `<svg viewBox="0 0 64 128" style="width:${w}px;height:auto" role="img" aria-label="Uniforme ${esc(MC.UNIFORM_TEMPLATES[t] || t)}">
+<rect x="20" y="4" width="24" height="24" fill="#c99a7a"/><rect x="20" y="4" width="24" height="7" fill="#5a3a26"/><rect x="25" y="16" width="3" height="3" fill="#24323c"/><rect x="36" y="16" width="3" height="3" fill="#24323c"/>
+${arm(8)}${arm(46)}
+<rect x="18" y="30" width="28" height="40" fill="${L.main}"/><rect x="18" y="30" width="28" height="3" fill="${L.trim}"/><rect x="29" y="30" width="6" height="6" fill="${L.accent}"/>
+${t === "medecin" ? `<rect x="22" y="40" width="6" height="2" fill="${L.accent}"/><rect x="24" y="38" width="2" height="6" fill="${L.accent}"/>` : ""}${t === "ingenieur" ? `<rect x="18" y="52" width="28" height="3" fill="${L.trim}"/>` : ""}${t === "armee" || t === "armee_officier" ? `<path d="M18 30 L46 66 M46 30 L18 66" stroke="${L.trim}" stroke-width="3"/>` : ""}${t === "pilote" ? `<path d="M22 30 V66 M42 30 V66" stroke="${L.accent}" stroke-width="2.5"/>` : ""}${t === "scientifique" ? `<rect x="18" y="66" width="28" height="22" fill="${L.main}"/>` : ""}
+<rect x="18" y="66" width="28" height="4" fill="${belt}"/><rect x="30" y="66" width="4" height="4" fill="${belt === L.belt ? L.trim : "#fff"}" opacity=".85"/>
+<rect x="18" y="70" width="14" height="38" fill="${L.pants}"/><rect x="32" y="70" width="14" height="38" fill="${L.pants}"/><rect x="31.5" y="70" width="1" height="38" fill="#000" opacity=".25"/>
+<rect x="18" y="108" width="14" height="10" fill="${L.boots}"/><rect x="32" y="108" width="14" height="10" fill="${L.boots}"/>
+${insigniaSvg(ins, 9, 33, .9)}${insigniaSvg(ins, 47, 33, .9)}</svg>`;
+}
+function gradesPanel() {
+  const list = MC.gradesOf ? MC.gradesOf({ grades: V.grades }) : (V.grades || []);
+  const ed = perm("grades.edit");
+  const groups = Object.entries(MC.GRADE_CATEGORIES).map(([cat, label]) => {
+    const g = list.filter(x => x.category === cat);
+    if (!g.length) return "";
+    return `<div class="lbl">${esc(label)}</div>` + g.map(x => `<div class="vrow"><span style="display:flex;gap:12px;align-items:center;min-width:0"><svg viewBox="0 0 10 18" style="width:14px;height:24px;flex:none;background:var(--bg2)">${insigniaSvg(x.insignia, 1, 2, 1)}</svg><span style="min-width:0"><b style="font-weight:600">${esc(x.name)}</b> <span class="m dim" style="font-size:11.5px">${esc(x.abbr)} · niv. ${x.level}</span><div class="mu" style="font-size:12px">${esc(MC.UNIFORM_TEMPLATES[x.template] || x.template)} · ${people().filter(p => p.grade === x.id).length} pers.</div></span></span>${ed ? `<span class="btns" style="flex-wrap:nowrap">${btn("▲", { type: "grade.move", id: x.id, dir: -1 }, { cls: "sm ghost", title: "Monter" })}${btn("▼", { type: "grade.move", id: x.id, dir: 1 }, { cls: "sm ghost", title: "Descendre" })}${btn("Modifier", null, { fn: "editGrade", arg: x.id, cls: "sm" })}</span>` : ""}</div>`).join("");
+  }).join("");
+  return panel("Grades et uniformes", "GRD." + list.length, groups + (ed ? `<div class="btns" style="margin-top:12px">${btn("Nouveau grade", null, { fn: "editGrade", arg: "", cls: "sm solid" })}</div>` : "") + `<p class="note">L’uniforme se dessine en jeu par-dessus le skin et à la place des armures. Seule la ceinture change de couleur selon l’armure portée (cuir, mailles, fer, or, diamant, netherite).</p>`);
+}
+
 function personPanel(pid) {
   const p = V.people[pid];
   if (!p || p.admin) return panel("Fiche", "—", `<p class="empty">Sélectionnez une personne.</p>`);
   const v = p.vitals, vit = perm("crew.vitals") || p.id === V.me.id;
   let b = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="big" style="font-size:22px">${esc(p.name)}</span><span class="lvl">${p.level}</span></div>`;
+  const pg = (V.grades || []).find(g => g.id === p.grade), outfit = p.outfit || (pg && pg.template);
+  if (outfit) b += `<div style="float:right;margin:0 0 8px 12px">${uniformSvg(outfit, pg && pg.insignia, "none", 64)}</div>`;
   b += kv("Grade", esc(p.rank || "—")) + kv("Métier", esc(p.job || "—")) + kv("Rôle à bord", esc(p.role || "—")) + kv("Groupe", esc(p.group || "—")) + kv("Équipe", esc(p.team || "—")) + ((p.tags || []).length ? kv("Étiquettes", p.tags.map(t => "#" + esc(t)).join(" ")) : "");
   if (vit && v) {
     const pct = v.alive === false ? 0 : v.hp / (v.maxHp || 20) * 100;
@@ -2097,7 +2789,92 @@ function personPanel(pid) {
 }
 
 /* ---------------------------- Procédures ---------------------------- */
+/* ---------------------------------------------------------------------------
+   Ouverture de session : l'identifiant Alterra et le mot de passe s'écrivent,
+   court chargement, puis entrée dans le système. Clic ou touche pour passer.
+   --------------------------------------------------------------------------- */
+const LOGIN = { done: false };
+function mailOf(name) {
+  const base = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (base || "commandement") + ".meridian@alterra.com";
+}
+function loginAnim() {
+  LOGIN.done = true;
+  const me = V.people[V.me.id], hack = !!V.me.intrus;
+  const name = V.me.admin && !me ? "Commandement" : (me ? me.name : V.me.name);
+  const mail = hack ? "unknown@" + Math.random().toString(16).slice(2, 8) + ".null" : mailOf(name);
+  const ov = document.createElement("div");
+  ov.className = "login-ov";
+  const BR = brandOf(V.branding);
+  ov.innerHTML = `<div class="login-box"><div style="width:64px;height:64px;margin:0 auto" aria-hidden="true">${alterraMark(64)}</div>
+<div class="login-brand">ALTERRA</div><div class="login-sub">${esc(BR.mission.toUpperCase())} · ${esc(BR.code)} · SYSTÈME DE BORD</div>
+<label class="login-l">Identifiant</label><div class="login-f m" id="lg-mail"></div>
+<label class="login-l">Mot de passe</label><div class="login-f m" id="lg-pw"></div>
+<div class="login-bar"><i id="lg-bar"></i></div><div class="login-st m" id="lg-st">&nbsp;</div></div>`;
+  document.body.appendChild(ov);
+  let stop = false;
+  const end = () => { if (stop) return; stop = true; ov.classList.add("out"); setTimeout(() => ov.remove(), 450); };
+  ov.addEventListener("click", end);
+  document.addEventListener("keydown", end, { once: true });
+  const $ = (id) => ov.querySelector("#" + id), wait = (ms) => new Promise(r => setTimeout(r, ms));
+  (async () => {
+    await wait(250);
+    $("lg-mail").classList.add("on");
+    for (let i = 1; i <= mail.length && !stop; i++) { $("lg-mail").textContent = mail.slice(0, i); await wait(28 + Math.random() * 30); }
+    await wait(160);
+    $("lg-mail").classList.remove("on"); $("lg-pw").classList.add("on");
+    const pw = 10 + (name.length % 5);
+    for (let i = 1; i <= pw && !stop; i++) { $("lg-pw").textContent = "•".repeat(i); await wait(55 + Math.random() * 40); }
+    await wait(150);
+    $("lg-pw").classList.remove("on");
+    const steps = hack ? ["Contournement du pare-feu…", "Injection de jeton…", "ACCÈS NON AUTORISÉ · SESSION FANTÔME"] : ["Vérification de la puce…", "Chargement du profil…", "Accès accordé · Bienvenue, " + name];
+    for (let k = 0; k < steps.length && !stop; k++) {
+      $("lg-st").textContent = steps[k];
+      $("lg-st").className = "login-st m" + (k === steps.length - 1 ? (hack ? " red" : " okc") : "");
+      $("lg-bar").style.width = Math.round(100 * (k + 1) / steps.length) + "%";
+      await wait(k === steps.length - 1 ? 650 : 380);
+    }
+    end();
+  })();
+}
+
+/* Manuel de bord : mise en forme légère (titres, puces, étapes, dangers, notes, schémas). */
+function manualHtml(t) {
+  let out = "", list = null;
+  const close = () => { if (list) { out += `</${list}>`; list = null; } };
+  for (const raw of t.split("\n")) {
+    const l = raw.trim();
+    const sch = l.match(/^\[\[schema:([\w-]+)\]\]$/);
+    if (sch) { close(); out += `<div class="svgw schema" style="margin:12px 0;overflow-x:auto">${DIAGRAMS[sch[1]] || ""}</div>`; continue; }
+    if (/^- /.test(l)) { if (list !== "ul") { close(); out += "<ul class=\"man\">"; list = "ul"; } out += `<li>${esc(l.slice(2))}</li>`; continue; }
+    if (/^\d+\. /.test(l)) { if (list !== "ol") { close(); out += "<ol class=\"man\">"; list = "ol"; } out += `<li>${esc(l.replace(/^\d+\. /, ""))}</li>`; continue; }
+    close();
+    if (!l) continue;
+    if (l.startsWith("# ")) out += `<div class="lbl">${esc(l.slice(2))}</div>`;
+    else if (l.startsWith("! ")) out += `<p class="man-warn">${esc(l.slice(2))}</p>`;
+    else if (l.startsWith("> ")) out += `<p class="note">${esc(l.slice(2))}</p>`;
+    else out += `<p>${esc(l)}</p>`;
+  }
+  close();
+  return out;
+}
+function manualPanel() {
+  const me = V.people[V.me.id];
+  if (!ui.manRole) ui.manRole = manualRoleOf(me);
+  const list = MANUAL[ui.manRole] || [];
+  if (ui.manArt == null || !list[ui.manArt]) ui.manArt = 0;
+  const art = list[ui.manArt];
+  const roles = MANUAL_ROLES.map(([k, l]) => `<button class="b sm ${k === ui.manRole ? "solid" : "ghost"}" data-fn="manRole" data-arg="${k}">${esc(l)}</button>`).join("");
+  const toc = list.map(([t], i) => `<div class="vrow" data-fn="manArt" data-arg="${i}" style="cursor:pointer;${i === ui.manArt ? "background:rgba(98,230,242,.08)" : ""}"><span>${esc(t)}</span><span class="m dim">${String(i + 1).padStart(2, "0")}</span></div>`).join("");
+  return `<div class="btns" style="margin-bottom:14px">${roles}</div><div class="grid g-map" style="grid-template-columns:minmax(220px,300px) minmax(0,1fr)">${panel("Sommaire", "MAN." + ui.manRole.toUpperCase().slice(0, 4), toc)}${art ? panel(art[0], "MAN." + String(ui.manArt + 1).padStart(2, "0"), `<div class="man-body">${manualHtml(art[1])}</div>`) : ""}</div>`;
+}
+
 PAGE.procs = () => {
+  const tabs = `<div class="tabs" style="margin-bottom:14px">${[["urgence", "Procédures d’urgence"], ["manuel", "Manuel de bord"]].map(([k, l]) => `<button class="b sm ${(ui.procTab || "urgence") === k ? "solid" : "ghost"}" data-fn="procTab" data-arg="${k}">${l}</button>`).join("")}</div>`;
+  if (ui.procTab === "manuel") return tabs + manualPanel();
+  return tabs + procsUrgence();
+};
+function procsUrgence() {
   const active = V.procs.filter(p => p.status === "wait" || p.status === "countdown");
   const secs = Object.values(V.sections);
   const act1 = active.map(p => {
@@ -2111,7 +2888,7 @@ ${DEMO && p.status === "wait" ? `<p class="note">Démo : changez de puce en haut
   }).join("");
   const rows = secs.map(s => { const rooms = Object.values(V.rooms).filter(r => r.section === s.id), occ = people().filter(x => rooms.some(r => r.id === x.room)), busy = active.some(p => p.target === s.id); return `<tr data-fn="sec" data-arg="${esc(s.id)}"><td>${esc(s.name)}</td><td>${s.state === "ejected" ? `<span class="st gone">Éjectée</span>` : `<span class="st ok">Arrimée</span>`}</td><td class="m">${rooms.length}</td><td class="m ${occ.length ? "amb" : ""}">${perm("crew.vitals") ? occ.length : "—"}</td><td>${s.ejectable && s.state !== "ejected" ? btn("Code 1", { type: "proc.eject.start", section: s.id }, { perm: "proc.eject", cls: "red sm", disabled: busy, confirm: `Lancer l’éjection de ${s.name} ? Un second officier devra confirmer, puis un compte à rebours de ${MC.EJECT_COUNTDOWN_MS / 1000} s démarrera.` }) : `<span class="dim">${s.ejectable ? "—" : "non éjectable"}</span>`}</td></tr>`; }).join("");
   return `<div class="grid g-2"><div class="stack">${panel("Sections du vaisseau", "SEC." + secs.length, `<div class="tbl"><table><thead><tr><th>Section</th><th>État</th><th>Pièces</th><th>Présents</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="empty">Aucune section définie.</td></tr>`}</tbody></table></div><p class="note">Éjecter une section exige deux codes de deux personnes différentes de niveau ${need("proc.eject")} ou plus, puis un compte à rebours de ${MC.EJECT_COUNTDOWN_MS / 1000} s annulable.</p>`)}</div><div class="stack">${act1 || panel("Procédure en cours", "PRC", `<p class="empty">Aucune procédure en cours.</p>`)}</div></div>`;
-};
+}
 
 /* ---------------------------- Journal ---------------------------- */
 PAGE.log = () => {
@@ -2157,6 +2934,8 @@ PAGE.admin = () => {
 ${panel("Avaries actives", "FLT." + active.length, fl)}
 ${panel("Comportement de l’ordinateur", "AI.CORE", `<div class="vrow"><span>Refuser les commandes de l’équipage</span><button class="sw" role="switch" aria-checked="${V.computer.refuse}" data-fn="aiToggle" aria-label="Refuser les commandes"></button></div><label class="f" style="margin-top:10px">Message affiché aux joueurs<input type="text" id="ai-msg" maxlength="140" placeholder="ORDINATEUR : la survie de la mission prime."></label><p class="note">Toutes les actions non admin sont alors rejetées avec ce message.</p>`)}
 ${panel("Réserves", "STK.SET", stocks)}
+${(() => { const sec = V.security || { firewall: "2", hackLevel: 4, intrusions: [] }; const st = { running: "en cours", done: "aboutie", aborted: "interrompue" };
+  return panel("Sécurité informatique", "SEC.FW", `<div class="f2"><label class="f">Pare-feu<select id="fw-l">${Object.entries(MC.FIREWALL).map(([k, f]) => `<option value="${k}"${sec.firewall === k ? " selected" : ""}>${esc(f[0])} · ${Math.round(f[1] / 60)} min · repéré ${Math.round(f[2] * 100)} %</option>`).join("")}</select></label><label class="f">Niveau d’une session piratée<input type="number" id="fw-h" min="1" max="6" value="${sec.hackLevel || 4}"></label></div><div class="btns">${btn("Enregistrer", null, { fn: "saveSecurity", cls: "sm" })}</div><p class="note">Un boîtier d’intrusion branché sur un ordinateur de bord travaille le temps indiqué ; l’intrus doit rester à côté. S’il est repéré, l’équipage voit l’alerte « Intrusion informatique ». Au bout : un fragment de données (livre) et une console « ACCÈS INCONNU » pendant 15 min.</p><div class="lbl">Dernières intrusions</div>${(sec.intrusions || []).slice(0, 12).map(r => `<div class="vrow"><span>${esc(r.name || "?")} <span class="dim m" style="font-size:11.5px">${esc(r.id)}${r.room && V.rooms[r.room] ? " · " + esc(V.rooms[r.room].name) : ""}</span></span><span class="m" style="font-size:12px">${fmtT(r.start)} · <span class="${r.status === "done" ? "red" : r.status === "running" ? "amb" : "dim"}">${st[r.status] || r.status}</span>${r.detected ? ` · <span class="okc">repérée</span>` : ` · <span class="dim">non repérée</span>`}</span></div>`).join("") || `<p class="empty">Aucune intrusion.</p>`}`); })()}
 ${!DEMO ? panel("Accès à la console", "ADM.URL", `<p style="margin-top:0">Adresse fixe du poste admin : <span class="m cy">${esc(location.origin + location.pathname)}?connexion</span></p><p class="note">Connectez-vous une fois avec la clé admin en cochant « rester connecté » : sur cet appareil, la console s’ouvre ensuite directement en admin pendant 30 jours.</p><div class="btns" style="margin-top:10px">${btn("Se déconnecter de cet appareil", null, { fn: "logout", cls: "ghost sm" })}</div>`) : ""}
 ${!DEMO ? panel("Tests sans mod", "SIM", `<div class="vrow"><span>Simuler l’environnement<div class="mu" style="font-size:12px">Pression, oxygène et constantes évoluent comme si le mod tournait. S’arrête tout seul dès que le mod se connecte.</div></span><button class="sw" role="switch" aria-checked="${!!V.ship.sim}" data-cmd="${enc({ type: "admin.sim", on: !V.ship.sim })}" aria-label="Simulateur"></button></div><div class="btns" style="margin-top:10px">${btn("Recharger le vaisseau de démo", { type: "admin.resetDemo" }, { cls: "red sm", confirm: "Remplacer tout l’état actuel par le vaisseau de démonstration ? Le registre et les règles seront perdus." })}</div><p class="note">La bande « Test solo » en haut de page permet d’incarner n’importe quel membre d’équipage.</p>`) : ""}
 ${DEMO ? panel("Commandes envoyées au mod", "MOD.OUT", `<div class="feed">${MODFEED.map(x => `<div>${fmtT(x.t)} ${esc(JSON.stringify(x.c))}</div>`).join("") || `<div>Aucune commande pour l’instant. Manœuvrez une porte ou une vanne.</div>`}</div><p class="note">En production, ces messages partent par WebSocket vers le serveur Minecraft.</p>`) : ""}
@@ -2207,6 +2986,37 @@ function readClauses() {
 const cloneRule = (r) => ({ any: r && r.any ? JSON.parse(JSON.stringify(r.any)) : [] });
 
 const FN = {
+  crewView(el) { ui.crewView = el.dataset.arg; render(); },
+  editGrade(el) {
+    const g = (V.grades || []).find(x => x.id === el.dataset.arg);
+    const ins = g ? g.insignia : { kind: "bar", count: 1, color: "#c9d3d8" };
+    const prev = () => { const box = document.getElementById("gr-prev"); if (box) box.innerHTML = uniformSvg(val("gr-t"), { kind: val("gr-k"), count: +val("gr-n"), color: val("gr-c") }, val("gr-tier"), 110); };
+    openModal(() => `<h3>${g ? "Modifier le grade" : "Nouveau grade"}</h3><div style="display:flex;gap:18px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><div class="f2"><label class="f">Nom<input type="text" id="gr-n0" maxlength="40" value="${esc(g ? g.name : "")}" placeholder="Lieutenant"></label><label class="f">Abréviation<input type="text" id="gr-a" maxlength="6" value="${esc(g ? g.abbr : "")}" placeholder="LT"></label><label class="f">Catégorie<select id="gr-cat">${Object.entries(MC.GRADE_CATEGORIES).map(([k, l]) => `<option value="${k}"${g && g.category === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label><label class="f">Niveau habituel<input type="number" id="gr-lv" min="0" max="7" value="${g ? g.level : 1}"></label><label class="f">Uniforme<select id="gr-t" data-prev>${Object.entries(MC.UNIFORM_TEMPLATES).map(([k, l]) => `<option value="${k}"${g && g.template === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label><label class="f">Insigne<select id="gr-k" data-prev>${Object.entries(MC.INSIGNIA_KINDS).map(([k, l]) => `<option value="${k}"${ins.kind === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label><label class="f">Nombre<input type="number" id="gr-n" min="0" max="4" value="${ins.count}" data-prev></label><label class="f">Couleur de l’insigne<input type="color" id="gr-c" value="${esc(ins.color)}" data-prev></label></div></div><div style="text-align:center"><div id="gr-prev"></div><label class="f" style="margin-top:8px">Armure (aperçu)<select id="gr-tier" data-prev>${Object.entries(MC.ARMOR_TIERS).map(([k, [n]]) => `<option value="${k}"${k === "iron" ? " selected" : ""}>${esc(n)}</option>`).join("")}</select></label></div></div><p class="note">Le niveau habituel est indicatif : le niveau d’accès de chacun se règle dans « Affecter ».</p>${g ? `<div class="btns">${btn("Supprimer ce grade", null, { fn: "deleteGrade", arg: g.id, cls: "red sm" })}</div>` : ""}${mfoot()}`,
+      () => { act({ type: "grade.save", grade: { id: g ? g.id : undefined, name: val("gr-n0"), abbr: val("gr-a"), category: val("gr-cat"), level: +val("gr-lv"), template: val("gr-t"), insignia: { kind: val("gr-k"), count: +val("gr-n"), color: val("gr-c") } } }, "Grade enregistré."); return true; });
+    setTimeout(() => { prev(); document.querySelectorAll("[data-prev]").forEach(e => e.addEventListener("input", prev)); }, 0);
+  },
+  deleteGrade(el) { const id = el.dataset.arg; confirmModal("Supprimer ce grade ? Les personnes qui l’ont le perdent.", () => act({ type: "grade.delete", id }, "Grade supprimé.")); },
+  saveBrand() { act({ type: "brand.save", mission: val("br-mission"), code: val("br-code"), motto: val("br-motto"), tagline: val("br-tag"), crew: val("br-crew") }, "Identité visuelle enregistrée."); },
+  async brandExport(el) {
+    const [k, fmt] = el.dataset.arg.split("|"), B = brandOf(V.branding);
+    const draw = k.startsWith("svc:") ? () => servicePatch(k.slice(4), { brand: B }) : (BRAND_BOARDS.find(x => x[0] === k) || [])[3];
+    if (!draw) return;
+    const fonts = await brandFontCss();
+    let svg = draw(B).replace(/<svg([^>]*)>/, (m, a) => `<svg${a}>${fonts ? `<style>${fonts}</style>` : ""}`);
+    const slug = (B.code + "-" + k.replace("svc:", "ecusson-")).toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    if (fmt === "svg") return brandSave(new Blob([svg], { type: "image/svg+xml" }), slug + ".svg");
+    const vb = (svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/) || [0, 400, 400]).slice(1).map(Number);
+    const scale = Math.max(1, 2400 / Math.max(vb[0], vb[1]));
+    svg = svg.replace(/<svg /, `<svg width="${vb[0] * scale}" height="${vb[1] * scale}" `).replace(/ width="\d+" height="\d+"( role)/, "$1");
+    const img = new Image();
+    img.onload = () => { const c = document.createElement("canvas"); c.width = vb[0] * scale; c.height = vb[1] * scale; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => b && brandSave(b, slug + ".png"), "image/png"); };
+    img.onerror = () => toast("Export PNG impossible dans ce navigateur : prenez le SVG.");
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  },
+  saveSecurity() { act({ type: "admin.security", firewall: val("fw-l"), hackLevel: +val("fw-h") }, "Sécurité enregistrée."); },
+  procTab(el) { ui.procTab = el.dataset.arg; render(); },
+  manRole(el) { ui.manRole = el.dataset.arg; ui.manArt = 0; render(); },
+  manArt(el) { ui.manArt = +el.dataset.arg; render(); window.scrollTo({ top: 0, behavior: "smooth" }); },
   logout() { ls.del("meridian.admin"); try { sessionStorage.removeItem("meridian.t"); } catch {} location.href = location.pathname + "?connexion"; },
   demoWho(el) { DEMO.actor = el.value; update(DEMO.view(), Date.now()); },
   soloAs(el) { T.as(el.value); },
@@ -2255,8 +3065,8 @@ const FN = {
   },
   assign(el) {
     const p = V.people[el.dataset.arg], max = V.me.admin ? 7 : Math.max(0, V.me.level - 1);
-    openModal(() => `<h3>Affecter ${esc(p.name)}</h3><div class="f2"><label class="f">Nom à bord<input type="text" id="as-name" maxlength="32" value="${esc(p.name)}"></label><label class="f">Niveau d’accès<select id="as-lv">${MC.LEVELS.filter(([l]) => l <= max || l === p.level).map(([l, n]) => `<option value="${l}"${p.level === l ? " selected" : ""}>${l} · ${esc(n)}</option>`).join("")}</select></label><label class="f">Grade<input type="text" id="as-rank" maxlength="40" value="${esc(p.rank)}" placeholder="Lieutenant"></label><label class="f">Métier<input type="text" id="as-job" maxlength="40" value="${esc(p.job)}" placeholder="Technicien coque"></label><label class="f">Rôle à bord<input type="text" id="as-role" maxlength="40" value="${esc(p.role)}"></label><label class="f">Groupe<select id="as-grp"><option value="">—</option>${MC.GROUPS.map(g => `<option${p.group === g ? " selected" : ""}>${g}</option>`).join("")}</select></label><label class="f">Équipe<select id="as-team">${MC.TEAMS.map(t => `<option${p.team === t ? " selected" : ""}>${t}</option>`).join("")}</select></label><label class="f">Étiquettes<input type="text" id="as-tags" value="${esc((p.tags || []).join(", "))}" placeholder="armurerie, eva"></label></div><p class="note">Vous ne pouvez pas donner un niveau égal ou supérieur au vôtre.</p>${mfoot()}`,
-      () => { act({ type: "crew.assign", person: p.id, fields: { name: val("as-name"), level: +val("as-lv"), rank: val("as-rank"), job: val("as-job"), role: val("as-role"), group: val("as-grp"), team: val("as-team"), tags: val("as-tags").split(",").map(s => s.trim()).filter(Boolean) } }, "Affectation enregistrée."); return true; });
+    openModal(() => `<h3>Affecter ${esc(p.name)}</h3><div class="f2"><label class="f">Nom à bord<input type="text" id="as-name" maxlength="32" value="${esc(p.name)}"></label><label class="f">Niveau d’accès<select id="as-lv">${MC.LEVELS.filter(([l]) => l <= max || l === p.level).map(([l, n]) => `<option value="${l}"${p.level === l ? " selected" : ""}>${l} · ${esc(n)}</option>`).join("")}</select></label><label class="f">Grade<select id="as-grade"><option value="">— aucun —</option>${Object.entries(MC.GRADE_CATEGORIES).map(([c, l]) => `<optgroup label="${esc(l)}">${(V.grades || []).filter(g => g.category === c).sort((a, b) => a.order - b.order).map(g => `<option value="${esc(g.id)}"${p.grade === g.id ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select></label><label class="f">Tenue<select id="as-outfit"><option value="">Selon le grade</option>${Object.entries(MC.UNIFORM_TEMPLATES).map(([k, l]) => `<option value="${k}"${p.outfit === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label><label class="f">Métier<input type="text" id="as-job" maxlength="40" value="${esc(p.job)}" placeholder="Technicien coque"></label><label class="f">Rôle à bord<input type="text" id="as-role" maxlength="40" value="${esc(p.role)}"></label><label class="f">Groupe<select id="as-grp"><option value="">—</option>${MC.GROUPS.map(g => `<option${p.group === g ? " selected" : ""}>${g}</option>`).join("")}</select></label><label class="f">Équipe<select id="as-team">${MC.TEAMS.map(t => `<option${p.team === t ? " selected" : ""}>${t}</option>`).join("")}</select></label><label class="f">Étiquettes<input type="text" id="as-tags" value="${esc((p.tags || []).join(", "))}" placeholder="armurerie, eva"></label></div><p class="note">Vous ne pouvez pas donner un niveau égal ou supérieur au vôtre.</p>${mfoot()}`,
+      () => { act({ type: "crew.assign", person: p.id, fields: { name: val("as-name"), level: +val("as-lv"), grade: val("as-grade"), outfit: val("as-outfit"), job: val("as-job"), role: val("as-role"), group: val("as-grp"), team: val("as-team"), tags: val("as-tags").split(",").map(s => s.trim()).filter(Boolean) } }, "Affectation enregistrée."); return true; });
   },
   editSection(el) {
     const s = V.sections[el.dataset.arg];
@@ -2600,6 +3410,36 @@ const scrEff = (id) => MC.screenEffective(V, id);
 const scrMeta = (id) => (V.screens.meta || {})[id] || {};
 const scrDesc = (c) => c.mode === "page" ? `${MC.PAGES[c.page] || c.page}${c.uuid ? " · recopie" : c.level ? " · niv. " + c.level : ""}` : c.mode === "text" ? "« " + String(c.text || "").split("\n")[0].slice(0, 40) + " »" : c.mode === "url" ? (c.url || "—") : "État du vaisseau";
 const SRC = { relay: ["Relais en jeu", "amb"], screen: ["Réglage de l’écran", "cy"], group: ["Groupe", "ok"], default: ["Par défaut", "dim"] };
+/* ===================== Identité visuelle (Alterra, mission) ===================== */
+PAGE.branding = () => {
+  if (!V.me.admin) return panel("Identité visuelle", "BRD", `<p class="empty">Réservé au poste admin.</p>`);
+  const B = brandOf(V.branding);
+  const f = (id, label, v, hint) => `<label class="f">${label}<input id="${id}" value="${esc(v)}"${hint ? ` placeholder="${esc(hint)}"` : ""}></label>`;
+  const editor = panel("Réglages de la mission", "BRD.SET", `<div class="f2">${f("br-mission", "Nom de la mission", B.mission)}${f("br-code", "Indicatif", B.code)}</div><div class="f2">${f("br-motto", "Devise (écusson, bannière)", B.motto)}${f("br-tag", "Signature Alterra", B.tagline)}</div><label class="f">Équipage de commandement sur l’écusson<input id="br-crew" value="${esc(B.crew)}" placeholder="Noms séparés par des virgules (vide : « ${esc(B.code)} · ALTERRA »)"></label><div class="btns">${btn("Enregistrer", null, { fn: "saveBrand", cls: "sm" })}</div><p class="note">Ces réglages redessinent toutes les planches et l’écran d’ouverture de session. Exportez en SVG pour retoucher dans Inkscape ou Illustrator, en PNG pour un écran, une bannière ou une texture.</p>`);
+  const pal = panel("Palette et typographie", "BRD.PAL", `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px">${[["night", "Nuit", "fonds"], ["navy", "Marine", "écussons"], ["horizon", "Bleu horizon", "Alterra"], ["sky", "Ciel", "méridiens"], ["ivory", "Ivoire", "textes, bordures"], ["ochre", "Ocre", "la terre"], ["sand", "Sable", "sous-titres"], ["signal", "Signal", "l’étoile d’arrivée"]].map(([k, n, u]) => `<div><div style="height:46px;border-radius:6px;background:${BRAND_PAL[k]};border:1px solid var(--ln)"></div><div style="font-size:12.5px;margin-top:5px"><b style="font-weight:600">${n}</b> <span class="m dim" style="font-size:11px">${BRAND_PAL[k]}</span></div><div class="mu" style="font-size:11.5px">${u}</div></div>`).join("")}</div><div class="lbl">Typographie</div><p style="margin:0;font-family:'Chakra Petch',sans-serif;font-size:26px;font-weight:600;letter-spacing:.2em">ALTERRA · ${esc(B.mission.toUpperCase())}</p><p class="mu" style="font-size:12.5px">Chakra Petch (titres, capitales espacées) et IBM Plex Mono (indicatifs, chiffres). Le symbole : un globe dont la moitié basse est la terre qu’on quitte, traversé d’un méridien, et l’étoile d’arrivée qui se lève à l’horizon.</p>`);
+  const boards = BRAND_BOARDS.map(([k, title, use, draw]) => `<section class="pn"><div class="pi"><div class="ph"><h2>${esc(title)}</h2><span class="code">${esc(k.toUpperCase())}</span></div><div class="brand-board${k === "banner" ? " wide" : ""}">${draw(B)}</div><p class="mu" style="font-size:12.5px;margin:8px 0 0">${esc(use)}</p><div class="btns">${btn("SVG", null, { fn: "brandExport", arg: k + "|svg", cls: "ghost sm" })}${btn("PNG", null, { fn: "brandExport", arg: k + "|png", cls: "ghost sm" })}</div></div></section>`).join("");
+  const services = panel("Écussons de service (épaule droite)", "BRD.SRV", `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:14px">${BRAND_SERVICES.map(([k, n]) => `<figure style="margin:0;text-align:center"><div style="max-width:96px;margin:0 auto">${servicePatch(k, { brand: B })}</div><figcaption class="mu" style="font-size:11.5px">${esc(n)}</figcaption><div class="btns" style="justify-content:center;margin-top:4px">${btn("SVG", null, { fn: "brandExport", arg: "svc:" + k + "|svg", cls: "ghost sm" })}${btn("PNG", null, { fn: "brandExport", arg: "svc:" + k + "|png", cls: "ghost sm" })}</div></figure>`).join("")}</div><p class="note">La couleur de bandeau reprend celle du service ; l’indicatif de mission est brodé en tête.</p>`);
+  return `<div class="grid g-2"><div class="stack">${editor}${pal}</div><div class="stack">${boards.split("</section>").slice(0, 1).join("") + "</section>"}${services}</div></div><div class="grid g-2" style="margin-top:14px">${boards.split("</section>").slice(1, -1).map(x => x + "</section>").join("")}</div>`;
+};
+let BRAND_FONTS = null;
+async function brandFontCss() {
+  if (BRAND_FONTS !== null) return BRAND_FONTS;
+  try {
+    const css = await (await fetch("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap")).text();
+    let out = "";
+    for (const blk of css.split("@font-face").slice(1)) {
+      if (!/unicode-range:[^;]*U\+0000-00FF/.test(blk)) continue;
+      const url = (blk.match(/url\((https:[^)]+)\)/) || [])[1]; if (!url) continue;
+      const buf = new Uint8Array(await (await fetch(url)).arrayBuffer());
+      let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      out += "@font-face" + blk.replace(/url\([^)]+\)/, `url(data:font/woff2;base64,${btoa(bin)})`).replace(/}\s*$/, "}");
+    }
+    BRAND_FONTS = out;
+  } catch { BRAND_FONTS = ""; }
+  return BRAND_FONTS;
+}
+function brandSave(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); }
+
 PAGE.screens = () => {
   if (!V.screens) return panel("Écrans", "SCR", `<p class="empty">Réservé au poste admin.</p>`);
   const sc = V.screens, list = Object.values(sc.list || {}).sort((a, b) => a.id.localeCompare(b.id));
@@ -2953,12 +3793,22 @@ function groupPanel() {
   b += btn("Verrouiller les portes", G("lock"), { perm: "deck.act", cls: "amb" }) + btn("Déverrouiller", G("unlock"), { perm: "deck.act", cls: "ghost" });
   b += `</div><div class="btns" style="margin-top:8px">`;
   b += alarm ? btn("Couper l’alarme", G("alarmOff"), { perm: "deck.act", cls: "ghost" }) : btn("Alarme", G("alarm"), { perm: "deck.act", cls: "amb" });
-  b += btn(V.me.admin ? "Pressuriser (admin)" : "Accélérer l’O₂", G("pressurize"), { perm: "deck.act" }) + btn("Vider l’air", G("vent"), { perm: "deck.act", cls: "red", confirm: `Vider l’air de ${rooms.length} pièce(s) de ${sec ? sec.name : deck.name} ?${occ && occ.length ? " " + occ.length + " personne(s) présente(s)." : ""}` });
+  b += btn("Pressuriser", G("pressurize"), { perm: "deck.act" }) + btn("Vider l’air", G("vent"), { perm: "deck.act", cls: "red", confirm: `Vider l’air de ${rooms.length} pièce(s) de ${sec ? sec.name : deck.name} ?${occ && occ.length ? " " + occ.length + " personne(s) présente(s)." : ""}` });
   if (sec && sec.ejectable) b += btn("Éjecter (code 1)", { type: "proc.eject.start", section: sec.id }, { perm: "proc.eject", cls: "red", confirm: `Lancer l’éjection de ${sec.name} ? Un second officier devra confirmer.` });
   b += `</div>`;
   b += `<div class="lbl">Pièces</div>` + (rooms.length ? rooms.slice(0, 40).map(r => `<div class="vrow" data-room="${esc(r.id)}" style="cursor:pointer"><span>${esc(r.name)}</span><span class="st ${rs(r)}">${ST[rs(r)]}</span></div>`).join("") : `<p class="empty">Aucune pièce connue ici.${sec ? " Nommez-en avec /rebirth ClRoom dans l’anneau." : ""}</p>`);
   return panel(sec ? sec.name : deck.name, (sec ? sec.id : deck.id).toUpperCase(), b);
 }
+
+/* Écran des alertes de la passerelle : lisible de loin, pensé pour un écran en jeu. */
+PAGE.alerts = () => {
+  const alerts = V.alerts.filter(a => !a.ack), crit = alerts.filter(a => a.lvl === "crit"), lvl = V.ship.alert;
+  const row = (a) => {
+    const r = a.room && V.rooms[a.room], sec = r && r.section && V.sections[r.section];
+    return `<div class="vrow" ${a.room ? `data-room="${esc(a.room)}" style="cursor:pointer"` : ""}><span style="display:flex;gap:14px;align-items:baseline;min-width:0"><span class="st ${a.lvl === "crit" ? "fire" : "warn"}" style="font-size:15px">${a.lvl === "crit" ? "CRITIQUE" : "ALERTE"}</span><b style="font-size:22px;font-weight:600">${esc(a.text)}</b></span><span class="m" style="font-size:18px;text-align:right">${r ? esc(r.name) + (sec ? ` <span class="mu">· ${esc(sec.name)}</span>` : "") + ` <span class="mu">· ${esc(deckName(r.deck))}</span>` : ""}</span></div>`;
+  };
+  return `<div class="stack">${panel("Alertes · " + V.ship.name, "BRIDGE.ALR", `<div class="big ${lvl >= "3" || crit.length ? "red" : lvl || alerts.length ? "amb" : "okc"}" style="font-size:clamp(28px,5vw,56px);letter-spacing:.14em;${crit.length ? "animation:blink 1s steps(2) infinite" : ""}">${lvl ? "ALERTE NIVEAU " + esc(lvl) : crit.length ? crit.length + " ALERTE(S) CRITIQUE(S)" : alerts.length ? alerts.length + " ALERTE(S)" : "NOMINAL"}</div>${lvl && MC.PA_LEVELS[lvl] ? `<p style="font-size:18px">${esc(MC.PA_LEVELS[lvl][0])}</p>` : ""}`)}${panel("Alertes actives", "ALR." + String(alerts.length).padStart(2, "0"), alerts.length ? crit.concat(alerts.filter(a => a.lvl !== "crit")).map(row).join("") : `<p class="empty" style="font-size:20px">Aucune alerte.</p>`)}</div>`;
+};
 
 PAGE.plan = () => {
   if (!V.decks.length) return panel("Plan", "MAP", `<p class="empty">Aucune structure reçue du mod.</p>`);
