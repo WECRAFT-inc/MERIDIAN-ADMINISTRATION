@@ -289,10 +289,11 @@ const TEAMS = ["jour", "nuit", "aucune"];
 const PAGES = {
   overview: "Vue d’ensemble", alerts: "Alertes", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
-  galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", branding: "Identité visuelle", admin: "Ordinateur de bord"
+  galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", branding: "Identité visuelle", admin: "Ordinateur de bord",
+  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies"
 };
 /* Pages réservées au poste admin. */
-const ADMIN_PAGES = ["admin", "screens", "craft", "branding"];
+const ADMIN_PAGES = ["admin", "screens", "craft", "branding", "diseases"];
 
 /* action : [libellé, niveau minimum par défaut, page qui porte l'action] */
 const ACTIONS = {
@@ -317,8 +318,75 @@ const ACTIONS = {
   "announce":       ["Annonce générale", 6, "overview"],
   "pa.play":        ["Diffuser un signal (quart, début/fin de communication)", 4, "pa"],
   "nav.jump":       ["Lancer un saut hyperespace", 6, "galaxy"],
-  "comlink.rename": ["Renommer une liaison com (navette)", 4, "starmap"]
+  "comlink.rename": ["Renommer une liaison com (navette)", 4, "starmap"],
+  "power.breaker":  ["Manœuvrer les plombs (pièce, section, pont)", 4, "energy"],
+  "power.device":   ["Couper un appareil à distance", 4, "energy"],
+  "power.config":   ["Régler les calibres des plombs", 6, "energy"],
+  "pipe.block":     ["Fermer ou rouvrir un tronçon de conduite", 4, "networks"],
+  "thermal.set":    ["Régler la consigne de température d’une pièce", 3, "atmos"],
+  "airlock.cycle":  ["Faire cycler un sas à distance", 3, "doors"],
+  "airlock.lock":   ["Verrouiller un sas ou le réserver aux autorisés", 4, "doors"],
+  "med.view":       ["Consulter les dossiers médicaux", 3, "medical"],
+  "med.order":      ["Ordonner un traitement ou lever une quarantaine (site)", 6, "medical"]
 };
+
+/* Postes de travail (bloc en jeu, terminal « WS-métier-… ») : pages ouvertes d'office pour ce métier. */
+const WS_PRESETS = {
+  ingenieur: ["overview", "energy", "networks", "atmos", "plan", "procs", "alerts", "log"],
+  medecin: ["overview", "medical", "crew", "plan", "alerts", "log"],
+  pilote: ["overview", "starmap", "galaxy", "vue3d", "alerts", "log"],
+  securite: ["overview", "doors", "crew", "plan", "alerts", "log"],
+  chercheur: ["overview", "medical", "starmap", "galaxy", "log"],
+  commandement: ["overview", "alerts", "plan", "vue3d", "atmos", "energy", "networks", "doors", "crew", "medical", "procs", "pa", "starmap", "galaxy", "log", "structure"],
+  logistique: ["overview", "plan", "networks", "energy", "log"],
+  communications: ["overview", "pa", "alerts", "starmap", "log"],
+  agronome: ["overview", "atmos", "networks", "log"]
+};
+const WS_NAMES = { ingenieur: "Poste ingénierie", medecin: "Poste médical", pilote: "Poste de pilotage", securite: "Poste de sécurité", chercheur: "Poste de recherche",
+  commandement: "Poste de commandement", logistique: "Poste logistique", communications: "Poste communications", agronome: "Poste agronomie" };
+function wsJob(term) { const m = /^WS-([a-z]+)-/.exec(term || ""); return m && WS_PRESETS[m[1]] ? m[1] : null; }
+/* Pages d'un terminal : terminal configuré, ou poste de travail (préréglage), sinon toutes. */
+function termPages(state, term) {
+  if (term && state.terminals[term]) return state.terminals[term].pages;
+  const j = wsJob(term);
+  if (j) return WS_PRESETS[j].concat(["chat"]);
+  return Object.keys(PAGES);
+}
+
+/* Maladies par défaut (l'admin les modifie dans la page « Maladies »). */
+const SYMPTOMS = { toux: "Toux", fievre: "Fièvre", fatigue: "Fatigue", faiblesse: "Faiblesse musculaire", nausee: "Nausées", vertiges: "Vertiges",
+  hemorragie: "Hémorragies", douleur: "Douleurs", hallucinations: "Hallucinations", dyspnee: "Essoufflement", eruption: "Éruption cutanée", mort: "Défaillance (mortelle au terme du stade)" };
+const diseasesDefault = () => ({
+  fievre_kepler: { name: "Fièvre de Kepler", pathogen: "virus", morphology: "Virions icosaédriques de 80 nm, inclusions dans les globules blancs.",
+    description: "Transmise par les morsures et griffures de la faune de Kepler-442b.", planets: ["kepler_442b"], wound: 0.25, air: 0, contact: 0.6, lethal: false, cure: 240,
+    stages: [{ name: "Incubation", duration: 900, symptoms: [], contagion: 0 }, { name: "Phase fébrile", duration: 1200, symptoms: ["fievre", "fatigue"], contagion: 0.04 },
+      { name: "Phase aiguë", duration: 1500, symptoms: ["fievre", "nausee", "vertiges", "faiblesse"], contagion: 0.08 }, { name: "Convalescence", duration: 900, symptoms: ["fatigue"], contagion: 0 }] },
+  toux_grise: { name: "Toux grise de Trappist", pathogen: "champignon", morphology: "Spores grises septées, filaments ramifiés dans les sécrétions bronchiques.",
+    description: "Spores en suspension dans l'air de Trappist-1e : à ne respirer qu'avec un casque.", planets: ["trappist_1e"], wound: 0.05, air: 0.06, contact: 1, lethal: true, cure: 420,
+    stages: [{ name: "Colonisation", duration: 1200, symptoms: [], contagion: 0 }, { name: "Toux sèche", duration: 1800, symptoms: ["toux"], contagion: 0.06 },
+      { name: "Atteinte pulmonaire", duration: 2400, symptoms: ["toux", "dyspnee", "fatigue", "fievre"], contagion: 0.12 },
+      { name: "Détresse respiratoire", duration: 1200, symptoms: ["toux", "dyspnee", "hemorragie", "faiblesse", "vertiges"], contagion: 0.15 },
+      { name: "Défaillance", duration: 300, symptoms: ["dyspnee", "hallucinations", "mort"], contagion: 0.1 }] }
+});
+function cleanDisease(d) {
+  const num = (v, a, b, def) => { v = +v; return isNaN(v) ? def : Math.max(a, Math.min(b, v)); };
+  const out = { name: clean(d.name, 60) || "Maladie", pathogen: ["virus", "bactérie", "champignon", "parasite", "prion"].includes(d.pathogen) ? d.pathogen : "virus",
+    morphology: clean(d.morphology || "", 200), description: clean(d.description || "", 300),
+    planets: (Array.isArray(d.planets) ? d.planets : []).map(x => clean(String(x), 40)).filter(Boolean).slice(0, 20),
+    wound: num(d.wound, 0, 1, 0.1), air: num(d.air, 0, 1, 0.02), contact: num(d.contact, 0, 2, 1), lethal: !!d.lethal, cure: num(d.cure, 20, 36000, 300) | 0,
+    stages: (Array.isArray(d.stages) ? d.stages : []).slice(0, 10).map(st => ({ name: clean(st.name || "", 40), duration: num(st.duration, 20, 86400, 600) | 0,
+      symptoms: (st.symptoms || []).filter(x => SYMPTOMS[x]), contagion: num(st.contagion, 0, 1, 0) })) };
+  if (!out.stages.length) out.stages.push({ name: "Stade 1", duration: 600, symptoms: [], contagion: 0 });
+  return out;
+}
+/* Réseaux : état propre au site (consignes, calibres, sas) — la télémétrie arrive à part. */
+function netState(state) {
+  if (!state.power) state.power = { ratings: {}, telem: null, events: [] };
+  if (!state.thermal) state.thermal = {};
+  if (!state.airlocks) state.airlocks = { cfg: {}, list: [] };
+  if (!state.diseases) state.diseases = diseasesDefault();
+  return state;
+}
 const defaultPerms = () => Object.fromEntries(Object.entries(ACTIONS).map(([k, v]) => [k, v[1]]));
 
 /* Catalogue des avaries (poste admin uniquement). target : room | section | door | ship */
@@ -613,7 +681,7 @@ function can(state, actor, action, term) {
   if (state.computer.refuse) return false;
   const meta = ACTIONS[action];
   if (!meta) return false;
-  if (term && state.terminals[term] && !state.terminals[term].pages.includes(meta[2])) return false;
+  if (term && (state.terminals[term] || wsJob(term)) && !termPages(state, term).includes(meta[2])) return false;
   return levelOf(actor) >= (state.perms[action] ?? meta[1]);
 }
 
@@ -683,7 +751,11 @@ function compileAcl(state) {
       allow: people.filter(p => !p.admin && canOpenDoor(state, p, d).ok).map(p => p.id)
     };
   }
-  return { type: "acl", admins: people.filter(p => p.admin).map(p => p.id), doors, craft: compileCraft(state), uniforms: compileUniforms(state) };
+  netState(state);
+  const sections = {};
+  for (const r of Object.values(state.rooms)) if (r.section) sections[r.id] = r.section;
+  return { type: "acl", admins: people.filter(p => p.admin).map(p => p.id), doors, craft: compileCraft(state), uniforms: compileUniforms(state),
+    power: { sections, ratings: state.power.ratings }, thermal: state.thermal, airlocks: state.airlocks.cfg, diseases: { defs: state.diseases } };
 }
 
 /* ------------------------------ Alertes ----------------------------- */
@@ -985,6 +1057,16 @@ function applyTelemetry(state, m, now = Date.now()) {
       if (p.online && p.chip && p.chip !== p.id && state.people[p.chip]) state.people[p.chip].carriedBy = p.id;
   }
   if (m.stocks) Object.assign(state.stocks, m.stocks);
+  netState(state);
+  if (m.power) {
+    const prevMode = state.power.telem && state.power.telem.mode;
+    state.power.telem = m.power;
+    for (const e of m.power.events || []) { state.power.events.unshift({ t: now, text: e }); log(state, "RÉSEAU", e, "power", now); }
+    if (state.power.events.length > 60) state.power.events.length = 60;
+    if (prevMode && prevMode !== m.power.mode && m.power.mode !== "normal") log(state, "RÉSEAU", `Alimentation : ${m.power.mode}.`, "crit", now);
+  }
+  if (m.networks) state.networks = m.networks;
+  if (m.airlocks) state.airlocks.list = m.airlocks;
   /* Détecteur incendie : l'alarme de toute la section (ou de la pièce seule) se déclenche, l'alerte apparaît à la passerelle. */
   for (const r of fired) {
     const sec = r.section && state.sections[r.section];
@@ -1085,6 +1167,46 @@ function apply(state, actor, a, ctx = {}) {
         const v = Math.max(0, Math.min(7, a.level | 0));
         if (!actor.admin && (v > levelOf(actor) || state.perms[a.action] > levelOf(actor))) throw new Error("Impossible de régler un niveau au-dessus du vôtre.");
         state.perms[a.action] = v; L(`« ${ACTIONS[a.action][0]} » exige désormais le niveau ${v}.`, "struct"); break;
+      }
+      /* Réseaux : énergie, conduites, sas, température */
+      case "power.breaker": {
+        netState(state); const id = String(a.breaker || ""); const b = state.power.telem && state.power.telem.breakers && state.power.telem.breakers[id];
+        if (!b) throw new Error("Plomb inconnu.");
+        if (!["reset", "open", "close", "repair"].includes(a.action)) throw new Error("Manœuvre inconnue.");
+        need("power.breaker"); if (a.action === "repair" && !actor.admin) throw new Error("Une réparation se fait sur place, à la trousse à outils.");
+        cmds.push({ type: "power.breaker", breaker: id, action: a.action });
+        L(`${{ reset: "réarme", open: "coupe", close: "referme", repair: "répare" }[a.action]} le plomb ${b.name}.`, "power"); break;
+      }
+      case "power.device": { need("power.device"); cmds.push({ type: "power.device", device: String(a.device), off: !!a.off }); L(`${a.off ? "coupe" : "rétablit"} l’alimentation de ${clean(a.label || "un appareil", 60)}.`, "power"); break; }
+      case "power.rating": {
+        need("power.config"); netState(state); const id = String(a.breaker || ""); if (!/^(room|section|deck):/.test(id)) throw new Error("Plomb inconnu.");
+        if (a.watts == null || a.watts === "") delete state.power.ratings[id]; else state.power.ratings[id] = Math.max(100, Math.min(1e8, +a.watts || 0));
+        L(`règle le calibre de ${id.split(":")[0] === "room" ? "un plomb de pièce" : id} à ${a.watts ? (+a.watts / 1000).toFixed(1) + " kW" : "la valeur par défaut"}.`, "power"); break;
+      }
+      case "pipe.block": { need("pipe.block"); cmds.push({ type: "pipe.block", pipe: String(a.pipe), on: !!a.on }); L(`${a.on ? "ferme" : "rouvre"} un tronçon de conduite${a.label ? " (" + clean(a.label, 40) + ")" : ""}.`, "atmos"); break; }
+      case "thermal.set": {
+        need("thermal.set"); netState(state); const r = room(a.room);
+        if (a.value == null || a.value === "") delete state.thermal[r.id]; else state.thermal[r.id] = Math.max(5, Math.min(35, +a.value || 21));
+        L(`règle la température de ${r.name} sur ${state.thermal[r.id] != null ? state.thermal[r.id] + " °C" : "la consigne par défaut"}.`, "atmos"); break;
+      }
+      case "airlock.cycle": { need("airlock.cycle"); cmds.push({ type: "airlock.set", id: String(a.id), cycle: a.side === "out" ? "out" : "in" }); L(`fait cycler le sas ${clean(a.id, 20)} vers ${a.side === "out" ? "l’extérieur" : "l’intérieur"}.`, "door"); break; }
+      case "airlock.lock": {
+        need("airlock.lock"); netState(state); const id = clean(a.id, 20); const c = state.airlocks.cfg[id] || (state.airlocks.cfg[id] = { locked: false, restricted: false });
+        if (a.locked != null) c.locked = !!a.locked; if (a.restricted != null) c.restricted = !!a.restricted;
+        cmds.push({ type: "airlock.set", id, locked: c.locked, restricted: c.restricted });
+        L(`sas ${id} : ${c.locked ? "verrouillé" : c.restricted ? "réservé aux autorisés" : "libre"}.`, "door"); break;
+      }
+      case "disease.save": {
+        if (!actor.admin) throw new Error("Réservé au poste admin."); netState(state);
+        const id = (clean(a.id || "", 32).toLowerCase().replace(/[^a-z0-9_]/g, "_")) || "maladie_" + (state.seq++);
+        state.diseases[id] = cleanDisease(a.def || {}); L(`enregistre la maladie « ${state.diseases[id].name} ».`, "struct"); break;
+      }
+      case "disease.delete": { if (!actor.admin) throw new Error("Réservé au poste admin."); netState(state); delete state.diseases[a.id]; L(`supprime la maladie ${clean(a.id, 32)}.`, "struct"); break; }
+      case "disease.reset": { if (!actor.admin) throw new Error("Réservé au poste admin."); state.diseases = diseasesDefault(); L("rétablit les maladies par défaut.", "struct"); break; }
+      case "disease.cure": case "disease.infect": {
+        if (a.type === "disease.infect" ? !actor.admin : !(actor.admin || can(state, actor, "med.order", term))) throw new Error("Niveau insuffisant.");
+        const p = person(a.person); cmds.push({ type: a.type, uuid: p.id, disease: a.disease || "" });
+        L(`${a.type === "disease.cure" ? "guérit" : "contamine"} ${p.name}${a.disease && state.diseases && state.diseases[a.disease] ? " (" + state.diseases[a.disease].name + ")" : ""}.`, a.type === "disease.cure" ? "crew" : "crit"); break;
       }
       /* Alertes */
       case "alarm.general": {
@@ -1503,8 +1625,10 @@ function viewFor(state, actor, term) {
   const v = clone(state);
   const adm = !!(actor && actor.admin);
   const perms = Object.fromEntries(Object.keys(ACTIONS).map(k => [k, can(state, actor, k, term)]));
-  const termPages = term && state.terminals[term] ? state.terminals[term].pages : Object.keys(PAGES);
-  let pages = Object.keys(PAGES).filter(p => adm || (termPages.includes(p) && !ADMIN_PAGES.includes(p)));
+  const tPages = termPages(state, term);
+  let pages = Object.keys(PAGES).filter(p => adm || (tPages.includes(p) && !ADMIN_PAGES.includes(p)));
+  if (!adm && !perms["med.view"]) pages = pages.filter(p => p !== "medical");
+  if (!adm && !perms["power.breaker"] && !perms["power.device"] && !perms["power.config"]) pages = pages.filter(p => p !== "energy");
   if (actor && !pages.includes("chat")) pages.push("chat");
   if (!adm && !perms["structure.edit"] && !perms["perms.edit"]) pages = pages.filter(p => p !== "structure");
   if (!adm && !perms["alarm.general"] && !perms["pa.play"]) pages = pages.filter(p => p !== "pa");
@@ -1521,13 +1645,16 @@ function viewFor(state, actor, term) {
     delete v.screens;
     delete v.craft;
     delete v.security;
+    if (!perms["med.view"]) for (const p of Object.values(v.people)) if (p.id !== (actor && actor.id) && p.vitals) { delete p.vitals.body; delete p.vitals.diseases; delete p.vitals.symptoms; delete p.vitals.blood; }
+    for (const p of Object.values(v.people)) if (p.vitals) delete p.vitals.infections;   // vue admin seulement
+    if (!perms["power.breaker"] && v.power && v.power.telem) v.power = { telem: { mode: v.power.telem.mode, prod: v.power.telem.prod, demand: v.power.telem.demand } };
     v.chats = { [actor ? actor.id : "_"]: ((state.chats || {})[actor && actor.id] || []).map(m => ({ t: m.t, from: m.from, text: m.text })) };
     delete v.chatUnread;
     for (const p of Object.values(v.people)) { delete p.chip; delete p.carriedBy; delete p.notifyAi; }
   }
   v.me = actor ? {
     id: actor.id, name: actor.name, level: actor.level | 0, admin: adm, intrus: !!actor.intrus, role: actor.role, job: actor.job, rank: actor.rank, group: actor.group, team: actor.team,
-    perms, pages, term: term || null,
+    perms, pages, term: term || null, ws: wsJob(term),
     doors: Object.values(state.doors).filter(d => canOpenDoor(state, actor, d).ok).map(d => d.id),
     manages: Object.values(state.doors).filter(d => (d.managers || []).includes(actor.id)).map(d => d.id)
   } : null;
@@ -1682,10 +1809,55 @@ function seedDemo(now = Date.now()) {
     else if (/s[ée]cur|garde/.test(job)) p.outfit = "securite";
     const g = s.grades.find(x => x.id === p.grade); if (g) p.rank = g.name;
   }
+
+  /* Réseaux de démonstration : électricité, conduites, sas, fiches médicales */
+  netState(s);
+  const brk = {}, devices = [], net = { decks: {} };
+  let prodW = 1.42e6, dem = 0;
+  for (const dk of s.decks.filter(d => d.kind === "hull")) {
+    const N = net.decks[dk.id] = { gas: [], water: [], panels: [], devices: [] };
+    const did = "deck:" + dk.id; let dl = 0;
+    const rooms = Object.values(s.rooms).filter(r => r.deck === dk.id && r.kind !== "corridor");
+    rooms.forEach((r, i) => {
+      const [x0, z0, x1, z1] = r.rects[0], key = "minecraft:overworld|" + Math.round(x0 + 4) + "|" + (dk.y0 + 2) + "|" + Math.round(z0 < 80 ? z1 - 3 : z0 + 3);
+      const load = 1500 + ((i * 7919) % 9) * 900, tripped = dk.id === "P4" && i === 3, rid = "room:" + key;
+      brk[rid] = { name: "Panneau " + r.name, rating: 8000, load: tripped ? 0 : load, closed: !tripped, open: false, tripped, reason: tripped ? "surcharge (11,2 kW)" : "", health: tripped ? 62 : 100, parent: did, room: r.id, deck: dk.id };
+      if (!tripped) dl += load;
+      const px = x0 + 4, pz = z0 < 80 ? z1 - 3 : z0 + 3;
+      N.panels.push([px, pz, rid, tripped ? 1 : 0]);
+      ["Éclairage", "Four", "Poste de travail"].slice(0, 1 + i % 3).forEach((lab, k) => {
+        const dx = Math.min(x1 - 3, x0 + 10 + k * 12), dz = (z0 + z1) / 2 + (k - 1) * 8;
+        const id = "minecraft:overworld|" + Math.round(dx) + "|" + dk.y0 + "|" + Math.round(dz);
+        N.devices.push([dx, dz, rid, tripped ? 0 : 1, lab + " · " + r.name, id]);
+        devices.push({ id, label: lab + " · " + r.name, w: k === 1 ? 1800 : k === 2 ? 350 : 120, f: tripped ? 0 : 1, vital: false, panel: rid, cut: false });
+      });
+    });
+    brk[did] = { name: "Pont " + dk.name, rating: 600000, load: dl, closed: true, open: false, tripped: false, reason: "", health: 100 };
+    dem += dl;
+    for (let x = 6; x < 554; x++) {
+      N.gas.push([x, 78, x < 280 ? 5 : 4, "AIR", dk.id === "P2" && x === 300 ? 1 : 0, "minecraft:overworld|" + x + "|" + (dk.y0 + 3) + "|78"]);
+      N.water.push([x, 82, 4, "H2O", 0, "minecraft:overworld|" + x + "|" + (dk.y0 + 3) + "|82"]);
+    }
+    if (dk.id === "P6") for (let z = 79; z > 4; z--) N.gas.push([60, z, 2, "O2", 0, "minecraft:overworld|60|" + (dk.y0 + 3) + "|" + z]);
+    if (dk.id === "P6") for (let z = 79; z > 4; z--) N.gas.push([200, z, 3, "H2", 0, "minecraft:overworld|200|" + (dk.y0 + 3) + "|" + z]);
+  }
+  devices.push({ id: "minecraft:overworld|60|120|20", label: "Électrolyseur industriel", w: 290000, f: 1, vital: true, panel: Object.keys(brk).find(k => k.startsWith("room:") && brk[k].deck === "P6"), cut: false });
+  dem += 290000;
+  s.power.telem = { mode: "normal", prod: prodW, demand: dem + 11200, delivered: dem, battery: Math.max(0, prodW - dem) * .5, batteryJ: 5.3e8, batteryCapJ: 7.2e8, breakers: brk, devices, events: [] };
+  s.power.events = [{ t: now - 240000, text: "Plomb Panneau Atelier de fabrication sauté : surcharge (11,2 kW)." }, { t: now - 3600000, text: "Réacteur à fusion : montée en puissance terminée (1,5 MW)." }];
+  s.networks = net;
+  s.airlocks.list = [{ id: "SAS-1A2B3", phase: "idle", side: "in", kpa: 101.2, locked: false, restricted: true, doors: 2, vents: 2, deck: "P5", x: 520, z: 150 },
+    { id: "SAS-4C5D6", phase: "to_outside", side: "in", kpa: 38.4, locked: false, restricted: false, doors: 2, vents: 1, deck: "RB", x: 100, z: 188 }];
+  const fresh = () => [8, 14, 7, 7, 8, 8].map(m => ({ hp: m, max: m, bleed: 0, fracture: false, splint: false }));
+  for (const p of Object.values(s.people)) if (p.vitals) { p.vitals.body = fresh(); p.vitals.blood = 5000; p.vitals.symptoms = []; p.vitals.diseases = []; p.vitals.infections = []; }
+  const ek = s.people["p-ek"].vitals; ek.body[4] = { hp: 2.5, max: 8, bleed: 1, fracture: true, splint: false }; ek.body[1].hp = 9; ek.blood = 3400; ek.temp = 35.8;
+  const mb = s.people["p-mbaye"].vitals; mb.temp = 38.9; mb.symptoms = ["Fièvre", "Fatigue"]; mb.diseases = [{ id: "fievre_kepler", name: "Fièvre de Kepler", stage: 2, stages: 4, treated: false }]; mb.infections = [{ id: "fievre_kepler", stage: 2, diagnosed: true }];
+  const lp = s.people["p-lopes"].vitals; lp.infections = [{ id: "toux_grise", stage: 1, diagnosed: false }];
+  s.people["p-brenner"].vitals.body[3] = { hp: 5, max: 7, bleed: 0, fracture: true, splint: true };
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, WS_PRESETS, WS_NAMES, wsJob, termPages, SYMPTOMS, diseasesDefault, netState, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
 /* Manuel de bord du Meridian III : explications des systèmes, par rôle.
    Mise en forme : « # » titre, « - » puce, « 1. » étape, « ! » danger, « > » note, « [[schema:id]] » schéma. */
@@ -1781,6 +1953,23 @@ colon: [
 - Les pages que vous ne pouvez pas voir n’apparaissent pas.`],
 ],
 ingenieur: [
+["Réseau électrique et plombs", `Un seul réseau pour tout le vaisseau : réacteur à fusion, piles de secours et batteries d’un côté, les pièces de l’autre.
+- Chaque pièce a son panneau (plomb de pièce, 8 kW). Au-dessus : la section (60 kW), puis le pont (600 kW).
+- Un dépassement fait sauter le plomb ; un gros dépassement fait souvent sauter aussi celui du dessus.
+- Plomb de pont sauté ou production insuffisante : secours. Seuls les appareils vitaux restent alimentés.
+! Un panneau abîmé ou surchargé peut mettre le feu. Réparation : accroupi + clic avec la trousse à outils.
+> Page Énergie : arbre des plombs, calibres, appareils coupables à distance. Page Réseaux : câbles, gaz, eau, chaleur, respirabilité.`],
+["Trousse à outils", `Rien ne marche tant que ce n’est pas branché.
+1. Trousse : clic sur l’appareil, puis sur le panneau de la pièce.
+2. Diffuseur anti-incendie : clic sur le diffuseur, puis sur un tuyau de gaz proche.
+3. Sas : panneau, porte intérieure, porte extérieure, puis les bouches.
+> Trousse en main, les câbles proches s’affichent.`],
+["Machines centrales", `Deux ou trois grosses machines suffisent au vaisseau.
+- Électrolyseur industriel : 1 mol/s d’eau, de quoi faire respirer ~35 personnes.
+- Recycleur atmosphérique : CO₂ des pièces reliées → méthane et eau (Sabatier).
+- Climatisation : tient la consigne de température des pièces reliées.
+- Réacteur à fusion : 1,5 MW à l’hydrogène ; piles à combustible et batteries en secours.
+- Moteur de saut : se charge sur le réseau ; antimatière produite à partir d’exotite (Io-2b, HD 188753 Ab, Néo-Titan).`],
 ["Le circuit de l’air", `L’air n’est pas fabriqué à partir de rien : chaque atome passe par une machine, et chaque transformation coûte de l’énergie.
 [[schema:chaine-gaz]]
 - Électrolyseur : 2 H₂O → 2 H₂ + O₂. ≈ 14 kW à plein régime, de quoi faire respirer 1,7 personne.
@@ -1834,6 +2023,16 @@ ingenieur: [
 - Réseau inactif : une bouche ne se raccorde que par l’arrière ; une pièce « Analyse en cours » n’échange pas encore.`],
 ],
 medecin: [
+["Santé localisée", `Les blessures touchent une partie du corps.
+- Bandage : saignement. Attelle : fracture (6 min). Trousse : +5 sur une partie. Morphine : douleur masquée 3 min. Poche de sang : +1,5 L.
+- Touche K : fiche médicale. Objet de soin en main sur un patient : sa fiche s’ouvre, cliquez la partie à soigner.
+! Sous 2 L de sang le patient perd la vue ; sous 1,2 L il meurt.`],
+["Maladies et laboratoire", `Diagnostic en quatre temps.
+1. Seringue : prélèvement sur le patient.
+2. Microscope : forme du pathogène.
+3. Analyseur sanguin : rapport, diagnostic transmis à la console.
+4. Synthétiseur pharmaceutique : 3 doses de traitement (une fiole vide).
+> Approchez les malades contagieux en combinaison de protection sanitaire. Page Médical : fiches de tout l’équipage.`],
 ["Lire les signes vitaux", `La console (page Équipage) donne pour chaque personne : santé, faim, réserve du lifepack, pièce occupée.
 - « Signal vital perdu » apparaît dans les alertes et le journal à chaque décès.
 - La pièce occupée permet de remonter à la cause : air, feu, décompression.`],
@@ -2391,7 +2590,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["doors", "06"], ["crew", "07"], ["procs", "08"], ["pa", "09"], ["chat", "10"], ["starmap", "11"], ["galaxy", "12"], ["log", "13"], ["structure", "14"], ["screens", "15"], ["craft", "16"], ["branding", "17"], ["admin", "18"]];
+const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -2424,7 +2623,7 @@ function render() {
   const tick = V.log.slice(0, 14).map(l => `<span>${fmtT(l.t)} · ${esc(l.who)} : ${esc(l.text)}</span>`).join("");
   morph(app, `
 <div class="top"><header>
-  <div class="brand">MERIDIAN<small>CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : ""}</small></div>
+  <div class="brand">MERIDIAN<small>CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : V.me.ws ? " · " + esc(MC.WS_NAMES[V.me.ws].toUpperCase()) : ""}</small></div>
   <div class="hsep"></div>${shipChip}${linkChip}
   <span class="sp"></span>
   <div class="clock" data-clock>${fmtT(now())}<small>QUART DE ${hh >= 8 && hh < 20 ? "JOUR" : "NUIT"}</small></div>
@@ -2809,6 +3008,7 @@ PAGE.doors = () => {
 ${mine.length ? panel("Portes dont vous êtes gestionnaire", "MY.DOORS", mine.map(d => `<div class="vrow" data-door="${esc(d.id)}" style="cursor:pointer"><span><span class="m cy">${esc(d.id)}</span> ${esc(d.name)}</span>${doorState(d)}</div>`).join("")) : ""}
 ${panel("Portes du vaisseau", "DOOR." + Object.keys(V.doors).length, `<div class="toolbar"><input type="search" id="q-doors" data-fn="q" data-arg="doors" placeholder="Rechercher un nom, une pièce ou des numéros : 9, 7, 121" aria-label="Rechercher une porte"></div><div class="tbl"><table><thead><tr><th>N°</th><th>Porte</th><th>État</th><th>Qui peut ouvrir</th><th>Ma puce</th></tr></thead><tbody>${rows}</tbody></table></div>${list.length > 200 ? `<p class="note">200 premières sur ${list.length}. Affinez la recherche.</p>` : ""}`)}
 ${panel("Groupes d’autorisation", "ACL.GRP", gBody + `<p class="note">Un groupe applique une même règle à plusieurs portes. Une règle posée sur une porte remplace celle de son groupe.</p>`)}
+${airlockPanel()}
 </div>${doorPanel(ui.door)}</div>`;
 };
 
@@ -3899,6 +4099,247 @@ function groupPanel() {
 }
 
 /* Écran des alertes de la passerelle : lisible de loin, pensé pour un écran en jeu. */
+
+/* =====================================================================
+   Énergie : production, plombs (pièce → section → pont), appareils, secours
+   ===================================================================== */
+const fmtW = (w) => { w = +w || 0; const a = Math.abs(w); return a >= 1e6 ? (w / 1e6).toFixed(2).replace(".", ",") + " MW" : a >= 1e3 ? (w / 1e3).toFixed(1).replace(".", ",") + " kW" : Math.round(w) + " W"; };
+const PW = () => (V.power && V.power.telem) || null;
+const MODE_TXT = { normal: ["Réseau normal", "okc"], "secours partiel": ["Secours partiel : seuls les vitaux sont garantis", "amb"], secours: ["Alimentation de secours", "red"] };
+function brkState(b) { return b.tripped ? `<span class="st crit">Sauté${b.reason ? " · " + esc(b.reason) : ""}</span>` : b.open ? `<span class="st off">Coupé</span>` : b.health < 100 ? `<span class="st warn">Abîmé ${b.health} %</span>` : `<span class="st ok">Fermé</span>`; }
+function brkRow(id, b, depth) {
+  const f = b.rating ? b.load / b.rating : 0;
+  const acts = b.tripped || b.health <= 0 ? btn("Réarmer", { type: "power.breaker", breaker: id, action: "reset" }, { perm: "power.breaker", cls: "amb sm" })
+    : b.open ? btn("Refermer", { type: "power.breaker", breaker: id, action: "close" }, { perm: "power.breaker", cls: "sm" })
+    : btn("Couper", { type: "power.breaker", breaker: id, action: "open" }, { perm: "power.breaker", cls: "ghost sm", confirm: `Couper ${b.name} ? Tout ce qui est en aval s’éteint.` });
+  return `<div class="vrow${ui.brk === id ? " sel" : ""}" style="padding-left:${8 + depth * 18}px" data-fn="brkSel" data-arg="${esc(id)}"><div style="flex:1;min-width:0"><div class="row" style="gap:8px"><b>${esc(b.name)}</b>${brkState(b)}</div>${bar(f * 100, f > 1 ? "crit" : f > .85 ? "warn" : "")}<div class="m dim" style="font-size:11px">${fmtW(b.load)} / ${fmtW(b.rating)}</div></div><span class="row" style="gap:6px;flex:none">${acts}</span></div>`;
+}
+PAGE.energy = () => {
+  const T = PW();
+  if (!T) return panel("Énergie", "PWR", `<p class="empty">Aucune donnée du réseau électrique (mod hors ligne ou aucun panneau posé).</p>`);
+  const m = MODE_TXT[T.mode] || [T.mode, "amb"];
+  const bat = T.batteryCapJ ? T.batteryJ / T.batteryCapJ * 100 : 0;
+  const head = `<div class="tiles"><div class="tile"><span>Production</span><div class="big">${fmtW(T.prod)}</div></div><div class="tile"><span>Demande</span><div class="big ${T.demand > T.prod + Math.max(0, -T.battery) ? "amb" : ""}">${fmtW(T.demand)}</div></div><div class="tile"><span>Fournie</span><div class="big">${fmtW(T.delivered)}</div>${bar(T.demand ? T.delivered / T.demand * 100 : 100, T.delivered < T.demand * .98 ? "warn" : "", true)}</div><div class="tile"><span>Batteries</span><div class="big">${n0(bat)}<small>%</small></div>${bar(bat, bat < 20 ? "crit" : bat < 40 ? "warn" : "", true)}<div class="m dim" style="font-size:11px">${T.battery > 0 ? "charge " + fmtW(T.battery) : T.battery < 0 ? "décharge " + fmtW(-T.battery) : "au repos"}</div></div></div>
+  <p class="${m[1]}" style="margin:10px 0 0;letter-spacing:.08em;text-transform:uppercase">${esc(m[0])}</p>`;
+  const B = T.breakers || {};
+  const decks = Object.entries(B).filter(([k]) => k.startsWith("deck:")), sections = Object.entries(B).filter(([k]) => k.startsWith("section:")), rooms = Object.entries(B).filter(([k]) => k.startsWith("room:"));
+  let tree = "";
+  for (const [did, d] of decks) {
+    tree += brkRow(did, d, 0);
+    for (const [sid, s] of sections.filter(([, s]) => s.parent === did)) { tree += brkRow(sid, s, 1); for (const [rid, r] of rooms.filter(([, r]) => r.parent === sid)) tree += brkRow(rid, Object.assign({}, r, { name: r.room ? roomName(r.room) !== "—" ? roomName(r.room) : r.name : r.name }), 2); }
+    for (const [rid, r] of rooms.filter(([, r]) => r.parent === did)) tree += brkRow(rid, Object.assign({}, r, { name: r.room && roomName(r.room) !== "—" ? roomName(r.room) : r.name }), 1);
+  }
+  const sel = ui.brk && B[ui.brk];
+  let side = panel("Plomb", "BRK", `<p class="empty">Sélectionnez un plomb dans l’arbre pour son détail et ses appareils.</p>`);
+  if (sel) {
+    const devs = (T.devices || []).filter(d => d.panel === ui.brk || (ui.brk.startsWith("section:") || ui.brk.startsWith("deck:")) && B[d.panel] && (B[d.panel].parent === ui.brk || (B[B[d.panel].parent] || {}).parent === ui.brk));
+    let b = brkState(sel) + kv("Charge", fmtW(sel.load)) + kv("Calibre", fmtW(sel.rating)) + kv("État du matériel", sel.health + " %", sel.health < 50 ? "red" : "");
+    if (perm("power.config")) b += `<div class="row" style="margin-top:10px"><input type="number" id="brk-w" min="0.1" step="0.5" value="${(sel.rating / 1000).toFixed(1)}" style="width:110px" aria-label="Calibre en kW"> <span class="mu">kW</span>${btn("Régler le calibre", null, { fn: "brkRating", arg: ui.brk, cls: "sm" })}${btn("Défaut", { type: "power.rating", breaker: ui.brk, watts: null }, { cls: "sm ghost" })}</div>`;
+    b += `<div class="lbl">Appareils · ${devs.length}</div>` + (devs.map(d => `<div class="vrow"><span style="min-width:0"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.cut ? "var(--dim)" : d.f > .95 ? "var(--ok)" : d.f > .05 ? "var(--amb)" : "var(--red)"};margin-right:6px"></span>${esc(d.label)}${d.vital ? ` <span class="pill cy">vital</span>` : ""}<div class="m dim" style="font-size:11px">${fmtW(d.w)} · servi à ${n0(d.f * 100)} %</div></span>${btn(d.cut ? "Rétablir" : "Couper", { type: "power.device", device: d.id, off: !d.cut, label: d.label }, { perm: "power.device", cls: "sm " + (d.cut ? "" : "ghost") })}</div>`).join("") || `<p class="empty">Aucun appareil branché ici.</p>`);
+    side = panel(sel.name, ui.brk.split(":")[0].toUpperCase(), b);
+  }
+  const ev = (V.power.events || []).slice(0, 14).map(e => `<div class="kv" style="border:0;padding:2px 0"><span class="m dim">${fmtT(e.t)}</span><b style="font-weight:400;text-align:right">${esc(e.text)}</b></div>`).join("") || `<p class="empty">Aucun événement récent.</p>`;
+  const help = `<p class="note">Chaque pièce a son panneau (plomb de pièce). Au-dessus : la section, puis le pont. Un plomb qui saute coupe tout ce qui est en aval ; plus le dépassement est fort, plus le plomb du dessus risque de sauter aussi. Quand un pont saute ou que la production ne suffit plus, le vaisseau passe sur batteries et piles de secours : seuls les appareils vitaux (support vie, gravité, sas) restent alimentés. Un réseau abîmé ou surchargé peut mettre le feu.</p>`;
+  return `<div class="grid g-2"><div class="stack">${panel("Réseau électrique", "PWR." + (T.mode || "").toUpperCase().slice(0, 4), head + help)}${panel("Plombs", "BRK." + Object.keys(B).length, tree || `<p class="empty">Aucun panneau posé.</p>`)}</div><div class="stack">${side}${panel("Événements", "PWR.LOG", ev)}</div></div>`;
+};
+FN.brkSel = (el) => { ui.brk = el.dataset.arg; render(); };
+FN.brkRating = (el) => { const w = parseFloat(String(val("brk-w")).replace(",", ".")); if (!(w > 0)) return toast("Calibre invalide.", "err"); act({ type: "power.rating", breaker: el.dataset.arg, watts: w * 1000 }, "Calibre transmis."); };
+
+/* =====================================================================
+   Réseaux : câbles, gaz, eau, chaleur, respirabilité, sur le plan des ponts
+   ===================================================================== */
+const LAYERS = [["cables", "Câbles électriques"], ["gas", "Conduites de gaz"], ["water", "Conduites d’eau"], ["heat", "Chaleur"], ["breath", "Respirabilité"]];
+const GAS_COL = { O2: "#4aa3ff", H2: "#ff6b5a", N2: "#a8b4bf", CO2: "#b58a5a", CH4: "#f5a83a", NH3: "#c9e06a", AIR: "#62e6f2", H2O: "#3a8fe0", vide: "#4f6b74", "?": "#7f9fa9" };
+const GAS_NAME = { O2: "Oxygène", H2: "Hydrogène", N2: "Azote", CO2: "CO₂", CH4: "Méthane", NH3: "Ammoniac", AIR: "Air", H2O: "Eau", vide: "Vide", "?": "Inconnu" };
+const DIRV = { 2: [0, -1], 3: [0, 1], 4: [-1, 0], 5: [1, 0] };
+function heatCol(t) {
+  if (t == null || isNaN(t)) return "#33424a";
+  const stops = [[-60, [80, 60, 200]], [-10, [60, 120, 255]], [10, [70, 200, 230]], [21, [67, 217, 168]], [30, [245, 210, 60]], [45, [245, 140, 50]], [70, [255, 60, 80]]];
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) { const [a, ca] = stops[i - 1], [b, cb] = stops[i]; const k = Math.max(0, (t - a) / (b - a)); return `rgb(${ca.map((v, j) => Math.round(v + (cb[j] - v) * k)).join(",")})`; }
+  return "rgb(255,60,80)";
+}
+/* Respirabilité : 0 = vide, 1 = mortel, 2 = difficile, 3 = bon. */
+function breathScore(e) {
+  if (!e || e.p == null) return -1;
+  if (e.p < 15) return 0;
+  const po2 = e.p * (e.o2 || 0) / 100;
+  if (po2 < 10 || (e.co2 || 0) > 5 || (e.h2 || 0) > 4) return 1;
+  if (po2 < 16 || po2 > 50 || (e.co2 || 0) > 1 || e.p < 60) return 2;
+  return 3;
+}
+const BREATH = [["#a88dff", "Vide"], ["#ff5266", "Irrespirable"], ["#f5a83a", "Difficile"], ["#43d9a8", "Respirable"]];
+function netPlan(did, layer) {
+  const list = roomsOf(did);
+  const N = (V.networks && V.networks.decks && V.networks.decks[did]) || { gas: [], water: [], panels: [], devices: [] };
+  const P = HULL ? hullP : (x, z) => [x, z];
+  const R = ([a, b, c, d]) => { const p = P(a, b), q = P(c, d); return [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])]; };
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  const grow = (a, b, c, d) => { x0 = Math.min(x0, a); z0 = Math.min(z0, b); x1 = Math.max(x1, c); z1 = Math.max(z1, d); };
+  list.forEach(r => r.rects.forEach(q => grow(...R(q))));
+  for (const k of ["gas", "water", "panels", "devices"]) for (const e of N[k] || []) { const [u, v] = P(e[0], e[1]); grow(u - 1, v - 1, u + 1, v + 1); }
+  if (x0 > x1) return `<p class="empty">Rien de connu sur ce pont.</p>`;
+  const W = x1 - x0, H = z1 - z0, pad = Math.max(6, W * .03), fs = Math.max(3, Math.min(W, H * 3) / 80);
+  let g = "";
+  for (const r of list) {
+    const e = r.env || {};
+    let fill = "rgba(98,230,242,.07)", op = 1;
+    if (layer === "heat") fill = heatCol(e.t), op = .55;
+    else if (layer === "breath") { const s = breathScore(e); fill = s < 0 ? "#33424a" : BREATH[s][0]; op = .45; }
+    for (const q of r.rects) { const [a, b, c, d] = R(q); g += `<rect class="hit" data-room="${esc(r.id)}" x="${a}" y="${b}" width="${c - a}" height="${d - b}" fill="${fill}" fill-opacity="${op}" stroke="${ui.room === r.id ? "#fff" : "var(--cy2)"}" stroke-opacity="${ui.room === r.id ? 1 : .45}" stroke-width="${fs * .15}"><title>${esc(r.name)}${layer === "heat" ? " · " + n1(e.t) + " °C" : layer === "breath" ? " · " + n1(e.p) + " kPa, O₂ " + n1(e.o2) + " %, CO₂ " + n1(e.co2) + " %" : ""}</title></rect>`; }
+    const big = r.rects[0] && R(r.rects[0]);
+    if (big && r.kind !== "corridor") {
+      const cx = (big[0] + big[2]) / 2, cz = (big[1] + big[3]) / 2, max = Math.floor((big[2] - big[0]) / (fs * .5));
+      g += `<text x="${cx}" y="${cz - (layer === "heat" || layer === "breath" ? fs * .6 : 0)}" fill="var(--mu)" font-size="${fs * .8}" text-anchor="middle" dominant-baseline="middle" pointer-events="none">${esc(r.name.length > max ? r.name.slice(0, Math.max(3, max - 1)) + "…" : r.name)}</text>`;
+      if (layer === "heat" || layer === "breath") g += `<text x="${cx}" y="${cz + fs * .7}" fill="var(--tx)" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" pointer-events="none" font-family="IBM Plex Mono,monospace">${layer === "heat" ? n0(e.t) + " °C" : n0(e.o2) + " % O₂"}</text>`;
+    }
+  }
+  const ps = Math.max(1, fs * .55), step = Math.max(1, Math.round(ps * 4));
+  const pipes = (arr, kind) => {
+    for (const p of arr) {
+      const [u, v] = P(p[0], p[1]), blocked = p[4] === 1, sel = ui.pipe === p[5], col = kind === "water" ? GAS_COL.H2O : (GAS_COL[p[3]] || GAS_COL["?"]);
+      g += `<rect class="hit" data-fn="pipeSel" data-arg="${esc(p[5])}" x="${u - ps / 2}" y="${v - ps / 2}" width="${ps}" height="${ps}" fill="${blocked ? "var(--red)" : col}" fill-opacity="${blocked ? .95 : .8}" stroke="${sel ? "#fff" : "none"}" stroke-width="${ps * .25}"><title>${kind === "water" ? "Eau" : GAS_NAME[p[3]] || p[3]}${blocked ? " · FERMÉ" : ""}</title></rect>`;
+      const d = DIRV[p[2]];
+      const q = ps * 1.3;
+      if (d && !blocked && (Math.round(p[0]) + Math.round(p[1])) % step === 0) { const [dx, dz] = HULL && HULL.rot ? [d[1], -d[0]] : d; g += `<path d="M${u - dx * q * .5 - dz * q * .45} ${v - dz * q * .5 + dx * q * .45}L${u + dx * q * .6} ${v + dz * q * .6}L${u - dx * q * .5 + dz * q * .45} ${v - dz * q * .5 - dx * q * .45}" fill="none" stroke="#fff" stroke-width="${ps * .22}" pointer-events="none"/>`; }
+      if (blocked) g += `<path d="M${u - q} ${v - q}L${u + q} ${v + q}M${u + q} ${v - q}L${u - q} ${v + q}" stroke="#fff" stroke-width="${ps * .3}" pointer-events="none"/>`;
+    }
+  };
+  if (layer === "gas") pipes(N.gas || [], "gas");
+  if (layer === "water") pipes(N.water || [], "water");
+  if (layer === "cables") {
+    const pos = {}; for (const p of N.panels || []) pos[p[2]] = P(p[0], p[1]);
+    for (const d of N.devices || []) { const a = P(d[0], d[1]), b = pos[d[2]]; if (b) g += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${d[3] > .95 ? "#f5d13a" : d[3] > .05 ? "var(--amb)" : "var(--red)"}" stroke-width="${fs * .12}" stroke-dasharray="${d[3] > .05 ? "none" : fs * .4}" opacity=".85"/>`; }
+    for (const d of N.devices || []) { const [u, v] = P(d[0], d[1]); g += `<circle cx="${u}" cy="${v}" r="${fs * .35}" fill="${d[3] > .95 ? "var(--ok)" : d[3] > .05 ? "var(--amb)" : "var(--red)"}"><title>${esc(d[4])} · ${n0(d[3] * 100)} %</title></circle>`; }
+    for (const p of N.panels || []) { const [u, v] = P(p[0], p[1]), c = p[3] === 0 ? "#f5d13a" : p[3] === 1 ? "var(--red)" : "var(--dim)", s = fs * 1.1; g += `<rect class="hit" data-fn="brkGo" data-arg="${esc(p[2])}" x="${u - s / 2}" y="${v - s / 2}" width="${s}" height="${s}" fill="var(--bg)" stroke="${c}" stroke-width="${fs * .2}"><title>Panneau électrique · ${p[3] === 0 ? "sous tension" : p[3] === 1 ? "SAUTÉ" : "coupé"}</title></rect><path d="M${u + s * .08} ${v - s * .32}L${u - s * .18} ${v + s * .05}L${u + s * .05} ${v + s * .05}L${u - s * .1} ${v + s * .34}" fill="none" stroke="${c}" stroke-width="${fs * .14}" pointer-events="none"/>`; }
+  }
+  return `<svg viewBox="${x0 - pad} ${z0 - pad} ${W + pad * 2} ${H + pad * 2}" role="img" aria-label="Réseaux">${g}</svg>`;
+}
+function netLegend(layer) {
+  if (layer === "heat") return `<div class="row" style="gap:4px;align-items:center;font-size:12px"><span class="mu">−40 °C</span>${[-40, -10, 5, 15, 21, 27, 35, 50, 70].map(t => `<span style="width:26px;height:10px;background:${heatCol(t)}"></span>`).join("")}<span class="mu">70 °C</span></div>`;
+  if (layer === "breath") return `<div class="row" style="gap:14px;font-size:12px">${BREATH.map(([c, l]) => `<span><span style="display:inline-block;width:10px;height:10px;background:${c};margin-right:5px"></span>${l}</span>`).join("")}</div>`;
+  if (layer === "cables") return `<p class="note">Carré : panneau de pièce (jaune sous tension, rouge sauté, gris coupé). Point : appareil branché, relié à son panneau. Cliquez un panneau pour l’ouvrir dans « Énergie ».</p>`;
+  return `<div class="row" style="gap:12px;font-size:12px;flex-wrap:wrap">${(layer === "water" ? ["H2O"] : ["AIR", "O2", "N2", "H2", "CO2", "CH4", "vide"]).map(k => `<span><span style="display:inline-block;width:10px;height:10px;background:${GAS_COL[k]};margin-right:5px"></span>${GAS_NAME[k]}</span>`).join("")}<span class="mu">Flèche : sens de circulation · <span class="red">✕</span> tronçon fermé · cliquez un tronçon pour le fermer</span></div>`;
+}
+PAGE.networks = () => {
+  if (!V.decks.length) return panel("Réseaux", "NET", `<p class="empty">Aucune structure reçue du mod.</p>`);
+  if (!ui.deck || !V.decks.find(d => d.id === ui.deck)) ui.deck = V.decks[0].id;
+  const layer = ui.layer || "gas";
+  const tabs = `<div class="row" style="gap:6px;flex-wrap:wrap">${LAYERS.map(([k, l]) => `<button class="b sm ${layer === k ? "solid" : "ghost"}" data-fn="layer" data-arg="${k}">${esc(l)}</button>`).join("")}<select id="net-deck" data-fn="netDeck" aria-label="Pont" style="margin-left:auto;width:auto;max-width:260px">${V.decks.map(d => `<option value="${esc(d.id)}"${ui.deck === d.id ? " selected" : ""}>${esc(d.id)} · ${esc(d.name)}</option>`).join("")}</select></div>`;
+  const N = (V.networks && V.networks.decks && V.networks.decks[ui.deck]) || null;
+  const all = N ? [...(N.gas || []).map(p => ["gas", p]), ...(N.water || []).map(p => ["water", p])] : [];
+  const sp = ui.pipe && all.find(([, p]) => p[5] === ui.pipe);
+  let side = "";
+  if (sp) {
+    const [kind, p] = sp, blocked = p[4] === 1;
+    side = panel("Tronçon de conduite", kind === "water" ? "H2O" : "GAS", kv("Contenu", esc(kind === "water" ? "Eau" : GAS_NAME[p[3]] || p[3])) + kv("Circulation", blocked ? "Bloquée" : DIRV[p[2]] ? "Oui" : "À l’arrêt") + kv("Position", `<span class="m">${esc(p[5].split("|").slice(1).join(" "))}</span>`) +
+      `<div class="btns" style="margin-top:10px">${btn(blocked ? "Rouvrir le tronçon" : "Fermer le tronçon", { type: "pipe.block", pipe: p[5], on: !blocked, label: kind === "water" ? "eau" : GAS_NAME[p[3]] }, { perm: "pipe.block", cls: blocked ? "" : "amb" })}</div><p class="note">Un tronçon fermé coupe la conduite en deux réseaux : rien ne le traverse plus, comme une vanne d’isolement.</p>`);
+  }
+  const r = ui.room && V.rooms[ui.room] && V.rooms[ui.room].deck === ui.deck ? V.rooms[ui.room] : null;
+  if (r) {
+    const e = r.env || {}, sc = breathScore(e), sp = V.thermal && V.thermal[r.id];
+    side += panel(r.name, "ROOM", `<div class="gauge"><div><span>Temp.</span><b style="color:${heatCol(e.t)}">${n1(e.t)}</b> <small class="mu">°C</small></div><div><span>Pression</span><b class="${envCls("p", e.p)}">${n1(e.p)}</b> <small class="mu">kPa</small></div><div><span>O₂</span><b class="${envCls("o2", e.o2)}">${n1(e.o2)}</b> <small class="mu">%</small></div><div><span>CO₂</span><b>${n1(e.co2)}</b> <small class="mu">%</small></div><div><span>Air</span><b style="color:${sc >= 0 ? BREATH[sc][0] : "var(--mu)"}">${sc >= 0 ? BREATH[sc][1] : "—"}</b></div></div>
+      ${perm("thermal.set") ? `<div class="row" style="margin-top:10px"><label class="mu" for="th-v">Consigne</label><input type="number" id="th-v" min="5" max="35" step="0.5" value="${sp ?? 21}" style="width:80px"> <span class="mu">°C</span>${btn("Appliquer", null, { fn: "thermal", arg: r.id, cls: "sm" })}${sp != null ? btn("Défaut", { type: "thermal.set", room: r.id, value: null }, { cls: "sm ghost" }) : ""}</div>` : ""}
+      <p class="note">La chaleur et l’air s’équilibrent avec les pièces voisines quand les portes sont ouvertes. Une centrale de climatisation reliée aux bouches tient la consigne.</p>`);
+  }
+  if (!side) side = panel("Mode d’emploi", "NET.HELP", `<p>Cinq vues sur le plan de chaque pont :</p><p class="note"><b>Câbles</b> : panneaux électriques et appareils branchés.<br><b>Gaz</b> : chaque tronçon prend la couleur du gaz qui y domine, la flèche montre où il va.<br><b>Eau</b> : conduites d’eau et sens d’écoulement.<br><b>Chaleur</b> : température des pièces.<br><b>Respirabilité</b> : pression, O₂ et CO₂ combinés.</p><p class="note">Cliquez un tronçon pour le fermer ou le rouvrir, une pièce pour ses mesures et sa consigne de température.</p>`);
+  return `<div class="grid g-2">${panel("Réseaux · " + deckName(ui.deck), "NET." + layer.toUpperCase(), tabs + `<div class="svgw planwide" style="margin-top:10px">${netPlan(ui.deck, layer)}</div><div style="margin-top:8px">${netLegend(layer)}</div>${V.networks ? "" : `<p class="note">En attente du relevé des réseaux (toutes les 5 s quand le mod est en ligne).</p>`}`)}<div class="stack">${side}</div></div>`;
+};
+FN.layer = (el) => { ui.layer = el.dataset.arg; render(); };
+FN.netDeck = (el) => { ui.deck = el.value; ui.room = null; ui.pipe = null; render(); };
+FN.pipeSel = (el) => { ui.pipe = el.dataset.arg; render(); };
+FN.brkGo = (el) => { ui.brk = el.dataset.arg; ui.page = "energy"; render(); };
+FN.thermal = (el) => { act({ type: "thermal.set", room: el.dataset.arg, value: parseFloat(String(val("th-v")).replace(",", ".")) }, "Consigne transmise."); };
+
+/* =====================================================================
+   Médical : fiches par partie du corps, sang, température, diagnostics
+   ===================================================================== */
+const BODY_N = ["Tête", "Torse", "Bras G", "Bras D", "Jambe G", "Jambe D"];
+const BODY_R = [[2, 0, 4, 4], [2, 4, 4, 6], [6, 4, 2, 6], [0, 4, 2, 6], [4, 10, 2, 6], [2, 10, 2, 6]];
+function bodyCol(f) { return f <= .001 ? "#30363a" : f > .75 ? "var(--ok)" : f > .45 ? "#e8d13a" : f > .2 ? "var(--amb)" : "var(--red)"; }
+function bodySvg(body, size = 70) {
+  if (!body) return `<span class="dim">—</span>`;
+  const g = body.map((p, i) => { const [x, y, w, h] = BODY_R[i], f = p.hp / p.max; return `<rect x="${x + .1}" y="${y + .1}" width="${w - .2}" height="${h - .2}" fill="${bodyCol(f)}" fill-opacity="${.25 + .75 * f}" stroke="${p.bleed ? "#d0152b" : "var(--line2)"}" stroke-width="${p.bleed ? .35 : .12}"><title>${BODY_N[i]} · ${p.hp}/${p.max}${p.fracture ? p.splint ? " · fracture immobilisée" : " · FRACTURE" : ""}${p.bleed ? " · saignement ×" + p.bleed : ""}</title></rect>${p.fracture ? `<path d="M${x + .3} ${y + h * .3}L${x + w - .3} ${y + h * .7}" stroke="#fff" stroke-width=".25"/>` : ""}`; }).join("");
+  return `<svg viewBox="-.2 -.2 8.4 16.4" width="${size / 2}" height="${size}" style="flex:none;width:${size / 2}px;height:${size}px;max-width:none">${g}</svg>`;
+}
+PAGE.medical = () => {
+  const list = people().filter(p => p.vitals);
+  const adm = V.me.admin;
+  const card = (p) => {
+    const v = p.vitals, dead = v.alive === false, ds = v.diseases || [], inf = (v.infections || []).filter(x => !x.diagnosed);
+    const injuries = (v.body || []).map((b, i) => [b, i]).filter(([b]) => b.hp < b.max || b.bleed || b.fracture).map(([b, i]) => `${BODY_N[i]}${b.fracture ? b.splint ? " (attelle)" : " (fracture)" : ""}${b.bleed ? " (saigne)" : ""}`);
+    return `<div class="vrow${ui.person === p.id ? " sel" : ""}" data-person="${esc(p.id)}" style="align-items:flex-start;gap:12px">${bodySvg(v.body)}<div style="flex:1;min-width:0"><div class="row" style="gap:8px"><b>${esc(p.name)}</b>${vitalState(p)}${p.online ? "" : `<span class="pill">hors ligne</span>`}</div>
+      <div class="m dim" style="font-size:11.5px">${esc(roomName(p.room))} · sang ${v.blood != null ? n0(v.blood) + " mL" : "—"} · ${v.temp != null ? n1(v.temp) + " °C" : "—"}</div>
+      ${injuries.length ? `<div style="font-size:12.5px">${esc(injuries.join(" · "))}</div>` : ""}
+      ${(v.symptoms || []).length ? `<div class="amb" style="font-size:12.5px">Symptômes : ${esc(v.symptoms.join(", "))}</div>` : ""}
+      ${ds.map(d => `<div style="font-size:12.5px"><span class="pill vio" style="color:var(--vio)">${esc(d.name)}</span> stade ${d.stage}/${d.stages}${d.treated ? " · sous traitement" : ""}</div>`).join("")}
+      ${adm && inf.length ? `<div class="dim" style="font-size:11.5px">Non diagnostiqué : ${esc(inf.map(x => (V.diseases && V.diseases[x.id] ? V.diseases[x.id].name : x.id) + " st." + x.stage).join(", "))}</div>` : ""}
+      ${dead ? "" : `<div class="btns" style="margin-top:6px">${ds.length || (adm && inf.length) ? btn("Guérir (ordre médical)", { type: "disease.cure", person: p.id, disease: "" }, { perm: "med.order", cls: "sm ghost", confirm: `Lever toutes les maladies de ${p.name} ? (ordre du site, hors jeu)` }) : ""}${adm ? btn("Contaminer…", null, { fn: "infect", arg: p.id, cls: "sm ghost" }) : ""}</div>`}
+    </div></div>`;
+  };
+  const sick = list.filter(p => (p.vitals.diseases || []).length || (p.vitals.symptoms || []).length), hurt = list.filter(p => (p.vitals.body || []).some(b => b.hp < b.max * .7 || b.bleed || b.fracture) || (p.vitals.blood && p.vitals.blood < 3600));
+  const head = `<div class="tiles"><div class="tile"><span>Suivis</span><div class="big">${list.length}</div></div><div class="tile"><span>Blessés</span><div class="big ${hurt.length ? "amb" : ""}">${hurt.length}</div></div><div class="tile"><span>Malades</span><div class="big ${sick.length ? "red" : ""}">${sick.length}</div></div><div class="tile"><span>Diagnostics</span><div class="big">${list.reduce((a, p) => a + (p.vitals.diseases || []).length, 0)}</div></div></div>`;
+  const known = Object.entries(V.diseases || {});
+  const ref = known.length ? known.map(([id, d]) => `<div class="vrow"><div style="min-width:0"><b>${esc(d.name)}</b> <span class="pill">${esc(d.pathogen)}</span><div class="mu" style="font-size:12px">${esc(d.description || "")}</div><div class="dim" style="font-size:11.5px">${d.stages.length} stades · ${d.lethal ? "mortelle sans traitement" : "guérison spontanée"} · planètes : ${esc((d.planets || []).join(", ") || "aucune")}</div></div></div>`).join("") : `<p class="empty">Aucune maladie répertoriée.</p>`;
+  return `<div class="grid g-2"><div class="stack">${panel("Infirmerie", "MED", head + `<p class="note">Fiches par partie du corps transmises par les combinaisons. Les maladies n’apparaissent qu’une fois diagnostiquées au labo (prélèvement → analyseur sanguin) ; le patient, lui, ressent ses symptômes.</p>`)}${panel("Patients", "MED.PAT", list.length ? [...hurt, ...sick, ...list].filter((p, i, a) => a.indexOf(p) === i).map(card).join("") : `<p class="empty">Aucune donnée biométrique.</p>`)}</div><div class="stack">${panel("Répertoire des pathologies", "PATH", ref + `<p class="note">Protocole : seringue → prélèvement → analyseur (diagnostic) → synthétiseur pharmaceutique (traitement, 3 doses). Combinaisons de protection sanitaire pour approcher un malade contagieux.</p>`)}</div></div>`;
+};
+FN.infect = (el) => {
+  const p = V.people[el.dataset.arg];
+  openModal(() => `<h3>Contaminer ${esc(p.name)}</h3><label class="f">Maladie<select id="inf-d">${Object.entries(V.diseases || {}).map(([id, d]) => `<option value="${esc(id)}">${esc(d.name)}</option>`).join("")}</select></label><p class="note">Pour une scène : la maladie démarre au premier stade. Le joueur doit être en ligne.</p>${mfoot("Contaminer", "red")}`,
+    () => { act({ type: "disease.infect", person: p.id, disease: val("inf-d") }, "Ordre transmis."); return true; });
+};
+
+/* =====================================================================
+   Maladies (poste admin) : définition, stades, symptômes, planètes
+   ===================================================================== */
+const PATHOGENS = ["virus", "bactérie", "champignon", "parasite", "prion"];
+PAGE.diseases = () => {
+  const D = Object.entries(V.diseases || {});
+  const rows = D.map(([id, d]) => `<div class="vrow"><div style="min-width:0;flex:1"><div class="row" style="gap:8px"><b>${esc(d.name)}</b><span class="pill">${esc(d.pathogen)}</span>${d.lethal ? `<span class="pill" style="color:var(--red)">mortelle</span>` : ""}<span class="m dim" style="font-size:11px">${esc(id)}</span></div>
+    <div class="mu" style="font-size:12px">${esc(d.description || "")}</div>
+    <div class="dim" style="font-size:11.5px">Planètes : ${esc((d.planets || []).join(", ") || "aucune")} · blessure ${n0(d.wound * 100)} % · air ${n1(d.air * 100)} %/min · contact ×${n1(d.contact)} · traitement ${Math.round(d.cure / 60)} min</div>
+    <div class="row" style="gap:4px;margin-top:6px;flex-wrap:wrap">${d.stages.map((s, i) => `<span class="pill" title="${esc(s.symptoms.map(x => MC.SYMPTOMS[x]).join(", "))}">${i + 1}. ${esc(s.name)} · ${Math.round(s.duration / 60)} min${s.contagion ? " · contagieux" : ""}</span>`).join("")}</div></div>
+    <span class="row" style="gap:6px;flex:none">${btn("Modifier", null, { fn: "dzEdit", arg: id, cls: "sm" })}</span></div>`).join("") || `<p class="empty">Aucune maladie.</p>`;
+  return `<div class="grid g-2">${panel("Maladies", "BIO." + D.length, rows + `<div class="btns" style="margin-top:10px">${btn("Nouvelle maladie", null, { fn: "dzEdit", arg: "", cls: "sm" })}${btn("Rétablir les maladies par défaut", { type: "disease.reset" }, { cls: "sm ghost", confirm: "Remplacer toutes les maladies par les deux maladies par défaut ?" })}</div>`)}
+  ${panel("Fonctionnement", "BIO.HELP", `<p class="note">Une maladie est posée sur une ou plusieurs planètes (identifiant de dimension, ex. <span class="m">kepler_442b</span>). On l’attrape :</p><p class="note">• <b>blessure</b> : à chaque coup d’une bête ou d’une plante de la planète (chance par blessure) ;<br>• <b>air</b> : en respirant l’air de la planète sans casque ni cagoule (chance par minute) ;<br>• <b>contact</b> : près d’un malade contagieux sans combinaison sanitaire (multiplicateur de la contagiosité du stade).</p><p class="note">Chaque stade dure un temps donné et apporte ses symptômes. Au dernier stade, une maladie mortelle tue si elle porte le symptôme « Défaillance » ; sinon le patient guérit et devient immunisé. Le traitement (synthétisé au labo) fige la maladie puis la guérit après la durée indiquée.</p>`)}</div>`;
+};
+function dzRead() {
+  const d = ui.draft.dz;
+  d.name = val("dz-n"); d.pathogen = val("dz-p"); d.planets = String(val("dz-pl") || "").split(/[ ,;]+/).filter(Boolean);
+  d.wound = (+val("dz-w") || 0) / 100; d.air = (+val("dz-a") || 0) / 100; d.contact = +val("dz-c") || 0; d.cure = Math.round((+val("dz-cu") || 5) * 60);
+  d.lethal = !!(document.getElementById("dz-l") || {}).checked; d.description = val("dz-de"); d.morphology = val("dz-mo");
+  d.stages.forEach((s, i) => { s.name = val("dzs-n" + i); s.duration = Math.round((+val("dzs-d" + i) || 1) * 60); s.contagion = (+val("dzs-c" + i) || 0) / 100; s.symptoms = [...document.querySelectorAll(`[data-dzs="${i}"]:checked`)].map(x => x.dataset.sym); });
+}
+function dzHtml() {
+  const d = ui.draft.dz;
+  return `<h3>${ui.draft.id ? "Modifier " + esc(d.name) : "Nouvelle maladie"}</h3>
+  <div class="f2"><label class="f">Nom<input type="text" id="dz-n" maxlength="60" value="${esc(d.name)}"></label><label class="f">Identifiant<input type="text" id="dz-id" maxlength="32" value="${esc(ui.draft.id)}"${ui.draft.id ? " disabled" : ""} placeholder="fievre_kepler"></label>
+  <label class="f">Pathogène<select id="dz-p">${PATHOGENS.map(x => `<option${d.pathogen === x ? " selected" : ""}>${x}</option>`).join("")}</select></label><label class="f">Planètes (dimensions)<input type="text" id="dz-pl" value="${esc((d.planets || []).join(", "))}" placeholder="kepler_442b, trappist_1e"></label>
+  <label class="f">Chance par blessure (%)<input type="number" id="dz-w" min="0" max="100" step="1" value="${n0(d.wound * 100)}"></label><label class="f">Chance par minute d’air (%)<input type="number" id="dz-a" min="0" max="100" step="0.5" value="${(d.air * 100).toFixed(1)}"></label>
+  <label class="f">Multiplicateur de contact<input type="number" id="dz-c" min="0" max="2" step="0.1" value="${d.contact}"></label><label class="f">Durée de traitement (min)<input type="number" id="dz-cu" min="1" max="600" value="${Math.round(d.cure / 60)}"></label></div>
+  <label class="chk"><input type="checkbox" id="dz-l"${d.lethal ? " checked" : ""}> Mortelle sans traitement (au terme d’un stade « Défaillance »)</label>
+  <label class="f">Description<input type="text" id="dz-de" maxlength="300" value="${esc(d.description || "")}"></label><label class="f">Au microscope<input type="text" id="dz-mo" maxlength="200" value="${esc(d.morphology || "")}"></label>
+  <div class="lbl">Stades</div>${d.stages.map((s, i) => `<div class="pn" style="margin:6px 0"><div class="pi" style="padding:10px"><div class="f2"><label class="f">Stade ${i + 1}<input type="text" id="dzs-n${i}" maxlength="40" value="${esc(s.name)}"></label><label class="f">Durée (min)<input type="number" id="dzs-d${i}" min="1" max="1440" value="${Math.max(1, Math.round(s.duration / 60))}"></label><label class="f">Contagiosité (% / 20 s)<input type="number" id="dzs-c${i}" min="0" max="100" step="0.5" value="${(s.contagion * 100).toFixed(1)}"></label></div>
+    <div>${Object.entries(MC.SYMPTOMS).map(([k, l]) => `<label class="chk" style="display:inline-flex;margin-right:10px"><input type="checkbox" data-dzs="${i}" data-sym="${k}"${s.symptoms.includes(k) ? " checked" : ""}> ${esc(l)}</label>`).join("")}</div>
+    ${d.stages.length > 1 ? `<div class="btns">${btn("Retirer ce stade", null, { fn: "dzRm", arg: String(i), cls: "sm ghost" })}</div>` : ""}</div></div>`).join("")}
+  <div class="btns">${btn("Ajouter un stade", null, { fn: "dzAdd", cls: "sm" })}${ui.draft.id ? btn("Supprimer la maladie", null, { fn: "dzDel", arg: ui.draft.id, cls: "sm red" }) : ""}</div>${mfoot()}`;
+}
+FN.dzEdit = (el) => {
+  const id = el.dataset.arg, src = id && V.diseases[id];
+  ui.draft = { id, dz: JSON.parse(JSON.stringify(src || { name: "", pathogen: "virus", planets: [], wound: .1, air: .02, contact: 1, lethal: false, cure: 300, description: "", morphology: "", stages: [{ name: "Incubation", duration: 600, symptoms: [], contagion: 0 }] })) };
+  openModal(dzHtml, () => { dzRead(); act({ type: "disease.save", id: ui.draft.id || val("dz-id") || ui.draft.dz.name, def: ui.draft.dz }, "Maladie enregistrée."); return true; });
+};
+FN.dzAdd = () => { dzRead(); ui.draft.dz.stages.push({ name: "", duration: 600, symptoms: [], contagion: 0 }); drawModal(); };
+FN.dzRm = (el) => { dzRead(); ui.draft.dz.stages.splice(+el.dataset.arg, 1); drawModal(); };
+FN.dzDel = (el) => { const id = el.dataset.arg; closeModal(); confirmModal("Supprimer cette maladie ? Les malades guérissent aussitôt.", () => act({ type: "disease.delete", id }, "Maladie supprimée.")); };
+
+/* Sas : panneau dans la page Portes */
+function airlockPanel() {
+  const L = (V.airlocks && V.airlocks.list) || [];
+  if (!L.length) return "";
+  return panel("Sas", "AIRLOCK." + L.length, L.map(a => `<div class="vrow"><div style="min-width:0"><b class="m cy">${esc(a.id)}</b> <span class="mu" style="font-size:12px">${esc(deckName(a.deck))}</span><div style="font-size:12.5px">${a.phase === "idle" ? (a.side === "out" ? "Ouvert côté extérieur" : "Ouvert côté intérieur") : a.phase === "to_outside" ? "Dépressurisation…" : "Pressurisation…"} · ${n1(a.kpa)} kPa${a.locked ? ` · <span class="red">verrouillé</span>` : a.restricted ? ` · <span class="amb">réservé</span>` : ""}</div>${a.doors < 2 ? `<div class="dim" style="font-size:11.5px">Sas incomplet : ${a.doors}/2 portes reliées</div>` : ""}</div>
+    <span class="row" style="gap:6px;flex:none;flex-wrap:wrap">${btn(a.side === "out" ? "Cycler vers l’intérieur" : "Cycler vers l’extérieur", { type: "airlock.cycle", id: a.id, side: a.side === "out" ? "in" : "out" }, { perm: "airlock.cycle", cls: "sm", disabled: a.phase !== "idle" || a.doors < 2 })}${btn(a.locked ? "Déverrouiller" : "Verrouiller", { type: "airlock.lock", id: a.id, locked: !a.locked }, { perm: "airlock.lock", cls: "sm amb" })}${btn(a.restricted ? "Ouvrir à tous" : "Réserver", { type: "airlock.lock", id: a.id, restricted: !a.restricted }, { perm: "airlock.lock", cls: "sm ghost", title: "Réservé : seules les personnes autorisées sur la porte intérieure peuvent le cycler" })}</span></div>`).join(""));
+}
+
 PAGE.alerts = () => {
   const alerts = V.alerts.filter(a => !a.ack), crit = alerts.filter(a => a.lvl === "crit"), lvl = V.ship.alert;
   const row = (a) => {
