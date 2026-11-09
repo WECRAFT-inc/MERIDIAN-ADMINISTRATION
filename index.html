@@ -728,7 +728,8 @@ function computeAlerts(state, withSilent = false) {
    prend la couleur de l'armure portée. */
 const UNIFORM_TEMPLATES = {
   equipage: "Équipage", officier: "Officier d’équipage", armee: "Armée", armee_officier: "Officier de l’armée", securite: "Sécurité",
-  colon: "Colon", ingenieur: "Ingénieur", medecin: "Médecin", pilote: "Pilote", explorateur: "Explorateur", scientifique: "Scientifique", civil: "Tenue civile (aucun uniforme)"
+  colon: "Colon", ingenieur: "Ingénieur", medecin: "Médecin", pilote: "Pilote", explorateur: "Explorateur", scientifique: "Scientifique (laboratoire)", chercheur: "Chercheur (recherche)", agronome: "Agronome · hydroponie", cuisinier: "Cuisine · intendance",
+  logistique: "Logistique · soute", communications: "Communications", administration: "Administration · RH", civil: "Tenue civile (aucun uniforme)"
 };
 /* Couleurs de chaque uniforme (identiques aux textures du mod). sleeves : "full" ou "short" (avant-bras nus). */
 const UNIFORM_LOOK = {
@@ -743,6 +744,12 @@ const UNIFORM_LOOK = {
   pilote:         { main: "#55605a", trim: "#e07a2a", accent: "#2b2b2b", pants: "#4a5450", boots: "#1c1d1c", belt: "#2b2b2b", sleeves: "full" },
   explorateur:    { main: "#b8bec2", trim: "#e07a2a", accent: "#4d5a63", pants: "#a2a9ad", boots: "#3b3f42", belt: "#4d5a63", sleeves: "full" },
   scientifique:   { main: "#eef3f6", trim: "#4aa3ff", accent: "#4aa3ff", pants: "#3a4a5e", boots: "#1c2026", belt: "#c3ccd2", sleeves: "full" },
+  chercheur:      { main: "#2e2f3a", trim: "#a88dff", accent: "#e8eef0", pants: "#272832", boots: "#1a1b20", belt: "#3a3b46", sleeves: "full" },
+  agronome:       { main: "#5b7a3a", trim: "#c9b48a", accent: "#e0b94a", pants: "#4e6a32", boots: "#3a2c1f", belt: "#4a3a28", sleeves: "short" },
+  cuisinier:      { main: "#eeeae2", trim: "#2b2b2b", accent: "#c8333f", pants: "#2b2b2b", boots: "#1c1c1c", belt: "#5a5a5a", sleeves: "full" },
+  logistique:     { main: "#4f5660", trim: "#e8d24a", accent: "#e07a2a", pants: "#3f454d", boots: "#22252a", belt: "#2b2b2b", sleeves: "full" },
+  communications: { main: "#2a3b55", trim: "#e8d24a", accent: "#62e6f2", pants: "#232f44", boots: "#16181c", belt: "#3a4150", sleeves: "full" },
+  administration: { main: "#2b2f36", trim: "#c9d3d8", accent: "#7a1f2b", pants: "#24272d", boots: "#121214", belt: "#1a1c20", sleeves: "full" },
 };
 /* Couleur de la ceinture selon l'armure portée : le seul détail qui trahit l'armure. */
 const ARMOR_TIERS = { none: ["Sans armure", null], leather: ["Cuir", "#7a4a2a"], chainmail: ["Mailles", "#9a9a9a"], iron: ["Fer", "#dcdcdc"], gold: ["Or", "#e8c04a"], diamond: ["Diamant", "#4ee0e0"], netherite: ["Netherite", "#5a4a63"], turtle: ["Carapace", "#3fa34a"] };
@@ -1702,12 +1709,20 @@ const MANUAL = {
 equipage: [
 ["Uniformes et grades", `Votre tenue vient de l’ordinateur de bord : le commandement vous donne un grade (page Équipage), et ce grade porte un modèle d’uniforme et des insignes.
 - L’uniforme se dessine par-dessus votre peau et remplace l’apparence de toute armure : on ne voit pas ce que vous portez dessous.
-- Un seul détail le trahit : la ceinture et sa boucle prennent la couleur du matériau de votre armure (cuir, mailles, fer, or, diamant, netherite, carapace).
+- Un seul détail le trahit : la ceinture. Elle prend la couleur, le motif et la boucle du matériau de l’armure portée :
+- Cuir : brune, piqûres claires, boucle laiton.
+- Mailles : grise, maillée.
+- Fer : plaques claires rivetées.
+- Or : dorée à reflets, boucle dorée.
+- Diamant : cyan sombre, gemmes serties.
+- Netherite : métal sombre, liseré de braise.
+- Carapace : verte à écailles.
+- Ceinture d’origine (couleur de l’uniforme) : aucune armure.
 - Les insignes sont sur les épaules : barrettes, chevrons ou étoiles, en nombre et en couleur selon le grade.
 - Épaule gauche : l’écusson de la mission. Épaule droite : l’écusson de votre service (commandement, ingénierie, médical, pilotage, exploration, sécurité, colons, sciences).
 - Officiers : galons dorés aux manches, pattes d’épaule, casquette. Hommes du rang : chevrons sur la manche.
 - Tenues de métier en relief : sac d’explorateur, sacoche d’outils, étui des militaires.
-- Sur la poitrine : le badge nominatif (votre prénom et votre nom à bord) et la plaque de grade ; au dos des combinaisons, votre nom en grand.
+- Pattes de col à la couleur du grade (barrettes, étoiles ou chevrons). Votre nom en grand au dos pour les combinaisons de travail, l’armée, la sécurité, les pilotes, la logistique, les communications et la recherche.
 - Écusson d’unité : fabriquez-le (laine blanche + ficelle), clic droit pour le dessiner (forme, couleurs, motif, sigle), accroupi + clic droit pour le coudre sous l’écusson de mission ou le retirer.
 - Commande /uniforme : passer en tenue civile, ou remettre l’uniforme.
 > Reconnaître un grade d’un coup d’œil évite bien des malentendus dans un couloir enfumé.`],
@@ -1732,7 +1747,7 @@ equipage: [
 - Moins de 16 kPa d’O₂ : vous ralentissez. Moins de 10 kPa : vous vous blessez. Moins de 6 kPa : asphyxie.
 - Moins de 50 kPa au total : basse pression. Moins de 20 kPa : décompression.
 - Plus de 2 kPa de CO₂ : faiblesse. Plus de 5 kPa : intoxication.
-- Le lifepack (n’importe où dans l’inventaire) prend le relais dès que l’air devient irrespirable : environ 13 minutes.
+- Le lifepack (n’importe où dans l’inventaire) prend le relais dès que l’air devient irrespirable : environ 13 minutes (dans le vide, seule la combinaison EVA protège le corps).
 ! Gardez toujours un lifepack chargé sur vous.`],
 ["Décompression et brèche", `Quand une pièce s’ouvre sur le vide, tout l’air s’en échappe en quelques secondes et emporte ce qui n’est pas attaché.
 1. Accrochez-vous : câble SAFELINE sur une poignée (6 blocs de longueur).
@@ -1830,7 +1845,13 @@ medecin: [
 ["Décompression", `- Sous 50 kPa : basse pression, lenteur.
 - Sous 20 kPa : décompression, blessures importantes.
 - Une décompression explosive projette les victimes vers la brèche : cherchez-les près du trou ou dehors.
-! Le lifepack protège de l’asphyxie et de la décompression tant qu’il reste de l’oxygène (≈ 13 minutes).`],
+! Le lifepack ne protège que la respiration : dans le vide, le corps subit la décompression et ne tient que quelques secondes. Pour sortir, il faut la combinaison EVA complète.`],
+["Combinaison EVA", `Les quatre pièces (casque, torse, jambes, bottes) forment une enveloppe étanche : dans le vide, plus de décompression, et vous respirez la réserve du torse (≈ 53 min), puis vos lifepacks.
+- Le torse se recharge dans un compresseur LIFEPACK, comme un lifepack.
+- Sous 20 % de réserve, la combinaison vous prévient toutes les dix secondes : regagnez un sas.
+- Une pièce manquante = plus d’étanchéité : le lifepack seul ne vous laisse que quelques secondes dans le vide.
+- Avec un uniforme attribué, la combinaison prend les couleurs de votre métier ; le grade se lit aux bandes du casque, du sac dorsal et des cuisses, et les écussons restent sur les bras.
+> Recettes : laine blanche et fer ; le torse demande un lifepack, le casque un bloc de verre.`],
 ["Intoxication au CO₂", `- Au-dessus de 2 kPa : faiblesse. Au-dessus de 5 kPa : intoxication et blessures.
 - Causes : filtreur à l’arrêt, pièce surpeuplée, incendie, extincteur vidé dans un petit local.
 > Traitement : quitter la pièce, faire relancer le filtreur.`],
@@ -1870,7 +1891,7 @@ explorateur: [
 ["Si le vaisseau part sans vous", `- Vous ressortez dans l’espace profond : les planètes et l’étoile du système, sans le vaisseau.
 - De là, on peut redescendre sur n’importe quelle planète du système.
 - Au retour du vaisseau, tout ce qui attend dans l’espace profond est ramené près de lui.
-! L’espace profond est le vide : lifepack ou navette pressurisée obligatoires.`],
+! L’espace profond est le vide : combinaison EVA complète ou navette pressurisée obligatoires.`],
 ["Sortie dans le vide (EVA)", `1. Entrez dans le sas, fermez la porte intérieure.
 2. Attachez-vous à une poignée SAFELINE, lifepack chargé.
 3. Videz le sas (dépressuriseur), puis ouvrez la porte extérieure.
@@ -2054,7 +2075,11 @@ const BRAND_SERVICES = [
   ["exploration", "Exploration", "EXP", "#8fd07a"],
   ["securite", "Sécurité et armée", "SEC", "#c8333f"],
   ["colons", "Colons", "COL", "#c9b48a"],
-  ["sciences", "Sciences", "SCI", "#4aa3ff"]
+  ["sciences", "Sciences", "SCI", "#4aa3ff"],
+  ["recherche", "Recherche", "RCH", "#a88dff"],
+  ["intendance", "Intendance", "INT", "#e0a060"],
+  ["communications", "Communications", "COM", "#e8d24a"],
+  ["administration", "Administration", "ADM", "#9fb3c8"]
 ];
 function serviceIcon(k, c) {
   switch (k) {
@@ -2069,6 +2094,10 @@ function serviceIcon(k, c) {
     case "securite": return `<path d="M60 38 L82 46 V62 Q82 80 60 88 Q38 80 38 62 V46 Z" fill="none" stroke="${c}" stroke-width="3"/>` + brandSpark(60, 62, 12, c);
     case "colons": return `<path d="M60 86 V58" stroke="${c}" stroke-width="3.5"/><path d="M60 62 Q40 60 38 42 Q56 42 60 62Z M60 56 Q78 52 82 36 Q64 36 60 56Z" fill="${c}"/><path d="M36 86 H84" stroke="${c}" stroke-width="3"/>`;
     case "sciences": return `<ellipse cx="60" cy="62" rx="24" ry="9" fill="none" stroke="${c}" stroke-width="2.5"/><ellipse cx="60" cy="62" rx="24" ry="9" fill="none" stroke="${c}" stroke-width="2.5" transform="rotate(60 60 62)"/><ellipse cx="60" cy="62" rx="24" ry="9" fill="none" stroke="${c}" stroke-width="2.5" transform="rotate(-60 60 62)"/><circle cx="60" cy="62" r="5" fill="${c}"/>`;
+    case "recherche": return `<circle cx="56" cy="58" r="15" fill="none" stroke="${c}" stroke-width="4"/><path d="M66 69 L82 86" stroke="${c}" stroke-width="6" stroke-linecap="round"/><circle cx="56" cy="58" r="5" fill="${c}"/>`;
+    case "intendance": return `<path d="M44 40 V60 M38 40 V54 Q38 60 44 60 Q50 60 50 54 V40 M44 60 V86" stroke="${c}" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M74 40 Q84 52 76 64 V86" stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+    case "communications": return `<path d="M60 86 L52 58 H68 Z" fill="${c}"/><circle cx="60" cy="52" r="5" fill="${c}"/><path d="M48 40 Q40 52 48 64 M72 40 Q80 52 72 64 M40 34 Q28 52 40 70 M80 34 Q92 52 80 70" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    case "administration": return `<path d="M40 38 H70 L80 48 V86 H40 Z" fill="none" stroke="${c}" stroke-width="3.5"/><path d="M48 56 H72 M48 66 H72 M48 76 H64" stroke="${c}" stroke-width="3"/>`;
   }
   return "";
 }
