@@ -314,6 +314,20 @@ button.mn{background:#2c3a44;box-shadow:inset 2px 2px 0 #46606e,inset -2px -2px 
 .bh-m{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}.bh-m>div{background:#1a1a1a;padding:20px;max-width:380px;border-top:4px solid #ff9000}.bh-btn{background:#ff9000;color:#000;border:0;font:700 14px Arial;padding:8px 14px;cursor:pointer;border-radius:3px}
 .bh-age{display:flex;align-items:center;justify-content:center;text-align:center;padding:30px}.bh-age>div{max-width:420px}
 @media (max-width:640px){.kb{grid-template-columns:1fr}.mw-desk{flex-direction:row}}
+
+.camgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
+.camcard{border:1px solid var(--ln);background:var(--bg2);min-width:0}
+.cam{position:relative;background:#000;aspect-ratio:16/9;overflow:hidden}
+.cam canvas{width:100%;height:100%;display:block;image-rendering:pixelated;filter:contrast(1.08) saturate(.85)}
+.cam::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55))}
+.cam-osd{position:absolute;left:8px;right:8px;top:6px;display:flex;gap:8px;align-items:center;font:11px var(--mono,monospace);color:#d9f3f6;text-shadow:0 0 3px #000;z-index:1}
+.cam-osd>span{white-space:nowrap}.cam-osd .cam-n{overflow:hidden;text-overflow:ellipsis;min-width:0}.cam-osd .rec{color:#ff4d4d;animation:camblink 1.6s steps(2) infinite}.cam-osd .cam-id{opacity:.6}.cam-osd .cam-t{margin-left:auto;opacity:.85}
+@keyframes camblink{50%{opacity:.2}}
+.camfoot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px}
+.camctl{display:flex;flex-wrap:wrap;gap:4px}.camfoot select{max-width:100%}
+.campicks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 12px;margin:8px 0}
+.campick{display:flex;gap:6px;align-items:center;font-size:13px}
+.kcam{position:fixed;inset:0;background:#000}.kcam .cam{position:absolute;inset:0;aspect-ratio:auto}.kcam .cam-osd{font-size:2.4vh;top:1.5vh;left:2vh;right:2vh}
 </style>
 
 <div id="app"></div>
@@ -347,7 +361,7 @@ const PAGES = {
   overview: "Vue d’ensemble", alerts: "Alertes", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
   galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", branding: "Identité visuelle", admin: "Ordinateur de bord",
-  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies", bord: "Vie de bord", stocks: "Réserves et soute"
+  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies", bord: "Vie de bord", stocks: "Réserves et soute", cameras: "Caméras"
 };
 /* Pages réservées au poste admin. */
 const ADMIN_PAGES = ["admin", "screens", "craft", "branding", "diseases"];
@@ -389,6 +403,9 @@ const ACTIONS = {
   "kb.procedure":   ["Publier une procédure technique (lisible par tous)", 3, "overview"],
   "kb.pathology":   ["Publier une fiche de pathologie", 4, "overview"],
   "info.general":   ["Publier sur le canal général (passerelle)", 5, "bord"],
+  "cam.view":       ["Consulter les caméras de surveillance", 3, "cameras"],
+  "cam.move":       ["Orienter les caméras", 3, "cameras"],
+  "cam.screen":     ["Afficher une caméra sur un écran", 3, "cameras"],
   "info.crew":      ["Publier sur le canal de l’équipage", 4, "bord"],
   "mobilize":       ["Mobiliser par alerte de puce", 6, "bord"],
   "schedule.edit":  ["Régler le déroulé de session et l’ambiance lumineuse", 6, "bord"],
@@ -439,7 +456,7 @@ const WS_PRESETS = {
   ingenieur: ["overview", "energy", "networks", "atmos", "plan", "procs", "alerts", "log"],
   medecin: ["overview", "medical", "crew", "plan", "alerts", "log"],
   pilote: ["overview", "starmap", "galaxy", "vue3d", "alerts", "log"],
-  securite: ["overview", "doors", "crew", "plan", "alerts", "log"],
+  securite: ["overview", "cameras", "doors", "crew", "plan", "alerts", "log"],
   chercheur: ["overview", "medical", "starmap", "galaxy", "log"],
   commandement: ["overview", "bord", "stocks", "alerts", "plan", "vue3d", "atmos", "energy", "networks", "doors", "crew", "medical", "procs", "pa", "starmap", "galaxy", "log", "structure"],
   logistique: ["overview", "stocks", "plan", "networks", "energy", "log"],
@@ -496,10 +513,12 @@ const defaultPerms = () => Object.fromEntries(Object.entries(ACTIONS).map(([k, v
 /* Catalogue des avaries (poste admin uniquement). target : room | section | door | ship */
 const FAULTS = [
   ["Énergie", [
-    ["power.surge", "Surcharge du réseau", "room", "La pièce perd l’alimentation, reroutage manuel"],
+    ["power.surge", "Surtension", "room", "Court-circuit sur une machine de la pièce : le plomb saute, pièces de rechange requises"],
     ["reactor.heat", "Réacteur en surchauffe", "ship", "Purge du refroidissement, puissance réduite"],
     ["power.backup", "Batteries de secours vides", "ship", "L’éclairage de secours tombe"],
-    ["power.breaker", "Disjoncteur grillé", "room", "Pièce fabriquée à l’atelier requise"]]],
+    ["power.breaker", "Disjoncteur grillé", "room", "Le panneau de la pièce est hors service jusqu’à sa réparation"],
+    ["machine.short", "Court-circuit d’une machine", "room", "Une machine de la pièce fait sauter son plomb en boucle, étincelles, risque d’incendie"],
+    ["machine.fail", "Panne d’une machine", "room", "Une machine de la pièce s’arrête, réparation à la trousse à outils"]]],
   ["Coque et structure", [
     ["hull.breach", "Brèche par micro-météorites", "room", "L’air fuit, colmatage ou scellement"],
     ["ring.crack", "Fissure d’anneau", "section", "Vibrations, renfort en EVA"],
@@ -644,7 +663,7 @@ function cleanPlanet(p, old) {
    1. relais en jeu (ordinateur : recopie ou écran précis), sauf mode « par défaut » ;
    2. réglage admin de l'écran ; 3. réglage admin de son groupe ; 4. écran d'état. */
 const SCREEN_TYPES = { screen: "Écran", flatscreen: "Écran plat", transparent: "Écran transparent" };
-const SCREEN_MODES = { status: "État du vaisseau", page: "Page Meridian", text: "Texte", url: "Adresse web" };
+const SCREEN_MODES = { status: "État du vaisseau", page: "Page Meridian", text: "Texte", url: "Adresse web", camera: "Caméra de surveillance" };
 function screensEmpty() { return { list: {}, meta: {}, cfg: {}, groups: {} }; }
 function cleanScreenCfg(c) {
   c = c || {};
@@ -653,6 +672,7 @@ function cleanScreenCfg(c) {
   if (mode === "page") { out.page = PAGES[c.page] && !ADMIN_PAGES.includes(c.page) ? c.page : "overview"; out.level = Math.max(0, Math.min(7, c.level | 0)); if (c.uuid) out.uuid = clean(c.uuid, 64); if (c.mirror) out.mirror = clean(String(c.mirror), 24); }
   if (mode === "text") { out.text = clean(c.text, 600); out.size = Math.max(1, Math.min(5, (c.size | 0) || 3)); out.color = /^#[0-9a-f]{6}$/i.test(c.color || "") ? c.color : "#62e6f2"; }
   if (mode === "url") { const u = String(c.url || "").trim().slice(0, 500); out.url = /^https:\/\//i.test(u) ? u : ""; }
+  if (mode === "camera") out.cam = clean(c.cam, 24);
   return out;
 }
 /* Message « screens » du mod : liste complète des écrans posés. */
@@ -670,6 +690,7 @@ function applyScreens(S, m, now = Date.now()) {
 }
 function screenEffective(S, id) {
   const sc = S.screens || screensEmpty(), s = sc.list[id], meta = sc.meta[id] || {};
+  if (sc.cfg[id] && sc.cfg[id].mode === "camera") return Object.assign({}, sc.cfg[id], { src: "screen" });   // caméra par écran : prime sur le relais
   if (s && s.override) return Object.assign({}, s.override, { src: "relay" });
   if (sc.cfg[id]) return Object.assign({}, sc.cfg[id], { src: "screen" });
   if (meta.group && sc.groups[meta.group]) return Object.assign({}, sc.groups[meta.group], { src: "group" });
@@ -1172,7 +1193,11 @@ function compileChip(state, now = Date.now()) {
   const rooms = Object.values(state.rooms).filter(r => (r.named || r.name !== r.id) && !(r.section && state.sections[r.section] && state.sections[r.section].state === "ejected"))
     .map(r => ({ id: r.id, n: r.name, d: deckName(r.deck) })).slice(0, 400);
   const alarms = { ship: state.ship.alert || null, rooms: Object.fromEntries(Object.values(state.rooms).filter(r => r.alarm).map(r => [r.id, "4"])) };
-  return { sched: { tz: sc.tz, slots: sc.slots, force: sc.force, cycle: sc.cycle }, general: B.general.slice(-15), crew: B.crew.slice(-15),
+  /* Modèle 3D (le même que la vue 3D de la console) : ponts et pièces extrudées, pour le GPS de la puce. */
+  const model = { decks: (state.decks || []).filter(d => d.y0 != null && d.kind !== "ring").map(d => [d.id, d.y0, d.y1]),
+    rooms: Object.values(state.rooms).filter(r => r.rects && r.rects.length && !(r.section && state.sections[r.section] && state.sections[r.section].state === "ejected"))
+      .map(r => [r.id, r.deck, r.kind === "corridor" ? 1 : 0, r.rects.slice(0, 12)]) };
+  return { sched: { tz: sc.tz, slots: sc.slots, force: sc.force, cycle: sc.cycle }, general: B.general.slice(-15), crew: B.crew.slice(-15), model,
     mob: B.mob.filter(m => m.active).map(m => ({ id: m.id, t: m.t, text: m.text, by: m.by, groups: m.groups, room: m.room || null, acks: m.acks || [] })),
     people, rooms, alarms, services: SERVICES };
 }
@@ -1358,7 +1383,9 @@ function applyTelemetry(state, m, now = Date.now()) {
   }
   if (m.stocks) Object.assign(state.stocks, m.stocks);
   if (m.inv) applyInventory(state, m.inv, now);
+  if (Array.isArray(m.cams)) state.cameras = Object.fromEntries(m.cams.slice(0, 200).map(c => [String(c.id), { id: String(c.id), name: String(c.name || c.id).slice(0, 40), room: c.room || null, x: c.x, y: c.y, z: c.z, yaw: c.yaw, pitch: c.pitch, fov: c.fov }]));
   netState(state);
+  if (Array.isArray(m.damage)) state.damage = m.damage.slice(0, 300);   // les événements arrivent déjà par le journal du mod
   if (m.power) {
     const prevMode = state.power.telem && state.power.telem.mode;
     state.power.telem = m.power;
@@ -1779,6 +1806,26 @@ function apply(state, actor, a, ctx = {}) {
       case "admin.computer": { if (!actor.admin) throw new Error("Réservé au poste admin."); state.computer.refuse = !!a.refuse; state.computer.message = clean(a.message, 140); log(state, "ORDINATEUR", a.refuse ? "refuse désormais les commandes de l’équipage." : "obéit de nouveau à l’équipage.", "admin", now); break; }
       case "admin.setAdmin": { if (!actor.admin) throw new Error("Réservé au poste admin."); const p = person(a.person); p.admin = !!a.on; log(state, "ORDINATEUR", `${p.name} ${a.on ? "reçoit" : "perd"} l’accès admin.`, "admin", now); break; }
       case "admin.env": { if (!actor.admin) throw new Error("Réservé au poste admin."); const r = room(a.room); cmds.push({ type: "env.set", room: r.id, env: a.env }); Object.assign(r.env, a.env); log(state, "ORDINATEUR", `force l’environnement de ${r.name}.`, "admin", now); break; }
+      case "cam.move": {
+        need("cam.move"); const c = (state.cameras || {})[a.id]; if (!c) throw new Error("Caméra inconnue.");
+        const k = { type: "cam.set", cam: c.id };
+        for (const f of ["dyaw", "dpitch", "dfov"]) if (isFinite(+a[f]) && +a[f]) k[f] = Math.max(-90, Math.min(90, +a[f]));
+        // Mise à jour immédiate (le mod renverra les valeurs réelles à la prochaine télémétrie).
+        if (k.dyaw) c.yaw = Math.max(-80, Math.min(80, (+c.yaw || 0) + k.dyaw));
+        if (k.dpitch) c.pitch = Math.max(-70, Math.min(30, (+c.pitch || 0) + k.dpitch));
+        if (k.dfov) c.fov = Math.max(25, Math.min(100, (+c.fov || 70) + k.dfov));
+        cmds.push(k); break;
+      }
+      case "damage.clear": { if (!actor.admin) throw new Error("Réservé au poste admin."); const d = (state.damage || []).find(x => x.id === a.id); if (!d) throw new Error("Avarie inconnue."); state.damage = state.damage.filter(x => x.id !== a.id); cmds.push({ type: "damage.clear", id: a.id, clear: true }); log(state, "ORDINATEUR", `lève l’avarie de ${d.label} (${d.room}).`, "admin", now); break; }
+      case "cam.rename": { need("cam.move"); const c = (state.cameras || {})[a.id]; if (!c) throw new Error("Caméra inconnue."); c.name = clean(a.name, 40) || c.id; cmds.push({ type: "cam.set", cam: c.id, name: c.name }); L(`renomme la caméra ${c.id} : ${c.name}.`, "info"); break; }
+      case "cam.screen": {
+        need("cam.screen"); const sc = state.screens || (state.screens = screensEmpty());
+        const ids = (Array.isArray(a.ids) ? a.ids : []).map(x => clean(x, 24)).filter(x => sc.list[x]).slice(0, 40);
+        if (!ids.length) throw new Error("Aucun écran choisi.");
+        if (a.cam) { if (!(state.cameras || {})[a.cam]) throw new Error("Caméra inconnue."); for (const id of ids) sc.cfg[id] = { mode: "camera", cam: a.cam }; L(`affiche la caméra ${state.cameras[a.cam].name} sur ${ids.length} écran(s).`, "info"); }
+        else { for (const id of ids) if (sc.cfg[id] && sc.cfg[id].mode === "camera") delete sc.cfg[id]; L(`retire la caméra de ${ids.length} écran(s).`, "info"); }
+        break;
+      }
       case "info.post": {
         const ch = a.channel === "crew" ? "crew" : "general"; need(ch === "crew" ? "info.crew" : "info.general");
         const text = clean(a.text, 280); if (!text) throw new Error("Message vide.");
@@ -2055,6 +2102,7 @@ function viewFor(state, actor, term) {
     delete v.chatUnread;
     for (const p of Object.values(v.people)) { delete p.chip; delete p.carriedBy; delete p.notifyAi; }
   }
+  if (!(actor && (adm || actor.id === "display" || can(state, actor, "cam.view")))) delete v.cameras;
   /* Inventaire : chiffres comptés (avec erreurs) pour tous ; vrais chiffres et erreurs pour l’admin. */
   delete v.inv;
   if (state.inv && state.inv.real) v.inv = { t: state.inv.t, ref: state.inv.ref, counted: invCounted(state), recount: canRecount(actor), ...(adm ? { real: state.inv.real, err: state.inv.err } : {}) };
@@ -2284,6 +2332,14 @@ function seedDemo(now = Date.now()) {
   post("p-mbaye", "Ils déplacent des caisses la nuit. Pas marquées. J’ai vu passer un chariot vers le hangar.", 5000000, t1);
   post("p-ek", "Vends 4 rations de café véritable contre une carte d’accès niveau 3. Pas de questions.", 2600000, null);
   dw.posts.sort((a, b) => b.t - a.t);
+  s.damage = [
+    { id: "demo|1", label: "Électrolyseur", kind: "short", kindName: "Court-circuit", cause: "court-circuit dans le câblage", room: "Support vie et recyclage", x: 412, y: 120, z: 31, since: now - 6 * 60000, repair: 0, parts: true },
+    { id: "demo|2", label: "Hotte de cuisine", kind: "worn", kindName: "Panne d’usure", cause: "usure normale", room: "Cuisine", x: 288, y: 152, z: 74, since: now - 40 * 60000, repair: 34, parts: false }];
+  // Caméras de démonstration (une par grande salle).
+  s.cameras = {};
+  Object.values(s.rooms).filter(r => r.kind === "room" && !/Coursive|Cabine/.test(r.name)).slice(0, 12).forEach((r, i) => {
+    const id = "CAM-" + String(101 + i); s.cameras[id] = { id, name: r.name, room: r.id, yaw: 0, pitch: -15, fov: 70 };
+  });
   return s;
 }
 
@@ -2925,13 +2981,14 @@ function makeRemote(token) {
   const open = async () => {
     try { const chk = await fetch(API + "/api/state?t=" + encodeURIComponent(token) + SCREEN_Q); if (chk.status === 401 || chk.status === 403) { const j = await chk.json().catch(() => ({})); try { sessionStorage.removeItem("meridian.t"); } catch {} if (token === ls.get("meridian.admin")) { ls.del("meridian.admin"); return loginGate("Session admin expirée : reconnectez-vous."); } document.getElementById("app").innerHTML = `<div class="gate" style="grid-column:1/-1;grid-row:1/-1"><div><div class="brand">MERIDIAN</div><p class="red" style="margin-top:18px;letter-spacing:.12em">ACCÈS REFUSÉ</p><p class="mu">${esc(j.error || "Session invalide.")}</p></div></div>`; return; } } catch {}
     const ws = R.ws = new WebSocket(API.replace(/^http/, "ws") + "/api/ws?t=" + encodeURIComponent(token) + SCREEN_Q);
-    ws.onopen = () => { R.retry = 0; LINK = "live"; renderChrome(); };
+    ws.onopen = () => { R.retry = 0; LINK = "live"; renderChrome(); CAM_WATCH = ""; camSync(); };
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "state") update(m.state, m.now);
       if (m.type === "hull") { setHull(m.hull); if (V) render(); }
       if (m.type === "mirror") { MIRROR = m.ui || null; if (V) render(); }
       if (m.type === "img") { IMG_CACHE[m.id] = m.data || ""; if (V) render(); }
+      if (m.type === "cam") camFrame(m);
       if (m.type === "craftItems") { CRAFT_ITEMS = m.items || []; if (V && ui.page === "craft") render(); }
       if (m.type === "result" && R.pend.has(m.reqId)) { R.pend.get(m.reqId)(m); R.pend.delete(m.reqId); }
     };
@@ -3048,7 +3105,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"]];
+const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["cameras", "08·C"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -3094,6 +3151,7 @@ ${demoBar}${soloBar}${banners}</div>
 <main id="main">${V.me && V.me.intrus ? `<div class="intrus-b">SESSION NON AUTORISÉE · ACCÈS INCONNU · niv. ${V.me.level}</div>` : ""}${PAGE[ui.page] ? PAGE[ui.page]() : ""}</main>
 <footer><span class="tl">JOURNAL &gt;&gt;</span><div class="tk"><div>${tick}${tick}</div></div></footer>`);
   restoreForm(snap);
+  camSync();
 }
 
 /* Mise à jour sans tout reconstruire : on ne modifie que ce qui a changé. Un élément en cours d'utilisation
@@ -4142,7 +4200,8 @@ function renderDisplay() {
   const n = V.nav, sys = n && MC.navSystem(n.catalog, n.system);
   const head = `<div class="khead"><b>MERIDIAN</b><span>${esc(V.ship.name.toUpperCase())}</span><span class="sp" style="flex:1"></span><span data-clock>${fmtT(now())}</span></div>`;
   let body;
-  if (c.mode === "text") body = `<div class="ktext" style="color:${esc(c.color || "var(--cy)")};font-size:${(c.size || 3) * 2.6}vh">${esc(c.text || "")}</div>`;
+  if (c.mode === "camera") body = `<div class="kcam">${camFeed(c.cam, true)}</div>`;
+  else if (c.mode === "text") body = `<div class="ktext" style="color:${esc(c.color || "var(--cy)")};font-size:${(c.size || 3) * 2.6}vh">${esc(c.text || "")}</div>`;
   else if (c.mode === "url") body = c.url ? `<iframe src="${esc(c.url)}" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>` : `<div class="ktext mu">Adresse non définie</div>`;
   else if (c.mode === "page" && PAGE[c.page]) {
     // Recopie : on reprend l'état exact de la console de l'ordinateur (si la page est permise à ce niveau).
@@ -4159,13 +4218,14 @@ function renderDisplay() {
     const jump = n && n.jump ? (() => { const to = MC.navSystem(n.catalog, n.jump.to), end = n.jump.startAt + MC.JUMP_INTRO_MS + n.jump.seconds * 1000; return `<span class="chip warn">HYPERESPACE → ${esc(to ? to.name : n.jump.to)} · <span data-cd="${end}">${Math.max(0, Math.ceil((end - now()) / 1000))}</span> s</span>`; })() : "";
     body = `<div class="kstat"><div><div class="big">${esc(V.ship.name.toUpperCase())}</div><div class="sub">${sys ? "SYSTÈME " + esc(sys.name.toUpperCase()) : ""}</div></div><div class="clk" data-clock>${fmtT(now())}</div><div class="row">${V.ship.alert ? `<span class="chip crit">ALERTE ${esc(V.ship.alert.toUpperCase())}</span>` : crit.length ? `<span class="chip crit">${crit.length} ALARME(S) CRITIQUE(S)</span>` : alerts.length ? `<span class="chip warn">${alerts.length} ALARME(S)</span>` : `<span class="chip ok">NOMINAL</span>`}${jump}</div>${c.denied ? `<div class="sub" style="font-size:1.8vh">Page non autorisée à ce niveau d’accès</div>` : ""}</div>`;
   }
-  morph(app, `<div class="kio">${c.mode === "page" ? body : (c.mode === "status" ? "" : head) + body}</div>`);
+  morph(app, `<div class="kio">${c.mode === "page" || c.mode === "camera" ? body : (c.mode === "status" ? "" : head) + body}</div>`);
+  camSync();
   if (c.mode === "page" && c.mirror && MIRROR) { const kb = app.querySelector(".kbody"); if (kb) kb.scrollTop = (MIRROR.scroll || 0) * (kb.scrollHeight - kb.clientHeight); }
 }
 
 const scrEff = (id) => MC.screenEffective(V, id);
 const scrMeta = (id) => (V.screens.meta || {})[id] || {};
-const scrDesc = (c) => c.mode === "page" ? `${MC.PAGES[c.page] || c.page}${c.uuid ? " · recopie" : c.level ? " · niv. " + c.level : ""}` : c.mode === "text" ? "« " + String(c.text || "").split("\n")[0].slice(0, 40) + " »" : c.mode === "url" ? (c.url || "—") : "État du vaisseau";
+const scrDesc = (c) => c.mode === "camera" ? "Caméra " + (((V.cameras || {})[c.cam] || {}).name || c.cam || "?") : c.mode === "page" ? `${MC.PAGES[c.page] || c.page}${c.uuid ? " · recopie" : c.level ? " · niv. " + c.level : ""}` : c.mode === "text" ? "« " + String(c.text || "").split("\n")[0].slice(0, 40) + " »" : c.mode === "url" ? (c.url || "—") : "État du vaisseau";
 const SRC = { relay: ["Relais en jeu", "amb"], screen: ["Réglage de l’écran", "cy"], group: ["Groupe", "ok"], default: ["Par défaut", "dim"] };
 /* ===================== Identité visuelle (Alterra, mission) ===================== */
 PAGE.branding = () => {
@@ -4231,7 +4291,8 @@ Object.assign(FN, {
     openModal(() => { const d = ui.draft.scr; return `<h3>${group ? "Groupe « " + esc(group) + " »" : ids.length + " écran(s)"}</h3><label class="f">Affichage<select id="ss-m" data-fn="scrMode">${Object.entries(MC.SCREEN_MODES).map(([k, v]) => `<option value="${k}"${d.mode === k ? " selected" : ""}>${v}</option>`).join("")}</select></label>` +
       (d.mode === "page" ? `<div class="f2"><label class="f">Page<select id="ss-p">${pages.map(p => `<option value="${p}"${d.page === p ? " selected" : ""}>${esc(MC.PAGES[p])}</option>`).join("")}</select></label><label class="f">Niveau d’accès affiché<input type="number" id="ss-l" min="0" max="7" value="${d.level | 0}"></label></div><p class="note">L’écran montre la page telle qu’une personne de ce niveau la voit, en lecture seule.</p>` : "") +
       (d.mode === "text" ? `<label class="f">Texte<textarea id="ss-t" rows="4" maxlength="600">${esc(d.text)}</textarea></label><div class="f2"><label class="f">Taille (1 à 5)<input type="number" id="ss-s" min="1" max="5" value="${d.size || 3}"></label><label class="f">Couleur<input type="color" id="ss-c" value="${esc(d.color || "#62e6f2")}"></label></div>` : "") +
-      (d.mode === "url" ? `<label class="f">Adresse (https)<input type="url" id="ss-u" value="${esc(d.url || "")}" placeholder="https://…"></label><p class="note">Certains sites refusent d’être affichés dans un autre site.</p>` : "") + mfoot(); },
+      (d.mode === "url" ? `<label class="f">Adresse (https)<input type="url" id="ss-u" value="${esc(d.url || "")}" placeholder="https://…"></label><p class="note">Certains sites refusent d’être affichés dans un autre site.</p>` : "") +
+      (d.mode === "camera" ? `<label class="f">Caméra<select id="ss-cam">${Object.values(V.cameras || {}).map(c => `<option value="${esc(c.id)}"${d.cam === c.id ? " selected" : ""}>${esc(c.name)} · ${esc(c.id)}</option>`).join("") || `<option value="">Aucune caméra connue</option>`}</select></label>` : "") + mfoot(); },
       () => { readScr(); act({ type: "admin.screen.set", ids, group, cfg: ui.draft.scr }, "Écrans réglés."); return true; });
   },
   scrMode(el) { readScr(); ui.draft.scr.mode = el.value; drawModal(); }
@@ -4243,6 +4304,7 @@ function readScr() {
   if (g("ss-p")) { d.page = g("ss-p").value; d.level = +g("ss-l").value || 0; }
   if (g("ss-t")) { d.text = g("ss-t").value; d.size = +g("ss-s").value || 3; d.color = g("ss-c").value; }
   if (g("ss-u")) d.url = g("ss-u").value;
+  if (g("ss-cam")) d.cam = g("ss-cam").value;
 }
 
 /* =====================================================================
@@ -4599,7 +4661,12 @@ PAGE.energy = () => {
   }
   const ev = (V.power.events || []).slice(0, 14).map(e => `<div class="kv" style="border:0;padding:2px 0"><span class="m dim">${fmtT(e.t)}</span><b style="font-weight:400;text-align:right">${esc(e.text)}</b></div>`).join("") || `<p class="empty">Aucun événement récent.</p>`;
   const help = `<p class="note">Chaque pièce a son panneau (plomb de pièce). Au-dessus : la section, puis le pont. Un plomb qui saute coupe tout ce qui est en aval ; plus le dépassement est fort, plus le plomb du dessus risque de sauter aussi. Quand un pont saute ou que la production ne suffit plus, le vaisseau passe sur batteries et piles de secours : seuls les appareils vitaux (support vie, gravité, sas) restent alimentés. Un réseau abîmé ou surchargé peut mettre le feu.</p>`;
-  return `<div class="grid g-2"><div class="stack">${panel("Réseau électrique", "PWR." + (T.mode || "").toUpperCase().slice(0, 4), head + help)}${panel("Plombs", "BRK." + Object.keys(B).length, tree || `<p class="empty">Aucun panneau posé.</p>`)}</div><div class="stack">${side}${panel("Événements", "PWR.LOG", ev)}</div></div>`;
+  const DMG = V.damage || [];
+  const DK = { short: ["Court-circuit", "red"], burnt: ["Grillé", "red"], impact: ["Choc", "amb"], worn: ["Usure", "amb"] };
+  const dmg = DMG.length ? DMG.map(d => `<div class="vrow"><span style="min-width:0"><span class="pill ${DK[d.kind] ? DK[d.kind][1] : "amb"}">${esc(DK[d.kind] ? DK[d.kind][0] : d.kind)}</span> <b style="font-weight:500">${esc(d.label)}</b> <span class="mu">· ${esc(roomName(d.room) !== "—" ? roomName(d.room) : d.room)} · ${d.x} ${d.y} ${d.z}</span><div class="dim" style="font-size:12px">${esc(d.cause)}${d.parts ? " · pièces de rechange requises" : ""}${d.repair ? ` · réparation ${d.repair} %` : ""} · depuis ${fmtT(d.since)}</div></span>${V.me.admin ? btn("Lever", { type: "damage.clear", id: d.id }, { cls: "sm ghost" }) : ""}</div>`).join("")
+    : `<p class="empty">Aucune machine en panne.</p>`;
+  const dmgHelp = `<p class="note">Une machine en panne reste en place mais ne fonctionne plus. Court-circuit : elle tire un courant énorme et fait sauter son plomb tant qu’elle n’est pas réparée ou coupée. Grillé : une demande trop forte sur un panneau finit par brûler l’appareil le plus gourmand (la production en excès, elle, n’abîme rien). Réparation : trousse à outils, accroupi + clic droit, avec un lot de pièces de rechange sauf pour l’usure.</p>`;
+  return `<div class="grid g-2"><div class="stack">${panel("Réseau électrique", "PWR." + (T.mode || "").toUpperCase().slice(0, 4), head + help)}${panel("Plombs", "BRK." + Object.keys(B).length, tree || `<p class="empty">Aucun panneau posé.</p>`)}</div><div class="stack">${panel("Avaries des machines", "DMG." + DMG.length, dmg + dmgHelp, DMG.some(d => d.kind === "short") ? "crit" : "")}${side}${panel("Événements", "PWR.LOG", ev)}</div></div>`;
 };
 FN.brkSel = (el) => { ui.brk = el.dataset.arg; render(); };
 FN.brkRating = (el) => { const w = parseFloat(String(val("brk-w")).replace(",", ".")); if (!(w > 0)) return toast("Calibre invalide.", "err"); act({ type: "power.rating", breaker: el.dataset.arg, watts: w * 1000 }, "Calibre transmis."); };
@@ -5086,6 +5153,75 @@ FN.bhOpen = (el) => { ui.bhSel = +el.dataset.arg; render(); };
 FN.bhClose = () => { ui.bhSel = null; render(); };
 FN.bhSub = () => { ui.bhSel = null; ui.bhPop = "Paiement refusé : votre puce n’est pas autorisée pour ce type d’achat. L’intendance a peut-être été prévenue."; render(); setTimeout(() => { ui.bhPop = null; render(); }, 5000); };
 
+
+
+/* ----------------------------------------------------------------- Caméras de surveillance */
+let CAM_WATCH = "";
+const CAM_FRAMES = {};
+function camFeed(id, big) {
+  const c = (V.cameras || {})[id], f = CAM_FRAMES[id];
+  return `<div class="cam${big ? " big" : ""}" data-camwrap="${esc(id || "")}"><canvas data-cam="${esc(id || "")}" width="96" height="54" aria-label="Image de la caméra ${esc(c ? c.name : id || "")}"></canvas>
+<div class="cam-osd"><span class="rec">● REC</span><span class="cam-n">${esc(c ? c.name : id || "Caméra inconnue")}</span><span class="cam-id">${esc(id || "")}</span><span class="cam-t" data-camt="${esc(id || "")}">${f ? fmtT(f.t) : "attente de l’image…"}</span></div></div>`;
+}
+/* RVB 3-3-2 (envoyé par le mod) → pixels du canevas. */
+function camPaint(cv, f) {
+  const ctx = cv.getContext("2d"); if (!ctx) return;
+  if (cv.width !== f.w || cv.height !== f.h) { cv.width = f.w; cv.height = f.h; }
+  const img = ctx.createImageData(f.w, f.h), d = img.data, b = f.px;
+  for (let i = 0; i < b.length; i++) { const v = b[i], k = i * 4; d[k] = ((v >> 5) & 7) * 36.43; d[k + 1] = ((v >> 2) & 7) * 36.43; d[k + 2] = (v & 3) * 85; d[k + 3] = 255; }
+  ctx.putImageData(img, 0, 0);
+}
+function camFrame(m) {
+  let px;
+  try { const bin = atob(m.d || ""); px = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) px[i] = bin.charCodeAt(i); } catch { return; }
+  const f = CAM_FRAMES[m.id] = { w: m.w, h: m.h, px, t: m.t || Date.now() };
+  document.querySelectorAll(`canvas[data-cam="${CSS.escape(m.id)}"]`).forEach(cv => camPaint(cv, f));
+  document.querySelectorAll(`[data-camt="${CSS.escape(m.id)}"]`).forEach(el => el.textContent = fmtT(f.t));
+}
+/* Après chaque rendu : on repeint les images connues et on dit au serveur quelles caméras sont à l'écran. */
+function camSync() {
+  const ids = [...new Set([...document.querySelectorAll("canvas[data-cam]")].map(c => c.dataset.cam).filter(Boolean))].sort();
+  document.querySelectorAll("canvas[data-cam]").forEach(cv => { const f = CAM_FRAMES[cv.dataset.cam]; if (f) camPaint(cv, f); });
+  const key = ids.join(",");
+  if (key === CAM_WATCH) return;
+  CAM_WATCH = key;
+  if (DEMO) { camDemo(ids); return; }
+  if (T && T.raw) T.raw({ type: "cam.watch", ids });
+}
+let CAM_DEMO_T = 0;
+function camDemo(ids) {
+  clearInterval(CAM_DEMO_T);
+  if (!ids.length) return;
+  const gen = (id, t) => { const w = 96, h = 54, px = new Uint8Array(w * h), seed = [...id].reduce((a, c) => a + c.charCodeAt(0), 0);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const floor = y > 34, wall = !floor && Math.abs(x - 48 + (seed % 20) - 10) < 30 - y * 0.4, door = Math.abs(x - 30 - seed % 30) < 6 && y > 16 && !floor;
+      let r = floor ? 3 : 2, g = floor ? 3 : 2, b = floor ? 2 : 1;
+      if (wall) { r = 4; g = 4; b = 2; } if (door) { r = 1; g = 2; b = 2; }
+      const pxx = (seed * 7 + t * 2) % 120 - 12; if (Math.abs(x - pxx) < 2 && y > 22 && y < 40) { r = y < 26 ? 6 : 2; g = y < 26 ? 5 : 2; b = y < 26 ? 3 : 3; }
+      if ((x + y * 3 + t) % 17 === 0) r = Math.min(7, r + 1);
+      px[y * w + x] = (r << 5) | (g << 2) | b;
+    }
+    return px; };
+  let t = 0;
+  const step = () => { t++; for (const id of ids) { const px = gen(id, t); let bin = ""; for (const v of px) bin += String.fromCharCode(v); camFrame({ id, w: 96, h: 54, d: btoa(bin), t: Date.now() }); } };
+  step(); CAM_DEMO_T = setInterval(step, 1500);
+}
+PAGE.cameras = () => {
+  const cams = Object.values(V.cameras || {}).sort((a, b) => a.name.localeCompare(b.name));
+  if (!cams.length) return `<div class="stack">${panel("Caméras de surveillance", "CAM", `<p class="empty">Aucune caméra à bord. Posez des caméras de surveillance (clic droit : tourner, accroupi : incliner).</p>`)}</div>`;
+  const sel = (ui.camSel || []).filter(id => V.cameras[id]);
+  const show = (sel.length ? sel : cams.slice(0, 20).map(c => c.id)).slice(0, 20);
+  const screens = Object.values((V.screens || {}).list || {});
+  const pick = cams.map(c => `<label class="campick"><input type="checkbox" data-fn="camPick" data-arg="${esc(c.id)}"${show.includes(c.id) ? " checked" : ""}> ${esc(c.name)}${c.room && V.rooms[c.room] ? ` <span class="mu">· ${esc(V.rooms[c.room].name)}</span>` : ""}</label>`).join("");
+  const cards = show.map(id => { const c = V.cameras[id];
+    const ctl = perm("cam.move") ? `<div class="camctl">${btn("◀", { type: "cam.move", id, dyaw: -15 }, { cls: "sm ghost", title: "Tourner à gauche" })}${btn("▲", { type: "cam.move", id, dpitch: 10 }, { cls: "sm ghost", title: "Lever" })}${btn("▼", { type: "cam.move", id, dpitch: -10 }, { cls: "sm ghost", title: "Baisser" })}${btn("▶", { type: "cam.move", id, dyaw: 15 }, { cls: "sm ghost", title: "Tourner à droite" })}${btn("＋", { type: "cam.move", id, dfov: -10 }, { cls: "sm ghost", title: "Zoomer" })}${btn("－", { type: "cam.move", id, dfov: 10 }, { cls: "sm ghost", title: "Élargir" })}${V.me.admin ? btn("Nommer", null, { fn: "camName", arg: id, cls: "sm ghost" }) : ""}</div>` : "";
+    const scr = perm("cam.screen") && screens.length ? `<select data-fn="camToScreen" data-arg="${esc(id)}" aria-label="Afficher sur un écran"><option value="">Afficher sur un écran…</option>${screens.map(x => { const e = MC.screenEffective(V, x.id), m = (V.screens.meta || {})[x.id] || {}; return `<option value="${esc(x.id)}">${esc(m.name || x.id)}${e.mode === "camera" && e.cam === id ? " ✓" : ""}</option>`; }).join("")}</select>` : "";
+    return `<div class="camcard">${camFeed(id)}<div class="camfoot"><span class="mu">cap ${c.yaw ?? 0}° · incl. ${c.pitch ?? 0}° · champ ${c.fov ?? 70}°</span>${ctl}${scr}</div></div>`; }).join("");
+  return `<div class="stack">${panel("Caméras de surveillance", "CAM", `<p class="note">${cams.length} caméra(s) · ${show.length} affichée(s) (20 au plus). Une image toutes les quelques secondes par caméra regardée. Chaque écran du bord peut afficher sa propre caméra.</p><details><summary class="mu" style="cursor:pointer">Choisir les caméras affichées</summary><div class="campicks">${pick}</div></details><div class="camgrid">${cards}</div>`)}</div>`;
+};
+FN.camPick = (el) => { const id = el.dataset.arg; const cur = new Set((ui.camSel && ui.camSel.length ? ui.camSel : Object.keys(V.cameras || {}).slice(0, 20))); if (el.checked) cur.add(id); else cur.delete(id); ui.camSel = [...cur].slice(0, 20); render(); };
+FN.camToScreen = (el) => { if (!el.value) return; act({ type: "cam.screen", ids: [el.value], cam: el.dataset.arg }, "Caméra affichée sur l’écran."); };
+FN.camName = (el) => { const id = el.dataset.arg, c = V.cameras[id]; openModal(() => `<h3>Nommer ${esc(id)}</h3><label class="f">Nom<input type="text" id="cam-n" maxlength="40" value="${esc(c.name)}"></label>` + mfoot(), () => { act({ type: "cam.rename", id, name: val("cam-n") }, "Caméra renommée."); return true; }); };
 
 /* ----------------------------------------------------------------- Réserves (inventaire automatique) */
 function stockBars() {
