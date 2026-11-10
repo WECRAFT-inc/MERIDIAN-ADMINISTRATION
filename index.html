@@ -361,7 +361,7 @@ const PAGES = {
   overview: "Vue d’ensemble", alerts: "Alertes", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
   galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", branding: "Identité visuelle", admin: "Ordinateur de bord",
-  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies", bord: "Vie de bord", stocks: "Réserves et soute", cameras: "Caméras"
+  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies", bord: "Vie de bord", stocks: "Réserves et soute", cameras: "Caméras", avaries: "Avaries"
 };
 /* Pages réservées au poste admin. */
 const ADMIN_PAGES = ["admin", "screens", "craft", "branding", "diseases"];
@@ -403,6 +403,7 @@ const ACTIONS = {
   "kb.procedure":   ["Publier une procédure technique (lisible par tous)", 3, "overview"],
   "kb.pathology":   ["Publier une fiche de pathologie", 4, "overview"],
   "info.general":   ["Publier sur le canal général (passerelle)", 5, "bord"],
+  "damage.view":    ["Consulter les avaries et leur emplacement", 2, "avaries"],
   "cam.view":       ["Consulter les caméras de surveillance", 3, "cameras"],
   "cam.move":       ["Orienter les caméras", 3, "cameras"],
   "cam.screen":     ["Afficher une caméra sur un écran", 3, "cameras"],
@@ -453,12 +454,12 @@ function kbCanRead(state, actor, a) {
 
 /* Postes de travail (bloc en jeu, terminal « WS-métier-… ») : pages ouvertes d'office pour ce métier. */
 const WS_PRESETS = {
-  ingenieur: ["overview", "energy", "networks", "atmos", "plan", "procs", "alerts", "log"],
+  ingenieur: ["overview", "avaries", "energy", "networks", "atmos", "plan", "procs", "alerts", "log"],
   medecin: ["overview", "medical", "crew", "plan", "alerts", "log"],
   pilote: ["overview", "starmap", "galaxy", "vue3d", "alerts", "log"],
   securite: ["overview", "cameras", "doors", "crew", "plan", "alerts", "log"],
   chercheur: ["overview", "medical", "starmap", "galaxy", "log"],
-  commandement: ["overview", "bord", "stocks", "alerts", "plan", "vue3d", "atmos", "energy", "networks", "doors", "crew", "medical", "procs", "pa", "starmap", "galaxy", "log", "structure"],
+  commandement: ["overview", "avaries", "bord", "stocks", "alerts", "plan", "vue3d", "atmos", "energy", "networks", "doors", "crew", "medical", "procs", "pa", "starmap", "galaxy", "log", "structure"],
   logistique: ["overview", "stocks", "plan", "networks", "energy", "log"],
   communications: ["overview", "bord", "pa", "alerts", "starmap", "log"],
   agronome: ["overview", "atmos", "networks", "log"]
@@ -521,11 +522,13 @@ const FAULTS = [
     ["machine.fail", "Panne d’une machine", "room", "Une machine de la pièce s’arrête, réparation à la trousse à outils"]]],
   ["Coque et structure", [
     ["hull.breach", "Brèche par micro-météorites", "room", "L’air fuit, colmatage ou scellement"],
-    ["ring.crack", "Fissure d’anneau", "section", "Vibrations, renfort en EVA"],
+    ["hull.crack", "Fissure de coque", "room", "Petite fuite vers l’espace qui s’élargit ; colmatage à la trousse (1 lot de pièces)"],
+    ["struct.beam", "Structure endommagée", "room", "Panneau extérieur à réparer en EVA ; des fissures apparaissent autour en attendant"],
     ["airlock.open", "Sas mal verrouillé", "door", "Alarme automatique, risque de décompression"],
     ["dock.seal", "Joint d’amarrage défaillant", "room", "Une navette ne peut plus s’arrimer"]]],
   ["Support vie", [
     ["o2.drop", "Chute d’oxygène", "room", "CO₂ qui monte, cuves à réparer"],
+    ["pipe.leak", "Fuite de conduite", "room", "Un tuyau de gaz qui longe la pièce se vide dedans (ou dans le vide)"],
     ["water.recycler", "Recycleur d’eau en panne", "ship", "Rationnement immédiat"],
     ["water.toxic", "Eau contaminée", "ship", "Malaises, intervention du médecin"],
     ["fire", "Incendie", "room", "Allume 3 foyers : extincteur, diffuseur à l’azote ou vider l’air"],
@@ -534,6 +537,7 @@ const FAULTS = [
   ["Propulsion et navigation", [
     ["fuel.leak", "Fuite de carburant", "ship", "Le compteur baisse sans cause visible"],
     ["jump.unstable", "Moteur de saut instable", "ship", "Calibrage avant le prochain saut"],
+    ["engine.damage", "Moteur endommagé", "ship", "Panneau extérieur près du moteur à réparer en EVA ; saut impossible d’ici là"],
     ["sensor.lie", "Capteur menteur", "room", "Valeurs fausses affichées sur la console"],
     ["course.drift", "Dérive de cap", "ship", "Correction à anticiper"]]],
   ["Informatique", [
@@ -543,10 +547,10 @@ const FAULTS = [
   ["Communications", [
     ["comms.jam", "Brouillage", "ship", "Annonces et messages coupés"],
     ["comms.shuttle", "Perte de liaison navette", "ship", "Équipage isolé en mission"]]],
-  ["Anneaux et rotation", [
+  ["Anneaux", [
     ["ring.hull", "Module de coque endommagé", "room", "Kit de réparation fabriqué à l’atelier"],
-    ["ring.lock", "Verrouillage de rotation bloqué", "section", "EVA impossible"],
-    ["ring.rotor", "Rotor déréglé", "section", "Gravité instable sur un côté"]]],
+    ["ring.crack", "Fissure d’anneau", "room", "Panneau extérieur de l’anneau à réparer en EVA ; fissures en attendant"],
+    ["ring.mount", "Fixation d’anneau endommagée", "room", "Panneau extérieur à réparer en EVA ; gravité instable autour"]]],
   ["Santé", [
     ["bio.pathogen", "Pathogène à bord", "room", "Quarantaine"],
     ["bio.food", "Intoxication alimentaire", "ship", "Cantine suspectée"],
@@ -1228,7 +1232,7 @@ function intrusionCheck(state, now = Date.now()) {
   for (const r of sec.intrusions) if (r.status === "running" && !r.detected && r.detectAt && now >= r.detectAt) {
     r.detected = true; r.detectedAt = now; hit = true;
     const room = r.room && state.rooms[r.room];
-    log(state, "SYSTÈME", `Intrusion détectée sur un ordinateur de bord${room ? " (" + room.name + ")" : ""}. Origine inconnue.`, "crit", now);
+    log(state, "A.T.L.A.S.", `Intrusion détectée sur un ordinateur de bord${room ? " (" + room.name + ")" : ""}. Origine inconnue.`, "crit", now);
   }
   return hit;
 }
@@ -1236,7 +1240,7 @@ function intrusionEnd(state, id, op, now = Date.now()) {
   const sec = securityOf(state), r = sec.intrusions.find(x => x.id === id);
   if (!r || r.status !== "running") return null;
   r.status = op === "done" ? "done" : "aborted"; r.ended = now;
-  if (r.detected) log(state, "SYSTÈME", op === "done" ? "L’intrusion repérée a abouti : des données ont été copiées." : "L’intrusion repérée s’est interrompue.", "crit", now);
+  if (r.detected) log(state, "A.T.L.A.S.", op === "done" ? "L’intrusion repérée a abouti : des données ont été copiées." : "L’intrusion repérée s’est interrompue.", "crit", now);
   return r;
 }
 /* Fragment de données : ce que le boîtier a pu copier (registre, journal récent, accès). */
@@ -1264,7 +1268,7 @@ function mergeStructure(state, s, now = Date.now()) {
     Object.assign(state, fresh);
     state.perms = keepPerms;
     for (const a of admins) state.people[a.id] = a;
-    log(state, "SYSTÈME", "Première structure reçue du mod : la démo est remplacée.", "sys", now);
+    log(state, "A.T.L.A.S.", "Première structure reçue du mod : la démo est remplacée.", "sys", now);
   }
   const keep = (old, neu, fields) => { if (old) for (const f of fields) if (old[f] !== undefined) neu[f] = old[f]; return neu; };
   const decks = [];
@@ -1320,7 +1324,7 @@ function mergeStructure(state, s, now = Date.now()) {
       pages: old ? old.pages : Object.keys(PAGES).filter(k => !ADMIN_PAGES.includes(k)) };
   }
   state.ship.lastStructure = now;
-  log(state, "SYSTÈME", `Structure synchronisée : ${state.decks.length} ponts, ${Object.keys(rooms).length} pièces, ${Object.keys(doors).length} portes.`, "sys", now);
+  log(state, "A.T.L.A.S.", `Structure synchronisée : ${state.decks.length} ponts, ${Object.keys(rooms).length} pièces, ${Object.keys(doors).length} portes.`, "sys", now);
 }
 
 /* Un joueur a saisi son nom à la connexion. */
@@ -1330,10 +1334,10 @@ function registerPlayer(state, { uuid, name, mcName }, now = Date.now()) {
   let p = state.people[uuid];
   if (!p) {
     p = state.people[uuid] = { id: uuid, name: name || mcName || "Inconnu", mcName: mcName || "", level: 0, rank: "", job: "", role: "Non assigné", group: "", team: "aucune", tags: [], online: true, room: null, vitals: null, joined: now };
-    log(state, "SYSTÈME", `Nouvel arrivant : ${p.name}. Affectation en attente.`, "crew", now);
+    log(state, "A.T.L.A.S.", `Nouvel arrivant : ${p.name}. Affectation en attente.`, "crew", now);
   } else if (mcName && p.mcName !== mcName) p.mcName = mcName;
   if (p && name && p.name !== name) {
-    log(state, "SYSTÈME", `${p.name} s’identifie désormais comme ${name}.`, "crew", now);
+    log(state, "A.T.L.A.S.", `${p.name} s’identifie désormais comme ${name}.`, "crew", now);
     p.name = name;
   }
   return p;
@@ -1346,7 +1350,7 @@ function resetPerson(state, uuid, now = Date.now()) {
   delete p.chip; delete p.carriedBy;
   if (state.chats) delete state.chats[uuid];
   if (state.chatUnread) delete state.chatUnread[uuid];
-  log(state, "SYSTÈME", `Dossier de ${p.name} remis à zéro.`, "crew", now);
+  log(state, "A.T.L.A.S.", `Dossier de ${p.name} remis à zéro.`, "crew", now);
   return p;
 }
 
@@ -1371,8 +1375,8 @@ function applyTelemetry(state, m, now = Date.now()) {
       seen.add(p.id);
       const wasAlive = !p.vitals || p.vitals.alive !== false;
       p.online = pl.online !== false; p.room = pl.room || null; p.vitals = Object.assign(p.vitals || {}, pl.vitals || {});
-      if (wasAlive && p.vitals.alive === false) log(state, "SYSTÈME", `Signal vital perdu : ${p.name}${p.room && state.rooms[p.room] ? " (" + state.rooms[p.room].name + ")" : ""}.`, "crit", now);
-      if (!wasAlive && p.vitals.alive !== false) { p.vitals.reported = false; log(state, "SYSTÈME", `${p.name} est de nouveau en vie.`, "crew", now); }
+      if (wasAlive && p.vitals.alive === false) log(state, "A.T.L.A.S.", `Signal vital perdu : ${p.name}${p.room && state.rooms[p.room] ? " (" + state.rooms[p.room].name + ")" : ""}.`, "crit", now);
+      if (!wasAlive && p.vitals.alive !== false) { p.vitals.reported = false; log(state, "A.T.L.A.S.", `${p.name} est de nouveau en vie.`, "crew", now); }
     }
     if (m.full) for (const p of Object.values(state.people)) if (!seen.has(p.id) && !p.demo) p.online = false;
     // Puces : qui porte la puce de qui (visible du poste admin seulement)
@@ -1401,7 +1405,7 @@ function applyTelemetry(state, m, now = Date.now()) {
     const zone = sec ? Object.values(state.rooms).filter(x => x.section === sec.id) : [r];
     for (const x of zone) if (!x.alarm) { x.alarm = true; x.alarmBy = "fire"; cmds.push({ type: "alarm.set", room: x.id, on: true, level: "4" }); }
     state.acks = state.acks.filter(k => k !== "fire:" + r.id);
-    log(state, "SYSTÈME", `Détecteur incendie : ${r.name}. Alarme ${sec ? "de la section " + sec.name : "de la pièce"} déclenchée.`, "crit", now);
+    log(state, "A.T.L.A.S.", `Détecteur incendie : ${r.name}. Alarme ${sec ? "de la section " + sec.name : "de la pièce"} déclenchée.`, "crit", now);
   }
   if (fired.length) cmds.push(paStateCmd(state));
   intrusionCheck(state, now);
@@ -1415,7 +1419,7 @@ function apply(state, actor, a, ctx = {}) {
   const now = ctx.now || Date.now(), term = ctx.term || null;
   if (!actor) return ERR("Session inconnue.");
   if (!a || !a.type) return ERR("Action vide.");
-  if (state.computer.refuse && !actor.admin) return ERR(state.computer.message || "ORDINATEUR : commande refusée.");
+  if (state.computer.refuse && !actor.admin) return ERR(state.computer.message || "A.T.L.A.S. : commande refusée.");
   const who = actor.name, cmds = [];
   const need = (perm) => { if (!can(state, actor, perm, term)) throw new Error("Niveau ou terminal insuffisant : " + ACTIONS[perm][0].toLowerCase() + "."); };
   const room = (id) => { const r = state.rooms[id]; if (!r) throw new Error("Pièce inconnue."); if (roomStatus(state, r) === "gone") throw new Error("Pièce éjectée."); return r; };
@@ -1774,7 +1778,7 @@ function apply(state, actor, a, ctx = {}) {
           (state.chats[actor.id] = state.chats[actor.id] || []).push({ t: now, from: "p", text });
           state.chatUnread[actor.id] = true;
           const staff = Object.values(state.people).filter(p => p.notifyAi && !p.demo && p.id !== actor.id).map(p => p.id);
-          if (staff.length) cmds.push({ type: "staff.notify", uuids: staff, title: "ORDINATEUR · " + who, text });
+          if (staff.length) cmds.push({ type: "staff.notify", uuids: staff, title: "A.T.L.A.S. · " + who, text });
         }
         for (const k of Object.keys(state.chats)) if (state.chats[k].length > 200) state.chats[k].splice(0, state.chats[k].length - 200);
         break;
@@ -1795,17 +1799,17 @@ function apply(state, actor, a, ctx = {}) {
         const fault = { id: "f" + (state.seq++), key: f.key, target, silent: !!a.silent, active: true, t: now };
         state.faults.unshift(fault); faultEffect(state, fault, true);
         cmds.push({ type: "fault", id: fault.id, key: f.key, target, on: true, silent: fault.silent });
-        log(state, "ORDINATEUR", `avarie « ${f.name} »${targetName(state, target)}${fault.silent ? " (silencieuse)" : ""}.`, "admin", now); break;
+        log(state, "A.T.L.A.S.", `avarie « ${f.name} »${targetName(state, target)}${fault.silent ? " (silencieuse)" : ""}.`, "admin", now); break;
       }
       case "admin.clearFault": {
         if (!actor.admin) throw new Error("Réservé au poste admin.");
         const fault = state.faults.find(x => x.id === a.id); if (!fault) throw new Error("Avarie inconnue.");
         fault.active = false; faultEffect(state, fault, false); cmds.push({ type: "fault", id: fault.id, key: fault.key, target: fault.target, on: false });
-        log(state, "ORDINATEUR", `avarie « ${FAULT_INDEX[fault.key]?.name} » résolue.`, "admin", now); break;
+        log(state, "A.T.L.A.S.", `avarie « ${FAULT_INDEX[fault.key]?.name} » résolue.`, "admin", now); break;
       }
-      case "admin.computer": { if (!actor.admin) throw new Error("Réservé au poste admin."); state.computer.refuse = !!a.refuse; state.computer.message = clean(a.message, 140); log(state, "ORDINATEUR", a.refuse ? "refuse désormais les commandes de l’équipage." : "obéit de nouveau à l’équipage.", "admin", now); break; }
-      case "admin.setAdmin": { if (!actor.admin) throw new Error("Réservé au poste admin."); const p = person(a.person); p.admin = !!a.on; log(state, "ORDINATEUR", `${p.name} ${a.on ? "reçoit" : "perd"} l’accès admin.`, "admin", now); break; }
-      case "admin.env": { if (!actor.admin) throw new Error("Réservé au poste admin."); const r = room(a.room); cmds.push({ type: "env.set", room: r.id, env: a.env }); Object.assign(r.env, a.env); log(state, "ORDINATEUR", `force l’environnement de ${r.name}.`, "admin", now); break; }
+      case "admin.computer": { if (!actor.admin) throw new Error("Réservé au poste admin."); state.computer.refuse = !!a.refuse; state.computer.message = clean(a.message, 140); log(state, "A.T.L.A.S.", a.refuse ? "refuse désormais les commandes de l’équipage." : "obéit de nouveau à l’équipage.", "admin", now); break; }
+      case "admin.setAdmin": { if (!actor.admin) throw new Error("Réservé au poste admin."); const p = person(a.person); p.admin = !!a.on; log(state, "A.T.L.A.S.", `${p.name} ${a.on ? "reçoit" : "perd"} l’accès admin.`, "admin", now); break; }
+      case "admin.env": { if (!actor.admin) throw new Error("Réservé au poste admin."); const r = room(a.room); cmds.push({ type: "env.set", room: r.id, env: a.env }); Object.assign(r.env, a.env); log(state, "A.T.L.A.S.", `force l’environnement de ${r.name}.`, "admin", now); break; }
       case "cam.move": {
         need("cam.move"); const c = (state.cameras || {})[a.id]; if (!c) throw new Error("Caméra inconnue.");
         const k = { type: "cam.set", cam: c.id };
@@ -1816,7 +1820,7 @@ function apply(state, actor, a, ctx = {}) {
         if (k.dfov) c.fov = Math.max(25, Math.min(100, (+c.fov || 70) + k.dfov));
         cmds.push(k); break;
       }
-      case "damage.clear": { if (!actor.admin) throw new Error("Réservé au poste admin."); const d = (state.damage || []).find(x => x.id === a.id); if (!d) throw new Error("Avarie inconnue."); state.damage = state.damage.filter(x => x.id !== a.id); cmds.push({ type: "damage.clear", id: a.id, clear: true }); log(state, "ORDINATEUR", `lève l’avarie de ${d.label} (${d.room}).`, "admin", now); break; }
+      case "damage.clear": { if (!actor.admin) throw new Error("Réservé au poste admin."); const d = (state.damage || []).find(x => x.id === a.id); if (!d) throw new Error("Avarie inconnue."); state.damage = state.damage.filter(x => x.id !== a.id); cmds.push({ type: "damage.clear", id: a.id, clear: true }); log(state, "A.T.L.A.S.", `lève l’avarie de ${d.label} (${d.room}).`, "admin", now); break; }
       case "cam.rename": { need("cam.move"); const c = (state.cameras || {})[a.id]; if (!c) throw new Error("Caméra inconnue."); c.name = clean(a.name, 40) || c.id; cmds.push({ type: "cam.set", cam: c.id, name: c.name }); L(`renomme la caméra ${c.id} : ${c.name}.`, "info"); break; }
       case "cam.screen": {
         need("cam.screen"); const sc = state.screens || (state.screens = screensEmpty());
@@ -1890,19 +1894,19 @@ function apply(state, actor, a, ctx = {}) {
         const dir = ["north", "south", "east", "west", "up", "down"].includes(a.direction) ? a.direction : null;
         state.nav.jump = { to: to.id, seconds: seconds || navReach(state, to.id).seconds || 30, startAt: now, pending: true };
         cmds.push({ type: "nav.force", system: to.id, seconds, direction: dir, by: who });
-        log(state, "ORDINATEUR", `saut forcé vers ${to.name}${seconds ? " (" + seconds + " s)" : ""}.`, "admin", now); break;
+        log(state, "A.T.L.A.S.", `saut forcé vers ${to.name}${seconds ? " (" + seconds + " s)" : ""}.`, "admin", now); break;
       }
       case "admin.nav.set": {
         if (!actor.admin) throw new Error("Réservé au poste admin.");
         const to = navSystem(state.nav.catalog, a.system); if (!to) throw new Error("Système inconnu.");
         state.nav.system = to.id; state.nav.jump = null; cmds.push({ type: "nav.set", system: to.id });
-        log(state, "ORDINATEUR", `place le vaisseau dans le système ${to.name}.`, "admin", now); break;
+        log(state, "A.T.L.A.S.", `place le vaisseau dans le système ${to.name}.`, "admin", now); break;
       }
       case "admin.nav.fuel": {
         if (!actor.admin) throw new Error("Réservé au poste admin.");
         const mode = a.mode === "manual" ? "manual" : "tanks"; const value = Math.max(0, +a.value || 0);
         state.nav.fuelMode = mode; if (mode === "manual") state.nav.fuel = value;
-        cmds.push({ type: "nav.fuel", mode, value }); log(state, "ORDINATEUR", mode === "manual" ? `fixe le carburant à ${value} g.` : "calcule le carburant sur les cuves.", "admin", now); break;
+        cmds.push({ type: "nav.fuel", mode, value }); log(state, "A.T.L.A.S.", mode === "manual" ? `fixe le carburant à ${value} g.` : "calcule le carburant sur les cuves.", "admin", now); break;
       }
       case "admin.craft.save": case "admin.craft.delete": {
         if (!actor.admin) throw new Error("Réservé au poste admin.");
@@ -1945,42 +1949,42 @@ function apply(state, actor, a, ctx = {}) {
             const x = a.sys || {}; let s = x.id && navSystem(cat, x.id);
             if (!s) { s = { id: clean(x.id || x.name || "sys" + state.seq++, 40).replace(/[^a-z0-9_]/gi, "_").toLowerCase(), planets: [], fields: [] }; if (navSystem(cat, s.id)) throw new Error("Identifiant déjà utilisé."); cat.systems.push(s); }
             Object.assign(s, { name: clean(x.name, 60) || s.name || s.id, x: num(x.x, s.x || 0), y: num(x.y, s.y || 0), star: clean(x.star, 60), color: /^#[0-9a-f]{6}$/i.test(x.color || "") ? x.color : (s.color || "#ffd080"), description: clean(x.description, 400) });
-            log(state, "ORDINATEUR", `enregistre le système ${s.name}.`, "admin", now); break;
+            log(state, "A.T.L.A.S.", `enregistre le système ${s.name}.`, "admin", now); break;
           }
           case "admin.nav.system.delete": {
             if (a.id === state.nav.system) throw new Error("Impossible de supprimer le système où se trouve le vaisseau.");
             const s = sysOf(a.id); cat.systems = cat.systems.filter(x => x !== s); if (cat.start === s.id) cat.start = state.nav.system;
-            log(state, "ORDINATEUR", `supprime le système ${s.name}.`, "admin", now); break;
+            log(state, "A.T.L.A.S.", `supprime le système ${s.name}.`, "admin", now); break;
           }
           case "admin.nav.planet.save": {
             const s = sysOf(a.system); const old = (a.planet && a.planet.id) ? s.planets.find(p => p.id === a.planet.id) : null;
             const p = cleanPlanet(a.planet || {}, old);
             if (!old && cat.systems.some(sy => sy.planets.some(q => q.id === p.id))) throw new Error("Identifiant de planète déjà utilisé.");
             if (old) s.planets[s.planets.indexOf(old)] = p; else s.planets.push(p);
-            log(state, "ORDINATEUR", `enregistre la planète ${p.name} (${s.name}).`, "admin", now); break;
+            log(state, "A.T.L.A.S.", `enregistre la planète ${p.name} (${s.name}).`, "admin", now); break;
           }
-          case "admin.nav.planet.delete": { const s = sysOf(a.system); s.planets = s.planets.filter(p => p.id !== a.id); log(state, "ORDINATEUR", `retire une planète de ${s.name}.`, "admin", now); break; }
+          case "admin.nav.planet.delete": { const s = sysOf(a.system); s.planets = s.planets.filter(p => p.id !== a.id); log(state, "A.T.L.A.S.", `retire une planète de ${s.name}.`, "admin", now); break; }
           case "admin.nav.field.save": {
             const s = sysOf(a.system), f = a.field || {}; const old = f.id && s.fields.find(x => x.id === f.id);
             const n = { id: old ? old.id : "f" + (state.seq++), name: clean(f.name, 60) || "Champ de météorites", pos: [num((f.pos || [])[0], 0), num((f.pos || [])[1], 0)],
               radius: Math.max(10, num(f.radius, 200)), density: ["faible", "moyenne", "forte"].includes(f.density) ? f.density : "moyenne", show: f.show !== false };
             if (old) s.fields[s.fields.indexOf(old)] = n; else s.fields.push(n);
-            log(state, "ORDINATEUR", `enregistre le champ « ${n.name} » (${s.name}).`, "admin", now); break;
+            log(state, "A.T.L.A.S.", `enregistre le champ « ${n.name} » (${s.name}).`, "admin", now); break;
           }
           case "admin.nav.field.delete": { const s = sysOf(a.system); s.fields = s.fields.filter(f => f.id !== a.id); break; }
           case "admin.nav.rules": {
             const j = cat.jump || (cat.jump = {});
             for (const k of ["maxLy", "fuelPerLy", "baseSeconds", "secondsPerLy", "maxSeconds"]) if (a[k] !== undefined && isFinite(+a[k])) j[k] = Math.max(0, +a[k]);
             if (a.ship) cat.ship = { x: num(a.ship.x, 0), y: num(a.ship.y, 100), z: num(a.ship.z, 0) };
-            log(state, "ORDINATEUR", "modifie les règles de saut.", "admin", now); break;
+            log(state, "A.T.L.A.S.", "modifie les règles de saut.", "admin", now); break;
           }
           case "admin.nav.catalog": {
             const c = typeof a.catalog === "string" ? JSON.parse(a.catalog) : a.catalog;
             if (!c || !Array.isArray(c.systems) || !c.systems.length) throw new Error("Catalogue invalide.");
             c.systems.forEach(sy => { sy.planets = (sy.planets || []).map(p => cleanPlanet(p)); sy.fields = sy.fields || []; });
-            state.nav.catalog = c; log(state, "ORDINATEUR", `importe un catalogue de ${c.systems.length} systèmes.`, "admin", now); break;
+            state.nav.catalog = c; log(state, "A.T.L.A.S.", `importe un catalogue de ${c.systems.length} systèmes.`, "admin", now); break;
           }
-          case "admin.nav.reset": state.nav.catalog = clone(NAV_JSON); log(state, "ORDINATEUR", "recharge le catalogue de navigation par défaut.", "admin", now); break;
+          case "admin.nav.reset": state.nav.catalog = clone(NAV_JSON); log(state, "A.T.L.A.S.", "recharge le catalogue de navigation par défaut.", "admin", now); break;
         }
         cmds.push({ type: "nav.catalog", catalog: state.nav.catalog }); break;
       }
@@ -2058,7 +2062,7 @@ function tick(state, now = Date.now()) {
       const rooms = Object.values(state.rooms).filter(r => r.section === s.id);
       const aboard = Object.values(state.people).filter(x => rooms.some(r => r.id === x.room));
       cmds.push({ type: "section.eject", section: s.id, rooms: rooms.map(r => r.id) });
-      log(state, "ORDINATEUR", `Section ${s.name} éjectée${aboard.length ? " avec " + aboard.length + " personne(s) à bord" : ""}.`, "crit", now);
+      log(state, "A.T.L.A.S.", `Section ${s.name} éjectée${aboard.length ? " avec " + aboard.length + " personne(s) à bord" : ""}.`, "crit", now);
     }
   }
   if (state.procs.length > 30) state.procs.length = 30;
@@ -2333,8 +2337,10 @@ function seedDemo(now = Date.now()) {
   post("p-ek", "Vends 4 rations de café véritable contre une carte d’accès niveau 3. Pas de questions.", 2600000, null);
   dw.posts.sort((a, b) => b.t - a.t);
   s.damage = [
-    { id: "demo|1", label: "Électrolyseur", kind: "short", kindName: "Court-circuit", cause: "court-circuit dans le câblage", room: "Support vie et recyclage", x: 412, y: 120, z: 31, since: now - 6 * 60000, repair: 0, parts: true },
-    { id: "demo|2", label: "Hotte de cuisine", kind: "worn", kindName: "Panne d’usure", cause: "usure normale", room: "Cuisine", x: 288, y: 152, z: 74, since: now - 40 * 60000, repair: 34, parts: false }];
+    { id: "demo|1", label: "Électrolyseur", kind: "short", kindName: "Court-circuit", cause: "court-circuit dans le câblage", room: "Support vie et recyclage", x: 412, y: 120, z: 31, since: now - 6 * 60000, repair: 0, parts: 1 },
+    { id: "demo|2", label: "Hotte de cuisine", kind: "worn", kindName: "Panne d’usure", cause: "usure normale", room: "Cuisine", x: 288, y: 152, z: 74, since: now - 40 * 60000, repair: 34, parts: 0 },
+    { id: "demo|3", label: "Paroi (Bloc de fer)", kind: "crack", kindName: "Fissure de coque", cause: "micro-météorite", room: "Hangar", x: 455, y: 131, z: -12, since: now - 3 * 60000, repair: 0, parts: 1, area: 0.0082 },
+    { id: "demo|4", label: "Panneau de fixation d’anneau", kind: "ring", kindName: "Fixation d’anneau endommagée", cause: "fatigue des fixations", room: "coque extérieure", x: 610, y: 188, z: 96, since: now - 12 * 60000, repair: 0, parts: 2, ext: true, open: false }];
   // Caméras de démonstration (une par grande salle).
   s.cameras = {};
   Object.values(s.rooms).filter(r => r.kind === "room" && !/Coursive|Cabine/.test(r.name)).slice(0, 12).forEach((r, i) => {
@@ -3105,7 +3111,7 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["cameras", "08·C"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"]];
+const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["cameras", "23"], ["avaries", "24"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"]];
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -3139,7 +3145,7 @@ function render() {
   const tick = V.log.slice(0, 14).map(l => `<span>${fmtT(l.t)} · ${esc(l.who)} : ${esc(l.text)}</span>`).join("");
   morph(app, `
 <div class="top"><header>
-  <div class="brand">MERIDIAN<small>CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : V.me.ws ? " · " + esc(MC.WS_NAMES[V.me.ws].toUpperCase()) : ""}</small></div>
+  <div class="brand">MERIDIAN<small>A.T.L.A.S. · CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : V.me.ws ? " · " + esc(MC.WS_NAMES[V.me.ws].toUpperCase()) : ""}</small></div>
   <div class="hsep"></div>${MINDOWS ? `<button class="b sm ghost" data-fn="toDesk" title="Revenir au bureau Mindows">◂ Bureau</button>` : ""}${shipChip}${linkChip}
   <span class="sp"></span>
   <div class="clock" data-clock>${fmtT(now())}<small>${esc(MC.phaseNow(V, now()).name.toUpperCase())}</small></div>
@@ -3622,7 +3628,7 @@ function loginAnim() {
   ov.className = "login-ov";
   const BR = brandOf(V.branding);
   ov.innerHTML = `<div class="login-box"><div style="width:64px;height:64px;margin:0 auto" aria-hidden="true">${alterraMark(64)}</div>
-<div class="login-brand">ALTERRA</div><div class="login-sub">${esc(BR.mission.toUpperCase())} · ${esc(BR.code)} · SYSTÈME DE BORD</div>
+<div class="login-brand">ALTERRA</div><div class="login-sub">${esc(BR.mission.toUpperCase())} · ${esc(BR.code)} · A.T.L.A.S.</div><div class="login-sub" style="opacity:.6;margin-top:2px">Alterra Tactical Life-support &amp; Adaptive System</div>
 <label class="login-l">Identifiant</label><div class="login-f m" id="lg-mail"></div>
 <label class="login-l">Mot de passe</label><div class="login-f m" id="lg-pw"></div>
 <div class="login-bar"><i id="lg-bar"></i></div><div class="login-st m" id="lg-st">&nbsp;</div></div>`;
@@ -3642,7 +3648,7 @@ function loginAnim() {
     for (let i = 1; i <= pw && !stop; i++) { $("lg-pw").textContent = "•".repeat(i); await wait(55 + Math.random() * 40); }
     await wait(150);
     $("lg-pw").classList.remove("on");
-    const steps = hack ? ["Contournement du pare-feu…", "Injection de jeton…", "ACCÈS NON AUTORISÉ · SESSION FANTÔME"] : ["Vérification de la puce…", "Chargement du profil…", "Accès accordé · Bienvenue, " + name];
+    const steps = hack ? ["Contournement du pare-feu…", "Injection de jeton…", "ACCÈS NON AUTORISÉ · SESSION FANTÔME"] : ["A.T.L.A.S. · vérification de la puce…", "Chargement du profil…", "Accès accordé · Bienvenue, " + name];
     for (let k = 0; k < steps.length && !stop; k++) {
       $("lg-st").textContent = steps[k];
       $("lg-st").className = "login-st m" + (k === steps.length - 1 ? (hack ? " red" : " okc") : "");
@@ -3747,7 +3753,7 @@ PAGE.admin = () => {
   const stocks = [["fuel", "Carburant"], ["water", "Eau"], ["food", "Vivres"], ["o2", "Oxygène"], ["parts", "Pièces"]].map(([k, l]) => `<label class="f">${l} · <span class="m">${n0(V.stocks[k])} %</span><input type="range" id="stk-${k}" min="0" max="100" value="${n0(V.stocks[k])}" data-fn="stock" data-arg="${k}"></label>`).join("");
   return `<div class="grid g-2"><div class="stack">${panel("Avaries déclenchables", "FLT.CAT", cats + `<p class="note">Une avarie silencieuse n’apparaît pas aux joueurs : le mod reçoit l’ordre mais aucune alarme n’est levée.</p>`)}</div><div class="stack">
 ${panel("Avaries actives", "FLT." + active.length, fl)}
-${panel("Comportement de l’ordinateur", "AI.CORE", `<div class="vrow"><span>Refuser les commandes de l’équipage</span><button class="sw" role="switch" aria-checked="${V.computer.refuse}" data-fn="aiToggle" aria-label="Refuser les commandes"></button></div><label class="f" style="margin-top:10px">Message affiché aux joueurs<input type="text" id="ai-msg" maxlength="140" placeholder="ORDINATEUR : la survie de la mission prime."></label><p class="note">Toutes les actions non admin sont alors rejetées avec ce message.</p>`)}
+${panel("Comportement d’A.T.L.A.S.", "AI.CORE", `<div class="vrow"><span>Refuser les commandes de l’équipage</span><button class="sw" role="switch" aria-checked="${V.computer.refuse}" data-fn="aiToggle" aria-label="Refuser les commandes"></button></div><label class="f" style="margin-top:10px">Message affiché aux joueurs<input type="text" id="ai-msg" maxlength="140" placeholder="ORDINATEUR : la survie de la mission prime."></label><p class="note">Toutes les actions non admin sont alors rejetées avec ce message.</p>`)}
 ${panel("Réserves", "STK.SET", stocks)}
 ${(() => { const sec = V.security || { firewall: "2", hackLevel: 4, intrusions: [] }; const st = { running: "en cours", done: "aboutie", aborted: "interrompue" };
   return panel("Sécurité informatique", "SEC.FW", `<div class="f2"><label class="f">Pare-feu<select id="fw-l">${Object.entries(MC.FIREWALL).map(([k, f]) => `<option value="${k}"${sec.firewall === k ? " selected" : ""}>${esc(f[0])} · ${Math.round(f[1] / 60)} min · repéré ${Math.round(f[2] * 100)} %</option>`).join("")}</select></label><label class="f">Niveau d’une session piratée<input type="number" id="fw-h" min="1" max="6" value="${sec.hackLevel || 4}"></label></div><div class="btns">${btn("Enregistrer", null, { fn: "saveSecurity", cls: "sm" })}</div><p class="note">Un boîtier d’intrusion branché sur un ordinateur de bord travaille le temps indiqué ; l’intrus doit rester à côté. S’il est repéré, l’équipage voit l’alerte « Intrusion informatique ». Au bout : un fragment de données (livre) et une console « ACCÈS INCONNU » pendant 15 min.</p><div class="lbl">Dernières intrusions</div>${(sec.intrusions || []).slice(0, 12).map(r => `<div class="vrow"><span>${esc(r.name || "?")} <span class="dim m" style="font-size:11.5px">${esc(r.id)}${r.room && V.rooms[r.room] ? " · " + esc(V.rooms[r.room].name) : ""}</span></span><span class="m" style="font-size:12px">${fmtT(r.start)} · <span class="${r.status === "done" ? "red" : r.status === "running" ? "amb" : "dim"}">${st[r.status] || r.status}</span>${r.detected ? ` · <span class="okc">repérée</span>` : ` · <span class="dim">non repérée</span>`}</span></div>`).join("") || `<p class="empty">Aucune intrusion.</p>`}`); })()}
@@ -3841,7 +3847,7 @@ const FN = {
   crewF(el) { ui.crewF = el.dataset.arg; render(); },
   q(el) { ui.q[el.dataset.arg] = el.value; render(); },
   sec(el) { ui.sec = el.dataset.arg; },
-  aiToggle() { act({ type: "admin.computer", refuse: !V.computer.refuse, message: val("ai-msg") || V.computer.message || "ORDINATEUR : commande refusée." }, V.computer.refuse ? "L’ordinateur obéit de nouveau." : "L’ordinateur refuse les commandes."); },
+  aiToggle() { act({ type: "admin.computer", refuse: !V.computer.refuse, message: val("ai-msg") || V.computer.message || "A.T.L.A.S. : commande refusée." }, V.computer.refuse ? "L’ordinateur obéit de nouveau." : "L’ordinateur refuse les commandes."); },
   setGroup(el) { act({ type: "door.setGroup", door: el.dataset.arg, group: el.value || null }, "Groupe mis à jour."); },
   perm(el) { act({ type: "perms.set", action: el.dataset.arg, level: +el.value }, "Niveau mis à jour."); },
   stock(el) { act({ type: "admin.stocks", stocks: { [el.dataset.arg]: +el.value } }); },
@@ -4661,7 +4667,7 @@ PAGE.energy = () => {
   }
   const ev = (V.power.events || []).slice(0, 14).map(e => `<div class="kv" style="border:0;padding:2px 0"><span class="m dim">${fmtT(e.t)}</span><b style="font-weight:400;text-align:right">${esc(e.text)}</b></div>`).join("") || `<p class="empty">Aucun événement récent.</p>`;
   const help = `<p class="note">Chaque pièce a son panneau (plomb de pièce). Au-dessus : la section, puis le pont. Un plomb qui saute coupe tout ce qui est en aval ; plus le dépassement est fort, plus le plomb du dessus risque de sauter aussi. Quand un pont saute ou que la production ne suffit plus, le vaisseau passe sur batteries et piles de secours : seuls les appareils vitaux (support vie, gravité, sas) restent alimentés. Un réseau abîmé ou surchargé peut mettre le feu.</p>`;
-  const DMG = V.damage || [];
+  const DMG = (V.damage || []).filter(d => ["short", "burnt", "impact", "worn"].includes(d.kind));
   const DK = { short: ["Court-circuit", "red"], burnt: ["Grillé", "red"], impact: ["Choc", "amb"], worn: ["Usure", "amb"] };
   const dmg = DMG.length ? DMG.map(d => `<div class="vrow"><span style="min-width:0"><span class="pill ${DK[d.kind] ? DK[d.kind][1] : "amb"}">${esc(DK[d.kind] ? DK[d.kind][0] : d.kind)}</span> <b style="font-weight:500">${esc(d.label)}</b> <span class="mu">· ${esc(roomName(d.room) !== "—" ? roomName(d.room) : d.room)} · ${d.x} ${d.y} ${d.z}</span><div class="dim" style="font-size:12px">${esc(d.cause)}${d.parts ? " · pièces de rechange requises" : ""}${d.repair ? ` · réparation ${d.repair} %` : ""} · depuis ${fmtT(d.since)}</div></span>${V.me.admin ? btn("Lever", { type: "damage.clear", id: d.id }, { cls: "sm ghost" }) : ""}</div>`).join("")
     : `<p class="empty">Aucune machine en panne.</p>`;
@@ -4960,7 +4966,7 @@ APPUI.store = () => {
     const has = pc.apps.includes(id);
     return `<div class="st-app">${appIcon(id)}<div><b>${esc(a.name)}</b><p>${esc(a.desc)}</p></div>${has ? `<button class="b sm ghost" data-cmd="${enc({ type: "pc.uninstall", pc: PC_KEY, app: id })}">Désinstaller</button>` : `<button class="b sm" data-cmd="${enc({ type: "pc.install", pc: PC_KEY, app: id })}">Obtenir</button>`}</div>`;
   }).join("");
-  return `<div class="st"><div class="st-h"><b>BlocStore</b><span>Applications vérifiées par l’ordinateur de bord*</span></div>${list}<p class="st-f">* sauf celles qui ne le sont pas.</p></div>`;
+  return `<div class="st"><div class="st-h"><b>BlocStore</b><span>Applications vérifiées par A.T.L.A.S.*</span></div>${list}<p class="st-f">* sauf celles qui ne le sont pas.</p></div>`;
 };
 
 /* ----------------------------------------------------------------- Bibliothèque */
@@ -5155,6 +5161,31 @@ FN.bhSub = () => { ui.bhSel = null; ui.bhPop = "Paiement refusé : votre puce n�
 
 
 
+/* ----------------------------------------------------------------- Avaries */
+const DKIND = { short: ["Court-circuit", "red", "Machine"], burnt: ["Grillé", "red", "Machine"], impact: ["Choc", "amb", "Machine"], worn: ["Usure", "amb", "Machine"],
+  crack: ["Fissure", "red", "Coque"], leak: ["Fuite", "red", "Conduite"], ring: ["Anneau", "amb", "Extérieur"], engine: ["Moteur", "red", "Extérieur"], struct: ["Structure", "amb", "Extérieur"] };
+function damageRows(list, admin) {
+  return list.map(d => { const k = DKIND[d.kind] || [d.kind, "amb", "?"];
+    const where = d.ext ? `coque extérieure · ${d.x} ${d.y} ${d.z}` : `${esc(roomName(d.room) !== "—" ? roomName(d.room) : d.room)} · ${d.x} ${d.y} ${d.z}`;
+    const how = d.ext ? (d.open ? "panneau ouvert, réparation en cours" : "EVA : ouvrir le panneau à la trousse, puis réparer") : d.kind === "crack" ? "colmater à la trousse (accroupi)" : "réparer à la trousse (accroupi)";
+    return `<div class="vrow"><span style="min-width:0"><span class="pill ${k[1]}">${esc(k[0])}</span> <b style="font-weight:500">${esc(d.label)}</b> <span class="mu">· ${where}</span>
+<div class="dim" style="font-size:12px">${esc(d.cause)}${d.area ? ` · fuite ${String(d.area).replace(".", ",")} m²` : ""} · ${how}${d.parts ? ` · ${d.parts} lot${d.parts > 1 ? "s" : ""} de pièces` : ""}${d.repair ? ` · ${d.repair} %` : ""} · depuis ${fmtT(d.since)}</div></span>${admin ? btn("Lever", { type: "damage.clear", id: d.id }, { cls: "sm ghost" }) : ""}</div>`; }).join("");
+}
+PAGE.avaries = () => {
+  const D = V.damage || [], admin = V.me.admin;
+  const groups = [["Coque et structure", d => ["crack", "struct", "ring", "engine"].includes(d.kind)], ["Conduites", d => d.kind === "leak"], ["Machines", d => DKIND[d.kind] && DKIND[d.kind][2] === "Machine"]];
+  const crit = D.filter(d => ["crack", "leak", "short", "engine"].includes(d.kind)).length;
+  const tile = (l, v, c) => `<div class="tile"><span>${l}</span><div class="big ${v ? c : "okc"}">${v}</div></div>`;
+  const head = `<div class="tiles">${tile("Avaries", D.length, crit ? "red" : "amb")}${tile("Fissures de coque", D.filter(d => d.kind === "crack").length, "red")}${tile("Panneaux extérieurs (EVA)", D.filter(d => d.ext).length, "amb")}${tile("Machines en panne", D.filter(d => (DKIND[d.kind] || [])[2] === "Machine").length, "amb")}</div>`;
+  const body = groups.map(([t, f]) => { const l = D.filter(f); return l.length ? panel(t, "DMG." + l.length, damageRows(l, admin)) : ""; }).join("") || panel("Avaries", "DMG.0", `<p class="empty">Aucune avarie en cours. A.T.L.A.S. surveille la coque, les conduites et les machines.</p>`);
+  const help = panel("Interventions", "DMG.AIDE", `<ul class="note" style="margin:0;padding-left:18px;line-height:1.6">
+<li><b>Fissure de coque</b> : petite fuite d’air vers l’espace (sifflement, filet de gaz). Elle s’élargit avec le temps. Trousse à outils, accroupi + clic droit sur le bloc fissuré, 1 lot de pièces de rechange.</li>
+<li><b>Trou dans la coque</b> : accroupi + clic droit à la trousse sur le bord du trou : une plaque de colmatage est soudée (1 lot de pièces).</li>
+<li><b>Fuite de conduite</b> : le tuyau vide son réseau dans la pièce (gaz parfois dangereux). Même réparation que la fissure.</li>
+<li><b>Avaries extérieures</b> (anneau, moteur, structure) : sortie en EVA aux coordonnées indiquées, repérer les étincelles. Clic droit à la trousse ouvre le panneau, accroupi + clic droit répare (2 lots de pièces). Moteur : saut impossible. Anneau : gravité instable. Structure : nouvelles fissures toutes les quelques minutes.</li>
+<li><b>Machines</b> : court-circuit, surcharge, usure ou choc. Accroupi + clic droit à la trousse.</li></ul>`);
+  return `<div class="stack">${panel("État des avaries", "A.T.L.A.S.", head)}<div class="grid g-2"><div class="stack">${body}</div><div class="stack">${help}</div></div></div>`;
+};
 /* ----------------------------------------------------------------- Caméras de surveillance */
 let CAM_WATCH = "";
 const CAM_FRAMES = {};
@@ -5524,7 +5555,7 @@ PAGE.chat = () => {
   const box = (ph) => `<div class="row" style="margin-top:10px;align-items:stretch"><textarea id="chat-in" rows="2" maxlength="500" placeholder="${esc(ph)}" style="flex:1;min-width:0;resize:vertical"></textarea>${btn("Envoyer", null, { fn: "chatSend", cls: "solid" })}</div>`;
   if (!V.me.admin) {
     const list = chats[V.me.id] || [];
-    return panel("Ordinateur de bord", "AI.LINK", `<p class="note" style="margin-top:0">Parlez à l’ordinateur du Meridian. Il vous répondra ici.</p><div id="chat-log" style="max-height:52vh;overflow:auto;padding-right:4px">${list.length ? list.map(m => bubble(m, m.from === "p", m.from === "ai" ? "ORDINATEUR" : V.me.name)).join("") : `<p class="empty">Aucun échange. Écrivez votre premier message.</p>`}</div>${box("Votre message à l’ordinateur…")}`);
+    return panel("A.T.L.A.S. · ordinateur de bord", "AI.LINK", `<p class="note" style="margin-top:0">Parlez à A.T.L.A.S. (Alterra Tactical Life-support &amp; Adaptive System), l’ordinateur du Meridian. Il vous répondra ici.</p><div id="chat-log" style="max-height:52vh;overflow:auto;padding-right:4px">${list.length ? list.map(m => bubble(m, m.from === "p", m.from === "ai" ? "A.T.L.A.S." : V.me.name)).join("") : `<p class="empty">Aucun échange. Écrivez votre premier message.</p>`}</div>${box("Votre message à l’ordinateur…")}`);
   }
   const me = V.people[V.me.id] || {};
   const threads = Object.entries(chats).filter(([, l]) => l.length).map(([pid, l]) => ({ pid, l, last: l[l.length - 1], unread: (V.chatUnread || {})[pid] })).sort((a, b) => b.last.t - a.last.t);
@@ -5533,7 +5564,7 @@ PAGE.chat = () => {
   const left = `<div class="vrow" style="border:0"><span>Me notifier des nouveaux messages<div class="mu" style="font-size:12px">En jeu (si vous êtes connecté) et sur ce navigateur.</div></span><button class="sw" role="switch" aria-checked="${!!me.notifyAi}" data-fn="chatNotify" aria-label="Notifications"></button></div>
 <div class="lbl">Conversations</div>${threads.length ? threads.map(t => `<div class="vrow" data-fn="chatTo" data-arg="${esc(t.pid)}" style="cursor:pointer;${CHAT.to === t.pid ? "background:rgba(98,230,242,.08)" : ""}"><span style="min-width:0"><b style="font-weight:600">${esc(nm(t.pid))}</b>${t.unread ? ` <span class="pill amb">nouveau</span>` : ""}<div class="mu" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.last.text)}</div></span><span class="m dim" style="font-size:11px">${fmtT(t.last.t)}</span></div>`).join("") : `<p class="empty">Aucune conversation.</p>`}`;
   const cur = CHAT.to ? chats[CHAT.to] : null;
-  const right = cur ? `<div id="chat-log" style="max-height:52vh;overflow:auto;padding-right:4px">${cur.map(m => bubble(m, m.from === "ai", m.from === "ai" ? "ORDINATEUR" + (m.who ? " (" + m.who + ")" : "") : nm(CHAT.to))).join("")}</div>${box("Répondre en tant qu’ordinateur de bord…")}` : `<p class="empty">Sélectionnez une conversation.</p>`;
+  const right = cur ? `<div id="chat-log" style="max-height:52vh;overflow:auto;padding-right:4px">${cur.map(m => bubble(m, m.from === "ai", m.from === "ai" ? "A.T.L.A.S." + (m.who ? " (" + m.who + ")" : "") : nm(CHAT.to))).join("")}</div>${box("Répondre en tant qu’ordinateur de bord…")}` : `<p class="empty">Sélectionnez une conversation.</p>`;
   if (CHAT.to && (V.chatUnread || {})[CHAT.to] && CHAT.reading !== CHAT.to) { CHAT.reading = CHAT.to; const to = CHAT.to; queueMicrotask(() => act({ type: "chat.read", to }).finally(() => { CHAT.reading = null; })); }
   return `<div class="grid g-2">${panel("Discussion · " + (CHAT.to ? nm(CHAT.to) : "—"), "AI.LINK", right)}${panel("Ordinateur de bord · staff", "AI.STAFF", left)}</div>`;
 };
