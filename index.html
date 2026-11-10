@@ -54,7 +54,7 @@ header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding-block:10p
 .demo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;padding-block:6px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--ln);background:rgba(98,230,242,.04)}
 .demo b{color:var(--cy);letter-spacing:.14em;font-size:11px;font-weight:600;margin-right:6px}
 .demo select{min-height:30px;padding:4px 8px}
-select,input[type=text],input[type=number],input[type=search],input[type=password],textarea{background:var(--bg2);border:1px solid var(--ln2);padding:7px 9px;min-height:36px;border-radius:0;max-width:100%}
+select,input[type=text],input[type=number],input[type=time],input[type=search],input[type=password],textarea{background:var(--bg2);border:1px solid var(--ln2);padding:7px 9px;min-height:36px;border-radius:0;max-width:100%}
 select:hover,input:hover{border-color:var(--cy2)}
 
 nav{border-right:1px solid var(--ln);padding:14px 0;overflow:auto;background:rgba(6,18,26,.6)}
@@ -306,12 +306,12 @@ button.mn{background:#2c3a44;box-shadow:inset 2px 2px 0 #46606e,inset -2px -2px 
 /* Serpent */
 .snake{padding:10px;text-align:center;color:var(--tx)}.snake canvas{border:1px solid var(--ln2);max-width:100%;image-rendering:pixelated}.snake p{margin:4px 0;font:13px var(--f-mono)}
 /* BlocHub (parodie) */
-.bh{min-height:100%;background:#0e0e0e;color:#ddd;font-family:Arial,sans-serif;position:relative}.bh-logo{font:800 26px "Trebuchet MS",Arial,sans-serif;color:#fff;letter-spacing:-.5px}.bh-logo i{font-style:italic;color:#b6f23a;margin-left:2px}.bh-logo::before{content:"⛏";font-size:20px;margin-right:6px;color:#b6f23a}
+.bh{min-height:100%;background:#0e0e0e;color:#ddd;font-family:Arial,sans-serif;position:relative}.bh-logo{font:800 26px "Trebuchet MS",Arial,sans-serif;color:#fff;letter-spacing:-.5px}.bh-logo i{font-style:normal;background:#ff9000;color:#000;border-radius:4px;padding:0 5px;margin-left:3px}
 .bh-top{display:flex;gap:14px;align-items:center;padding:10px 14px;background:#000;flex-wrap:wrap}.bh-top input{flex:1;min-width:140px;background:#222;border:1px solid #333;color:#eee;padding:6px 10px}.bh-top span{font-size:12px;color:#999}
 .bh-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;padding:14px}.bh-c{background:none;border:0;color:#ddd;text-align:left;cursor:pointer;padding:0}.bh-c b{display:block;font-size:13px;margin:6px 0 2px;line-height:1.3}.bh-c>span:last-child{font-size:11.5px;color:#888}
 .bh-th{display:block;aspect-ratio:16/9;background-size:28%;background-repeat:repeat;image-rendering:pixelated;position:relative;border-radius:3px;max-width:100%}.bh-th i{position:absolute;right:5px;bottom:5px;background:rgba(0,0,0,.8);color:#fff;font:600 11px Arial;padding:1px 4px;border-radius:2px;font-style:normal}
-.bh-c:hover .bh-th{outline:2px solid #b6f23a}.bh-pop{position:sticky;bottom:14px;margin:0 14px;width:fit-content;background:#1d1d1d;border-left:4px solid #b6f23a;color:#fff;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.6);max-width:80%}
-.bh-m{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}.bh-m>div{background:#1a1a1a;padding:20px;max-width:380px;border-top:4px solid #b6f23a}.bh-btn{background:#b6f23a;color:#000;border:0;font:700 14px Arial;padding:8px 14px;cursor:pointer;border-radius:3px}
+.bh-c:hover .bh-th{outline:2px solid #ff9000}.bh-pop{position:sticky;bottom:14px;margin:0 14px;width:fit-content;background:#1d1d1d;border-left:4px solid #ff9000;color:#fff;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.6);max-width:80%}
+.bh-m{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}.bh-m>div{background:#1a1a1a;padding:20px;max-width:380px;border-top:4px solid #ff9000}.bh-btn{background:#ff9000;color:#000;border:0;font:700 14px Arial;padding:8px 14px;cursor:pointer;border-radius:3px}
 .bh-age{display:flex;align-items:center;justify-content:center;text-align:center;padding:30px}.bh-age>div{max-width:420px}
 @media (max-width:640px){.kb{grid-template-columns:1fr}.mw-desk{flex-direction:row}}
 </style>
@@ -347,7 +347,7 @@ const PAGES = {
   overview: "Vue d’ensemble", alerts: "Alertes", plan: "Plan du vaisseau", atmos: "Atmosphère et vannes",
   doors: "Portes et accès", crew: "Équipage", procs: "Procédures", starmap: "Carte stellaire",
   galaxy: "Carte interstellaire", vue3d: "Vue 3D", chat: "Discussion", log: "Journal", structure: "Structure", screens: "Écrans", pa: "Diffusion", craft: "Fabrication", branding: "Identité visuelle", admin: "Ordinateur de bord",
-  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies"
+  energy: "Énergie", networks: "Réseaux", medical: "Médical", diseases: "Maladies", bord: "Vie de bord", stocks: "Réserves et soute"
 };
 /* Pages réservées au poste admin. */
 const ADMIN_PAGES = ["admin", "screens", "craft", "branding", "diseases"];
@@ -387,7 +387,12 @@ const ACTIONS = {
   "med.order":      ["Ordonner un traitement ou lever une quarantaine (site)", 6, "medical"],
   "kb.write":       ["Publier un document dans la bibliothèque (au-delà de ses notes)", 2, "overview"],
   "kb.procedure":   ["Publier une procédure technique (lisible par tous)", 3, "overview"],
-  "kb.pathology":   ["Publier une fiche de pathologie", 4, "overview"]
+  "kb.pathology":   ["Publier une fiche de pathologie", 4, "overview"],
+  "info.general":   ["Publier sur le canal général (passerelle)", 5, "bord"],
+  "info.crew":      ["Publier sur le canal de l’équipage", 4, "bord"],
+  "mobilize":       ["Mobiliser par alerte de puce", 6, "bord"],
+  "schedule.edit":  ["Régler le déroulé de session et l’ambiance lumineuse", 6, "bord"],
+  "switchboard":    ["Tenir le standard des appels de puce", 3, "bord"]
 };
 
 /* =========================== Mindows : ordinateurs, bibliothèque, Abysse =========================== */
@@ -436,9 +441,9 @@ const WS_PRESETS = {
   pilote: ["overview", "starmap", "galaxy", "vue3d", "alerts", "log"],
   securite: ["overview", "doors", "crew", "plan", "alerts", "log"],
   chercheur: ["overview", "medical", "starmap", "galaxy", "log"],
-  commandement: ["overview", "alerts", "plan", "vue3d", "atmos", "energy", "networks", "doors", "crew", "medical", "procs", "pa", "starmap", "galaxy", "log", "structure"],
-  logistique: ["overview", "plan", "networks", "energy", "log"],
-  communications: ["overview", "pa", "alerts", "starmap", "log"],
+  commandement: ["overview", "bord", "stocks", "alerts", "plan", "vue3d", "atmos", "energy", "networks", "doors", "crew", "medical", "procs", "pa", "starmap", "galaxy", "log", "structure"],
+  logistique: ["overview", "stocks", "plan", "networks", "energy", "log"],
+  communications: ["overview", "bord", "pa", "alerts", "starmap", "log"],
   agronome: ["overview", "atmos", "networks", "log"]
 };
 const WS_NAMES = { ingenieur: "Poste ingénierie", medecin: "Poste médical", pilote: "Poste de pilotage", securite: "Poste de sécurité", chercheur: "Poste de recherche",
@@ -591,6 +596,18 @@ function navReach(state, id) {
   return { ok: !why, why, dist, fuel, seconds };
 }
 /* Message « nav » du mod : position réelle du vaisseau. */
+/* BlocHub piloté par les animateurs (commandes du mod) : nom forcé, installation, popup à la prochaine ouverture d’application. */
+function applyBlocHub(state, m, now = Date.now()) {
+  if (!state.bh) state.bh = {};
+  const who = String(m.uuid || "");
+  const e = who ? (state.bh[who] = state.bh[who] || { names: [], pop: [] }) : null;
+  switch (m.op) {
+    case "name": if (e) { const n = clean(m.name || "", 40); if (m.clear) e.names = []; else if (n && !e.names.includes(n)) e.names.push(n); e.names = e.names.slice(-8); } break;
+    case "popup": if (e) { e.pop.push({ t: now, text: clean(m.text || "", 200), name: clean(m.name || "", 40) }); e.pop = e.pop.slice(-5); } break;
+    case "install": if (m.pc) { const pc = pcOf(state, String(m.pc)); if (pc && !pc.apps.includes("blochub")) pc.apps.push("blochub"); } break;
+  }
+}
+
 function applyNav(state, m, now = Date.now()) {
   const n = state.nav || (state.nav = navEmpty());
   if (m.system && navSystem(n.catalog, m.system)) n.system = m.system;
@@ -855,7 +872,7 @@ function compileAcl(state) {
   const sections = {};
   for (const r of Object.values(state.rooms)) if (r.section) sections[r.id] = r.section;
   return { type: "acl", admins: people.filter(p => p.admin).map(p => p.id), doors, craft: compileCraft(state), uniforms: compileUniforms(state),
-    power: { sections, ratings: state.power.ratings }, thermal: state.thermal, airlocks: state.airlocks.cfg, diseases: { defs: state.diseases } };
+    power: { sections, ratings: state.power.ratings }, thermal: state.thermal, airlocks: state.airlocks.cfg, diseases: { defs: state.diseases }, chip: compileChip(state) };
 }
 
 /* ------------------------------ Alertes ----------------------------- */
@@ -901,7 +918,10 @@ function computeAlerts(state, withSilent = false) {
 const UNIFORM_TEMPLATES = {
   equipage: "Équipage", officier: "Officier d’équipage", armee: "Armée", armee_officier: "Officier de l’armée", securite: "Sécurité",
   colon: "Colon", ingenieur: "Ingénieur", medecin: "Médecin", pilote: "Pilote", explorateur: "Explorateur", scientifique: "Scientifique (laboratoire)", chercheur: "Chercheur (recherche)", agronome: "Agronome · hydroponie", cuisinier: "Cuisine · intendance",
-  logistique: "Logistique · soute", communications: "Communications", administration: "Administration · RH", civil: "Tenue civile (aucun uniforme)"
+  logistique: "Logistique · soute", communications: "Communications", administration: "Administration · RH",
+  technicien: "Technicien (équipage)", medecin_bord: "Médecin de bord", accueil: "Personnel de bord · accueil",
+  infirmier: "Infirmier", pompier: "Pompier-secouriste", mineur: "Mineur", raffineur: "Raffineur", constructeur: "Constructeur d’avant-poste", entretien: "Entretien de l’habitat",
+  civil: "Tenue civile (aucun uniforme)"
 };
 /* Couleurs de chaque uniforme (identiques aux textures du mod). sleeves : "full" ou "short" (avant-bras nus). */
 const UNIFORM_LOOK = {
@@ -922,10 +942,19 @@ const UNIFORM_LOOK = {
   logistique:     { main: "#4f5660", trim: "#e8d24a", accent: "#e07a2a", pants: "#3f454d", boots: "#22252a", belt: "#2b2b2b", sleeves: "full" },
   communications: { main: "#2a3b55", trim: "#e8d24a", accent: "#62e6f2", pants: "#232f44", boots: "#16181c", belt: "#3a4150", sleeves: "full" },
   administration: { main: "#2b2f36", trim: "#c9d3d8", accent: "#7a1f2b", pants: "#24272d", boots: "#121214", belt: "#1a1c20", sleeves: "full" },
+  technicien:     { main: "#2a3b55", trim: "#e07a2a", accent: "#e07a2a", pants: "#3a4150", boots: "#1c1d1f", belt: "#2b2b2b", sleeves: "full" },
+  medecin_bord:   { main: "#1f2c42", trim: "#e8eef0", accent: "#d23a3a", pants: "#1a2436", boots: "#111316", belt: "#2a2f3a", sleeves: "full" },
+  accueil:        { main: "#3b5f8a", trim: "#e0b94a", accent: "#f2f4f6", pants: "#24344c", boots: "#16181c", belt: "#2a2f3a", sleeves: "full" },
+  infirmier:      { main: "#5fb8b0", trim: "#e8eef0", accent: "#d23a3a", pants: "#55a8a0", boots: "#e2e8ea", belt: "#3f7f79", sleeves: "short" },
+  pompier:        { main: "#2a2c30", trim: "#e8d24a", accent: "#ef5a2a", pants: "#26282c", boots: "#121314", belt: "#3a2a20", sleeves: "full" },
+  mineur:         { main: "#5a4a3a", trim: "#f08a24", accent: "#d9e04a", pants: "#3f3a35", boots: "#2a221c", belt: "#2b241e", sleeves: "full" },
+  raffineur:      { main: "#6b7078", trim: "#e8b13a", accent: "#3a3d42", pants: "#55595f", boots: "#24262a", belt: "#3a3a3a", sleeves: "full" },
+  constructeur:   { main: "#d8a62a", trim: "#e8eef0", accent: "#2b2b2b", pants: "#4a4f57", boots: "#2a2420", belt: "#3a3a3a", sleeves: "short" },
+  entretien:      { main: "#4a5a52", trim: "#c9d3d8", accent: "#8fd07a", pants: "#3f4c45", boots: "#22252a", belt: "#2b2f2c", sleeves: "full" },
 };
 /* Couleur de la ceinture selon l'armure portée : le seul détail qui trahit l'armure. */
 const ARMOR_TIERS = { none: ["Sans armure", null], leather: ["Cuir", "#7a4a2a"], chainmail: ["Mailles", "#9a9a9a"], iron: ["Fer", "#dcdcdc"], gold: ["Or", "#e8c04a"], diamond: ["Diamant", "#4ee0e0"], netherite: ["Netherite", "#5a4a63"], turtle: ["Carapace", "#3fa34a"] };
-const GRADE_CATEGORIES = { equipage: "Équipage", armee: "Armée", colon: "Colons", civil: "Civils" };
+const GRADE_CATEGORIES = { equipage: "Équipage", armee: "Armée", travailleur: "Travailleurs", colon: "Colons", civil: "Civils" };
 const INSIGNIA_KINDS = { none: "Aucun", bar: "Barrettes", chevron: "Chevrons", star: "Étoiles" };
 function gradesDefault() {
   const g = (id, name, abbr, category, level, template, kind, count, color) => ({ id, name, abbr, category, level, template, insignia: { kind, count, color } });
@@ -945,12 +974,22 @@ function gradesDefault() {
     g("souslt", "Sous-lieutenant", "SLT", "armee", 4, "armee_officier", "bar", 1, GOLD),
     g("capitaine_armee", "Capitaine (armée)", "CNE", "armee", 5, "armee_officier", "bar", 3, GOLD),
     g("commandant_armee", "Commandant (armée)", "CDT", "armee", 6, "armee_officier", "star", 1, GOLD),
+    g("travailleur", "Travailleur", "TRV", "travailleur", 2, "entretien", "none", 0, SILVER),
+    g("chef_travailleur", "Chef d’équipe", "CHF", "travailleur", 3, "entretien", "chevron", 1, GOLD),
     g("colon", "Colon", "COL", "colon", 1, "colon", "none", 0, SILVER),
-    g("chef_equipe", "Chef d’équipe", "CHF", "colon", 2, "colon", "bar", 1, SILVER),
+    g("chef_equipe", "RSG (représentant syndical)", "RSG", "colon", 2, "colon", "bar", 1, SILVER),
   ].map((x, i) => Object.assign(x, { order: i }));
 }
 function gradesOf(state) {
   if (!Array.isArray(state.grades)) state.grades = gradesDefault();
+  /* Nouveaux grades par défaut ajoutés après coup : on les ajoute sans toucher aux grades réglés. */
+  if (!state.gradesV || state.gradesV < 2) {
+    const have = new Set(state.grades.map(g => g.id));
+    for (const g of gradesDefault()) if (!have.has(g.id)) state.grades.push(g);
+    const rsg = state.grades.find(g => g.id === "chef_equipe");
+    if (rsg && rsg.name === "Chef d’équipe" && rsg.category === "colon") { rsg.name = "RSG (représentant syndical)"; rsg.abbr = "RSG"; }
+    state.gradesV = 2;
+  }
   return state.grades.slice().sort((a, b) => (a.order | 0) - (b.order | 0));
 }
 function cleanGrade(g, old) {
@@ -970,11 +1009,172 @@ function compileUniforms(state) {
   for (const p of Object.values(state.people)) {
     if (p.demo || p.id === "admin" || p.id === "intrus") continue;
     const g = p.grade && grades[p.grade];
-    const t = p.outfit || (g ? g.template : null);
+    const post = postOf(p.job);
+    const t = p.outfit || (post ? post[6] : null) || (g ? g.template : null);
     if (!t || t === "civil") continue;
     out[p.id] = { t, k: g ? g.insignia.kind : "none", n: g ? g.insignia.count : 0, c: g ? g.insignia.color : "#c9d3d8", g: g ? g.abbr : "", nm: String(p.name || "").slice(0, 40) };
   }
   return out;
+}
+
+
+
+/* =========================== Inventaire automatique ===========================
+   Le mod compte les coffres et réservoirs du vaisseau. Les objets (vivres, médical, pièces) peuvent être mal comptés :
+   une erreur apparaît de temps en temps et reste jusqu’au recompte d’un magasinier ou du chef de soute. Les réservoirs
+   (eau, ergols, O₂, antimatière) sont jaugés : jamais d’erreur. */
+const INV_RES = {
+  food: ["Vivres", "pts", true], meds: ["Fournitures médicales", "u.", true], parts: ["Pièces de rechange", "u.", true],
+  water: ["Eau", "m³", false], fuel: ["Ergols (carburant)", "m³", false], o2: ["Oxygène en cuves", "kg", false], am: ["Antimatière", "g", false]
+};
+const INV_REF = { food: 4000, meds: 80, parts: 300, water: 256, fuel: 64, o2: 600, am: 100 };
+const INV_ERR_P = 30 / 5400;   // ≈ une erreur par ressource toutes les 1 h 30 de jeu
+function invState(state) { if (!state.inv) state.inv = { real: null, err: {}, ref: Object.assign({}, INV_REF), t: 0, log: [] }; if (!state.inv.ref) state.inv.ref = Object.assign({}, INV_REF); if (!state.inv.err) state.inv.err = {}; return state.inv; }
+function invCounted(state) {
+  const I = invState(state), r = I.real; if (!r) return null;
+  const out = {};
+  for (const [k, [, , items]] of Object.entries(INV_RES)) {
+    const real = +r[k] || 0, e = items ? I.err[k] : null;
+    out[k] = e ? Math.max(0, Math.round(real * (1 + e.f) + e.d)) : real;
+  }
+  out.rations = r.rations | 0; out.containers = r.containers | 0;
+  out.cap = { water: +r.waterCap || 0, fuel: +r.fuelCap || 0, am: +r.amCap || 0 };
+  return out;
+}
+function applyInventory(state, m, now = Date.now(), rnd = Math.random) {
+  const I = invState(state);
+  I.real = m; I.t = now;
+  for (const [k, [, , items]] of Object.entries(INV_RES)) {
+    if (!items || I.err[k] || !(+m[k] > 0)) continue;
+    if (rnd() < INV_ERR_P) I.err[k] = { f: (rnd() < .5 ? -1 : 1) * (0.06 + rnd() * 0.2), d: Math.round((rnd() - .5) * 12), since: now };
+  }
+  const c = invCounted(state), pct = (k, cap) => Math.max(0, Math.min(100, Math.round((c[k] / Math.max(1e-9, cap || I.ref[k] || 1)) * 100)));
+  state.stocks = Object.assign(state.stocks || {}, { food: pct("food"), meds: pct("meds"), parts: pct("parts"), water: pct("water", c.cap.water), fuel: pct("fuel", c.cap.fuel), o2: pct("o2"), am: pct("am", c.cap.am) });
+}
+
+/* =========================== Postes du Meridian ===========================
+   Organigramme de la campagne (300 participants, 9 sessions, deux quarts). Effectif = total sur la session
+   (la moitié par quart, sauf « jour » ou « nuit » seul). Les effectifs de l’armée et des colons sont indicatifs :
+   le jeu de rôle décide des postes réels. [groupe, service, poste, effectif, quart, grades, uniforme, doit, peut] */
+const POSTS = [
+  ["Équipage", "Commandement", "Capitaine", 1, "jour", "capitaine", "officier", "Décisions majeures, annonces ; d’astreinte la nuit", "Convoquer le Conseil"],
+  ["Équipage", "Commandement", "Second", 1, "nuit", "second", "officier", "Arriver en avance, point avec le capitaine, commander la nuit", "Appeler le capitaine si nécessaire"],
+  ["Équipage", "Passerelle", "Astrogateur", 2, "", "capcorvette lieutenant", "officier", "Caps et fenêtres de saut", "Proposer un détour"],
+  ["Équipage", "Passerelle", "Pilote de passerelle", 2, "", "enseigne", "pilote", "Manœuvres, freinage", "Manœuvre d’urgence"],
+  ["Équipage", "Passerelle", "Opérateur capteurs", 2, "", "qm", "equipage", "Surveiller scans et dangers", "Douter d’un capteur"],
+  ["Équipage", "Communications et drones", "Officier comms (standard)", 4, "", "enseigne qm", "communications", "Standard, annonces, canaux, brouillage", "Retarder ou couper un canal"],
+  ["Équipage", "Communications et drones", "Technicien réseau", 2, "", "qm", "communications", "Site de contrôle, journaux, pannes", "Détecter un piratage"],
+  ["Équipage", "Communications et drones", "Opérateur de drone", 4, "", "matelot", "communications", "Piloter 2 drones chacun", "Reconfigurer un drone"],
+  ["Équipage", "Ingénierie et techniciens", "Ingénieur énergie", 2, "", "enseigne", "ingenieur", "Répartir la puissance", "Délester une section"],
+  ["Équipage", "Ingénierie et techniciens", "Ingénieur propulsion", 2, "", "enseigne", "ingenieur", "Calibrer le saut, carburant", "Tenter un saut instable"],
+  ["Équipage", "Ingénierie et techniciens", "Chef mécanicien", 2, "", "capcorvette lieutenant", "ingenieur", "Liste d’avaries, binômes", "Proposer de sacrifier une section"],
+  ["Équipage", "Ingénierie et techniciens", "Électricien", 2, "", "matelot", "technicien", "Disjoncteurs, câblage", "Monter une dérivation"],
+  ["Équipage", "Ingénierie et techniciens", "Technicien coque et EVA", 4, "", "matelot", "technicien", "Colmater, souder, sorties EVA", "Renforcer un anneau"],
+  ["Équipage", "Ingénierie et techniciens", "Technicien support vie", 4, "", "matelot", "technicien", "Oxygène, eau, gravité, recyclage", "Purger, quarantaine"],
+  ["Équipage", "Ingénierie et techniciens", "Fabricant d’atelier", 4, "", "matelot", "technicien", "Fabriquer pièces et kits", "Prototyper une amélioration"],
+  ["Équipage", "Sécurité intérieure", "Chef de sécurité", 2, "", "capcorvette lieutenant", "securite", "Accès, registre, cellules", "Arrêter, confiner"],
+  ["Équipage", "Sécurité intérieure", "Agent de sécurité", 10, "", "matelot qm", "securite", "Patrouiller, alarmes, enquêtes", "Fouiller, arrêter"],
+  ["Équipage", "Administration et justice", "Responsable RH et accès", 1, "jour", "lieutenant", "administration", "Badges, quarts, remplacements", "Révoquer un accès"],
+  ["Équipage", "Administration et justice", "Officier juridique", 1, "jour", "enseigne", "administration", "Cadrer plaintes et procès", "Présider le tribunal"],
+  ["Équipage", "Administration et justice", "Archiviste, journal de bord", 2, "", "qm", "administration", "Journal à chaque relève, preuves", "Reconstituer les faits"],
+  ["Équipage", "Administration et justice", "Intendant stocks et rations", 2, "", "qm", "logistique", "Suivre stocks, distribuer rations", "Rationner, auditer"],
+  ["Équipage", "Navettes", "Pilote de navette", 4, "", "qm", "pilote", "Piloter la mission de bout en bout", "Refuser une mission risquée"],
+  ["Équipage", "Navettes", "Copilote de navette", 4, "", "matelot", "pilote", "Checklists, navigation, amarrage", "Former un candidat"],
+  ["Équipage", "Soute", "Chef de soute", 2, "", "lieutenant", "logistique", "Inventaire, sorties de stock, recomptes", "Ordonner une saisie"],
+  ["Équipage", "Soute", "Magasinier", 2, "", "qm", "logistique", "Kits de réparation, dotations, recomptes", "Relever un écart de stock"],
+  ["Équipage", "Science et exploration", "Chef scientifique", 1, "jour", "lieutenant", "scientifique", "Cibles de scan, fiches planètes", "Défendre une planète"],
+  ["Équipage", "Science et exploration", "Scientifique de labo", 2, "", "matelot", "scientifique", "Analyser les échantillons", "Découvrir un danger caché"],
+  ["Équipage", "Science et exploration", "Chercheur (anneau Gamma)", 2, "", "qm", "chercheur", "Observatoire du rotor, archives", "Révéler du lore"],
+  ["Équipage", "Science et exploration", "Explorateur", 2, "", "enseigne", "explorateur", "Mener les sorties de reconnaissance", "Baliser un site"],
+  ["Équipage", "Personnel de bord", "Médecin de bord", 2, "", "enseigne qm", "medecin_bord", "Soigner l’équipage, aptitudes au service et aux EVA", "Déclarer un membre inapte"],
+  ["Équipage", "Personnel de bord", "Accueil et assistance des voyageurs", 4, "", "matelot", "accueil", "Accueillir, guider, guichet des requêtes", "Médiation, accompagner une évacuation"],
+  ["Armée", "État-major", "Commandant de l’armée", 1, "", "commandant_armee", "armee_officier", "Commander, siéger au Conseil", "Proposer l’état d’alerte"],
+  ["Armée", "État-major", "Officier de quart", 2, "", "capitaine_armee", "armee_officier", "Répartir les gardes, rapport de relève", "Donner le 2e code d’armurerie"],
+  ["Armée", "Défense du vaisseau", "Garde de l’armurerie et des points sensibles", 12, "", "souslt sergent caporal soldat", "armee", "Armurerie à 2 codes, réacteur, hangar", "Refuser une sortie d’armes"],
+  ["Armée", "Défense du vaisseau", "Armurier, logistique militaire", 6, "", "adjudant soldat", "armee", "Entretenir armes, munitions, inventaire", "Signaler un manque"],
+  ["Armée", "Opérations extérieures", "Éclaireur de surface", 10, "", "sergent caporal soldat", "armee", "Sécuriser les sites, escorter les missions", "Poser des balises"],
+  ["Armée", "Opérations extérieures", "Section d’intervention (Callisto)", 10, "", "souslt sergent soldat", "armee", "Embarquer, évacuer, escorter", "Renforcer une section en crise"],
+  ["Armée", "Opérations extérieures", "Démineur, pyrotechnicien", 4, "", "sergent soldat", "armee", "Charges de largage, engins piégés", "Désamorcer un engin"],
+  ["Travailleurs", "Santé", "Médecin", 4, "", "chef_travailleur travailleur", "medecin", "Soigner, dossiers, aptitudes", "Décréter une quarantaine"],
+  ["Travailleurs", "Santé", "Infirmier", 4, "", "travailleur", "infirmier", "Soins, triage en incident", "Suivre les malades"],
+  ["Travailleurs", "Secours", "Pompier-secouriste", 10, "", "chef_travailleur travailleur", "pompier", "Incendie, brèche, évacuation, premiers soins", "Assister les techniciens"],
+  ["Travailleurs", "Agriculture et cuisine", "Agronome", 2, "jour", "chef_travailleur travailleur", "agronome", "Sols, eau, contamination", "Tester des cultures"],
+  ["Travailleurs", "Agriculture et cuisine", "Fermier hydroponique", 6, "jour", "travailleur", "agronome", "Semer, récolter, livrer", "Variétés d’essai"],
+  ["Travailleurs", "Agriculture et cuisine", "Cuisinier", 4, "jour", "chef_travailleur travailleur", "cuisinier", "Repas de la cantine, station de cuisine", "Menus spéciaux"],
+  ["Travailleurs", "Extraction", "Mineur", 12, "", "chef_travailleur travailleur", "mineur", "Missions de collecte, minerai, glace", "Risquer un filon riche"],
+  ["Travailleurs", "Extraction", "Raffineur", 6, "", "chef_travailleur travailleur", "raffineur", "Métal, eau, carburant", "Choisir quoi raffiner d’abord"],
+  ["Travailleurs", "Habitat et construction", "Constructeur d’avant-poste", 6, "", "chef_travailleur travailleur", "constructeur", "Modules d’habitat, colonie", "Lancer un chantier"],
+  ["Travailleurs", "Habitat et construction", "Agent d’entretien de l’habitat", 6, "", "chef_travailleur travailleur", "entretien", "Réparer cabines et lieux communs", "Signaler un sabotage"],
+  ["Colons", "Représentation et justice", "RSG", 8, "", "chef_equipe", "colon", "Porter les revendications", "Pétition, grève, Conseil"],
+  ["Colons", "Représentation et justice", "Défenseur civil", 4, "", "colon", "colon", "Défendre un colon au tribunal", "Constituer un dossier"],
+  ["Colons", "Éducation et information", "Enseignant", 8, "", "colon", "colon", "Formations et certificats", "Cours public"],
+  ["Colons", "Éducation et information", "Journaliste de bord", 6, "", "colon", "colon", "Un bulletin par session", "Révéler un scandale"],
+  ["Colons", "Vie sociale et économie", "Barman", 4, "", "colon", "colon", "Tenir le bar du pont 3", "Accueillir des négociations"],
+  ["Colons", "Vie sociale et économie", "Artiste, animateur", 6, "", "colon", "colon", "Spectacle ou tournoi", "Réunion de faction"],
+  ["Colons", "Vie sociale et économie", "Prêtre, guide spirituel", 2, "", "colon", "colon", "Cérémonies, soutien moral", "Discours de crise"],
+  ["Colons", "Vie sociale et économie", "Commerçant, troqueur", 10, "", "colon", "colon", "Tenir un stand, échanger", "Marché noir"],
+  ["Colons", "Aménagement et avenir", "Bricoleur", 8, "", "colon", "colon", "Aménager cabines et lieux communs", "Lieu de réunion caché"],
+  ["Colons", "Aménagement et avenir", "Urbaniste de la colonie", 6, "", "colon", "colon", "Plan de la future colonie pour le vote", "Défendre un site de pose"],
+  ["Colons", "Relève", "Candidat à l’équipage", 16, "", "colon", "colon", "Poste de réserve, remplace les absents", "Passer l’examen de matelot"],
+  ["Colons", "Relève", "Colon polyvalent", 36, "", "colon", "colon", "Contrats du RH, entraide", "Vie de faction, votes"],
+];
+const normJob = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
+function postOf(job) { const j = normJob(job); if (!j) return null; return POSTS.find(p => normJob(p[2]) === j) || POSTS.find(p => j.startsWith(normJob(p[2]).split(" ").slice(0, 2).join(" "))) || null; }
+/* Recompte des stocks de soute : magasinier, chef de soute (ou intendant), et l’admin. */
+function canRecount(p) { return !!p && (p.admin || /magasinier|chef de soute|intendant/.test(normJob(p.job)) || (p.tags || []).includes("soute")); }
+
+/* Déroulé d’une session (heure de Paris). Chaque phase règle l’ambiance lumineuse du vaisseau. */
+const PHASES = { briefing: ["Briefing", "#ffd9a0"], jour: ["Quart de jour", "#f2f6ff"], releve: ["Relève", "#ffc27a"], nuit: ["Quart de nuit", "#4a6cff"], rapport: ["Rapport", "#ffb070"], hors: ["Hors session", "#9fb3c8"] };
+function scheduleDefault() { return { tz: "Europe/Paris", slots: [["briefing", "19:00"], ["jour", "19:10"], ["releve", "20:30"], ["nuit", "20:45"], ["rapport", "22:20"], ["hors", "22:30"]], force: null, cycle: 30 }; }
+function scheduleOf(state) { if (!state.schedule) state.schedule = scheduleDefault(); return state.schedule; }
+function minutesIn(tz, now) {
+  try { const f = new Intl.DateTimeFormat("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(now)); const g = (t) => +(f.find(x => x.type === t) || { value: 0 }).value; return g("hour") * 60 + g("minute") + g("second") / 60; }
+  catch { const d = new Date(now); return d.getUTCHours() * 60 + d.getUTCMinutes() + 60; }
+}
+const hm = (t) => { const [h, m] = String(t).split(":").map(Number); return (h | 0) * 60 + (m | 0); };
+/* Phase courante, minutes restantes, et pour chaque quart les bornes. */
+function phaseNow(state, now = Date.now()) {
+  const sc = scheduleOf(state), m = minutesIn(sc.tz, now), slots = sc.slots.map(([k, t]) => [k, hm(t)]);
+  let cur = ["hors", 0, slots[0][1]];
+  for (let i = 0; i < slots.length; i++) { const end = i + 1 < slots.length ? slots[i + 1][1] : slots[0][1] + 1440; if (m >= slots[i][1] && m < end) cur = [slots[i][0], slots[i][1], end]; }
+  if (cur[0] === "hors" && m < slots[0][1]) cur = ["hors", slots[slots.length - 1][1] - 1440, slots[0][1]];
+  const key = sc.force && PHASES[sc.force] ? sc.force : cur[0];
+  const shift = (k) => { const s = slots.find(x => x[0] === k); const i = slots.indexOf(s); return s ? [s[1], i + 1 < slots.length ? slots[i + 1][1] : s[1]] : null; };
+  return { key, name: PHASES[key][0], color: PHASES[key][1], forced: !!sc.force, left: Math.max(0, Math.round(cur[2] - m)), minute: m, day: shift("jour"), night: shift("nuit"), cycle: sc.cycle | 0 || 30 };
+}
+
+
+/* =========================== Puce : canaux, mobilisation, standard ===========================
+   Le mod reçoit ces données avec la liste d’accès et les affiche dans l’interface de puce (touche dédiée). */
+const MOB_GROUPS = { "Équipage": "Équipage", "Militaires": "Armée", "Travailleurs": "Travailleurs", "Colons": "Colons volontaires" };
+const SERVICES = { passerelle: "Passerelle", securite: "Sécurité", medical: "Infirmerie", ingenierie: "Ingénierie", soute: "Soute", secours: "Pompiers-secouristes", accueil: "Accueil des voyageurs" };
+function bordState(state) {
+  if (!state.bord) state.bord = { general: [], crew: [], mob: [], seq: 1, volunteers: [] };
+  return state.bord;
+}
+const isCrew = (p) => !!p && (p.admin || p.group === "Équipage");
+/* Message « chip » du mod : réponse à une mobilisation, volontariat, journal d’appel. */
+function applyChipMsg(state, m, now = Date.now()) {
+  const B = bordState(state), p = state.people[m.uuid];
+  if (m.op === "ack") { const x = B.mob.find(y => y.id === m.id && y.active); if (x && p && !x.acks.includes(p.id)) x.acks.push(p.id); }
+  if (m.op === "volunteer" && p) { B.volunteers = (B.volunteers || []).filter(x => x !== p.id); if (m.on) B.volunteers.push(p.id); }
+  if (m.op === "call" && p) log(state, "STANDARD", String(m.text || "").slice(0, 160), "info", now);
+}
+function compileChip(state, now = Date.now()) {
+  const B = bordState(state), sc = scheduleOf(state), people = {};
+  for (const p of Object.values(state.people)) {
+    if (p.demo || p.id === "admin" || p.id === "intrus") continue;
+    const post = postOf(p.job);
+    people[p.id] = { n: String(p.name || "").slice(0, 40), job: p.job || "", team: p.team || "aucune", grp: p.group || "", crew: isCrew(p),
+      only: post && post[4] ? post[4] : "", op: can(state, p, "switchboard"), vol: (B.volunteers || []).includes(p.id) };
+  }
+  const deckName = (id) => ((state.decks || []).find(d => d.id === id) || {}).name || "";
+  const rooms = Object.values(state.rooms).filter(r => (r.named || r.name !== r.id) && !(r.section && state.sections[r.section] && state.sections[r.section].state === "ejected"))
+    .map(r => ({ id: r.id, n: r.name, d: deckName(r.deck) })).slice(0, 400);
+  const alarms = { ship: state.ship.alert || null, rooms: Object.fromEntries(Object.values(state.rooms).filter(r => r.alarm).map(r => [r.id, "4"])) };
+  return { sched: { tz: sc.tz, slots: sc.slots, force: sc.force, cycle: sc.cycle }, general: B.general.slice(-15), crew: B.crew.slice(-15),
+    mob: B.mob.filter(m => m.active).map(m => ({ id: m.id, t: m.t, text: m.text, by: m.by, groups: m.groups, room: m.room || null, acks: m.acks || [] })),
+    people, rooms, alarms, services: SERVICES };
 }
 
 /* =========================== Sécurité informatique ===========================
@@ -1157,6 +1357,7 @@ function applyTelemetry(state, m, now = Date.now()) {
       if (p.online && p.chip && p.chip !== p.id && state.people[p.chip]) state.people[p.chip].carriedBy = p.id;
   }
   if (m.stocks) Object.assign(state.stocks, m.stocks);
+  if (m.inv) applyInventory(state, m.inv, now);
   netState(state);
   if (m.power) {
     const prevMode = state.power.telem && state.power.telem.mode;
@@ -1276,6 +1477,7 @@ function apply(state, actor, a, ctx = {}) {
         else if (!pc.apps.includes(a.app)) pc.apps.push(a.app);
         break;   // pas de journal : ce qui se passe sur un ordinateur reste sur l’ordinateur
       }
+      case "bh.ack": { const e = state.bh && actor && state.bh[actor.id]; if (e) e.pop.shift(); break; }
       case "pc.blochub.remove": {
         const pc = pcOf(state, a.pc); if (!pc) throw new Error("Ordinateur inconnu.");
         if (!actor.admin && Math.random() < 0.85) throw new Error("Impossible de désinstaller BlocHub : le logiciel est en cours d’utilisation par un autre utilisateur.");
@@ -1577,6 +1779,45 @@ function apply(state, actor, a, ctx = {}) {
       case "admin.computer": { if (!actor.admin) throw new Error("Réservé au poste admin."); state.computer.refuse = !!a.refuse; state.computer.message = clean(a.message, 140); log(state, "ORDINATEUR", a.refuse ? "refuse désormais les commandes de l’équipage." : "obéit de nouveau à l’équipage.", "admin", now); break; }
       case "admin.setAdmin": { if (!actor.admin) throw new Error("Réservé au poste admin."); const p = person(a.person); p.admin = !!a.on; log(state, "ORDINATEUR", `${p.name} ${a.on ? "reçoit" : "perd"} l’accès admin.`, "admin", now); break; }
       case "admin.env": { if (!actor.admin) throw new Error("Réservé au poste admin."); const r = room(a.room); cmds.push({ type: "env.set", room: r.id, env: a.env }); Object.assign(r.env, a.env); log(state, "ORDINATEUR", `force l’environnement de ${r.name}.`, "admin", now); break; }
+      case "info.post": {
+        const ch = a.channel === "crew" ? "crew" : "general"; need(ch === "crew" ? "info.crew" : "info.general");
+        const text = clean(a.text, 280); if (!text) throw new Error("Message vide.");
+        const B = bordState(state); B[ch].push({ t: now, from: actor.name, text }); if (B[ch].length > 60) B[ch].splice(0, B[ch].length - 60);
+        L(`publie sur le canal ${ch === "crew" ? "de l’équipage" : "général"} : « ${text.slice(0, 80)} ».`, "info"); break;
+      }
+      case "info.delete": {
+        const ch = a.channel === "crew" ? "crew" : "general"; need(ch === "crew" ? "info.crew" : "info.general");
+        const B = bordState(state); B[ch] = B[ch].filter(m => m.t !== a.t); break;
+      }
+      case "mob.start": {
+        need("mobilize");
+        const groups = (Array.isArray(a.groups) ? a.groups : []).filter(g => MOB_GROUPS[g]); if (!groups.length) throw new Error("Choisissez au moins un groupe.");
+        const text = clean(a.text, 200) || "Rejoignez votre poste immédiatement.";
+        const r = a.room && state.rooms[a.room] ? a.room : null;
+        const B = bordState(state); const m = { id: "mob" + (B.seq++), t: now, text, groups, room: r, by: actor.name, active: true, acks: [] };
+        B.mob.push(m); if (B.mob.length > 30) B.mob.splice(0, B.mob.length - 30);
+        L(`MOBILISATION (${groups.map(g => MOB_GROUPS[g]).join(", ")}) : ${text}${r ? " · rendez-vous " + state.rooms[r].name : ""}`, "crit"); break;
+      }
+      case "mob.end": { need("mobilize"); const m = bordState(state).mob.find(x => x.id === a.id); if (!m) throw new Error("Mobilisation introuvable."); m.active = false; L(`lève la mobilisation « ${m.text.slice(0, 60)} » (${(m.acks || []).length} réponse(s)).`, "info"); break; }
+      case "mob.volunteer": { const B = bordState(state); B.volunteers = (B.volunteers || []).filter(x => x !== actor.id); if (a.on) B.volunteers.push(actor.id); break; }
+      case "schedule.set": {
+        need("schedule.edit"); const sc = scheduleOf(state);
+        if (Array.isArray(a.slots)) { const ok = a.slots.filter(x => Array.isArray(x) && PHASES[x[0]] && /^\d{1,2}:\d{2}$/.test(x[1])); if (ok.length >= 2) sc.slots = ok.map(([k, t]) => [k, t.padStart(5, "0")]).sort((x, y) => hm(x[1]) - hm(y[1])); }
+        if (a.force !== undefined) sc.force = a.force && PHASES[a.force] ? a.force : null;
+        if (a.cycle !== undefined) sc.cycle = Math.max(5, Math.min(120, a.cycle | 0));
+        if (a.tz) sc.tz = clean(a.tz, 40);
+        L(sc.force ? `impose l’ambiance « ${PHASES[sc.force][0]} ».` : "règle le déroulé de session.", "struct"); break;
+      }
+      case "stock.recount": {
+        if (!canRecount(actor)) throw new Error("Recompte réservé aux magasiniers et au chef de soute.");
+        const I = invState(state), k = a.res; if (!INV_RES[k]) throw new Error("Ressource inconnue.");
+        if (!INV_RES[k][2]) throw new Error("Ressource jaugée en réservoir : pas de recompte manuel.");
+        const before = invCounted(state); delete I.err[k]; const after = invCounted(state);
+        const diff = before && after ? after[k] - before[k] : 0;
+        L(`recompte ${INV_RES[k][0].toLowerCase()} : ${diff ? "écart de " + (diff > 0 ? "+" : "") + diff + " " + INV_RES[k][1] + " corrigé" : "aucun écart"}.`, "info");
+        applyInventory(state, I.real || {}, now, () => 1); break;
+      }
+      case "stock.ref": { if (!actor.admin) throw new Error("Réservé au poste admin."); const I = invState(state); for (const k of Object.keys(INV_REF)) if (a.ref && +a.ref[k] > 0) I.ref[k] = +a.ref[k]; if (I.real) applyInventory(state, I.real, now, () => 1); break; }
       case "admin.stocks": { if (!actor.admin) throw new Error("Réservé au poste admin."); for (const k of Object.keys(state.stocks)) if (a.stocks && a.stocks[k] !== undefined) state.stocks[k] = Math.max(0, Math.min(100, +a.stocks[k])); cmds.push({ type: "stocks.set", stocks: state.stocks }); break; }
       /* Navigation */
       case "nav.jump": {
@@ -1814,6 +2055,12 @@ function viewFor(state, actor, term) {
     delete v.chatUnread;
     for (const p of Object.values(v.people)) { delete p.chip; delete p.carriedBy; delete p.notifyAi; }
   }
+  /* Inventaire : chiffres comptés (avec erreurs) pour tous ; vrais chiffres et erreurs pour l’admin. */
+  delete v.inv;
+  if (state.inv && state.inv.real) v.inv = { t: state.inv.t, ref: state.inv.ref, counted: invCounted(state), recount: canRecount(actor), ...(adm ? { real: state.inv.real, err: state.inv.err } : {}) };
+  /* Vie de bord : canal de l’équipage réservé à l’équipage. */
+  if (state.bord) { v.bord = clone(state.bord); if (!adm && !isCrew(actor)) v.bord.crew = []; v.bord.volunteer = !!actor && (state.bord.volunteers || []).includes(actor.id); delete v.bord.volunteers; }
+  v.bh = actor && state.bh && state.bh[actor.id] ? clone(state.bh[actor.id]) : { names: [], pop: [] };
   /* Bibliothèque : seulement ce que l’on a le droit de lire. Abysse : pseudonymes seulement. */
   v.kb = { articles: (state.kb ? state.kb.articles : []).filter(a => kbCanRead(state, actor, a)).map(a => Object.assign({}, a, { mine: !!actor && a.author === actor.id })) };
   v.darkweb = { posts: (state.darkweb ? state.darkweb.posts : []).map(p => { const o = { id: p.id, t: p.t, alias: p.alias, text: p.text, img: p.img, parent: p.parent, mine: !!actor && p.aid === actor.id }; if (adm) o.real = (state.people[p.aid] || {}).name || p.aid; return o; }),
@@ -1930,6 +2177,11 @@ function seedDemo(now = Date.now()) {
     { id: "f3", key: "fuel.leak", target: { kind: "ship" }, silent: true, active: true, t: now - 900000 }
   ];
   s.stocks = { fuel: 81, water: 74, food: 68, o2: 88, parts: 42 };
+  applyInventory(s, { food: 2710, rations: 642, meds: 51, parts: 128, water: 189.5, waterCap: 256, fuel: 41.2, fuelCap: 64, o2: 512.4, am: 62.5, amCap: 100, containers: 37 }, now, () => 1);
+  s.inv.err.food = { f: -0.14, d: -3, since: now - 900000 };
+  applyInventory(s, s.inv.real, now, () => 1);
+  bordState(s).general.push({ t: now - 1800000, from: "Cdt Varga", text: "Briefing terminé. Quart de jour : priorité à la réparation du pont 4." }, { t: now - 600000, from: "Lt Okafor", text: "Fenêtre de saut estimée à 21 h 40. Arrimez les charges en soute." });
+  bordState(s).crew.push({ t: now - 900000, from: "Cdt Varga", text: "Équipage : relève à 20 h 30, le second fait le point à la passerelle." });
   s.pa = paEmpty();
   [["SPK-1A20", 120, 70, -6, "Passerelle"], ["SPK-2B31", 136, 70, 4, "Passerelle"], ["SPK-3C42", 60, 54, 10, "Habitat"], ["SPK-4D53", 40, 38, 20, "Machines"], ["SPK-5E64", 90, 38, -12, "Machines"], ["SPK-6F75", 10, 54, -4, ""]].forEach(([id, x, y, z, g], k) => {
     const rid = Object.keys(s.rooms)[k * 7 % Object.keys(s.rooms).length];
@@ -2035,7 +2287,7 @@ function seedDemo(now = Date.now()) {
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, PC_APPS, KB_CATS, KB_PRIVATE, pcOf, kbState, dwState, dwAlias, kbCanRead, WS_PRESETS, WS_NAMES, wsJob, termPages, SYMPTOMS, diseasesDefault, netState, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, PC_APPS, KB_CATS, KB_PRIVATE, pcOf, kbState, dwState, dwAlias, kbCanRead, WS_PRESETS, WS_NAMES, wsJob, termPages, SYMPTOMS, diseasesDefault, netState, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyBlocHub, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, INV_RES, INV_REF, invState, invCounted, applyInventory, POSTS, postOf, canRecount, PHASES, scheduleDefault, scheduleOf, phaseNow, MOB_GROUPS, SERVICES, bordState, applyChipMsg, compileChip, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
 /* Manuel de bord du Meridian III : explications des systèmes, par rôle.
    Mise en forme : « # » titre, « - » puce, « 1. » étape, « ! » danger, « > » note, « [[schema:id]] » schéma. */
@@ -2076,6 +2328,22 @@ equipage: [
 - Écusson d’unité : fabriquez-le (laine blanche + ficelle), clic droit pour le dessiner (forme, couleurs, motif, sigle), accroupi + clic droit pour le coudre sous l’écusson de mission ou le retirer.
 - Commande /uniforme : passer en tenue civile, ou remettre l’uniforme.
 > Reconnaître un grade d’un coup d’œil évite bien des malentendus dans un couloir enfumé.`],
+["Interface de puce", `Votre puce s’affiche par-dessus le jeu.
+- P : afficher ou masquer la surimpression (horloge, quart, mobilisations, appels, GPS, canaux).
+- O : écran de commande de la puce : appels, contacts, GPS, canaux, mobilisation.
+- Horloge : l’heure de bord, la phase de la session et le temps restant de votre quart (jour, nuit, ou « jour seul » selon le poste), découpé en cycles de 30 min.
+- Appels : appelez un contact (les personnes qui se sont présentées à vous) ou un service (passerelle, sécurité, infirmerie…). Un service passe par le standard, qui vous transfère. Avec le chat vocal, la voix passe filtrée façon téléphone ; sinon, échangez par messages.
+- GPS : choisissez une pièce ou un contact. L’itinéraire suit les couloirs, escaliers et échelles, et ne passe que par les portes que votre puce ouvre. Une bande lumineuse au sol, visible de vous seul quand la surimpression est active, montre le chemin.
+- Canaux : le canal général (seule la passerelle publie) et, pour l’équipage, le canal de l’équipage.
+- Mobilisation : sonnerie et message rouge. Répondez « J’arrive » ; le GPS peut vous mener au point de rendez-vous.
+> Les colons ne sont mobilisés que s’ils se déclarent volontaires (onglet Mobilisation).`],
+["Rations et cuisine", `Toute la nourriture du bord est servie en rations lyophilisées : le sachet montre l’aliment d’origine.
+- Ration chaude (aliment cuit) : nourrit davantage et réchauffe le corps pendant 5 min (on supporte mieux le froid, moins la chaleur).
+- Ration froide (aliment cru) : nourrit moins et rafraîchit pendant 5 min.
+- Les plats se préparent à la station de cuisine (établi + une ration), avec les recettes habituelles : l’établi ne les fait plus.`],
+["Éclairage de bord", `Les panneaux d’éclairage suivent la session : lumière chaude au briefing, blanche le jour, ambrée à la relève, bleue et tamisée la nuit.
+- Alarme d’une pièce : ses éclairages passent au rouge.
+- Alerte générale : tout le vaisseau change de couleur (jaune aux niveaux 1 et 2, orange au niveau 3, rouge aux niveaux 4 et 5).`],
 ["Votre puce d’identité", `Votre puce est votre identité pour le vaisseau. Les portes, les consoles et l’ordinateur de bord ne connaissent que la puce que vous portez.
 - Elle est remise par le bureau du personnel (RH) à votre arrivée, puis portée par clic droit.
 - Touche N : votre puce, vos présentations, vos gestes et la demande d’aide.
@@ -2311,6 +2579,13 @@ militaire: [
 - Le garde-à-vous se rompt en bougeant.`],
 ],
 commandement: [
+["Vie de bord : canaux et mobilisation", `Page « Vie de bord » de la console.
+- Déroulé de session : horaires du briefing, des quarts, de la relève et du rapport (heure de Paris). Il règle l’horloge des puces et l’éclairage. Une ambiance peut être imposée.
+- Canal général : réservé à la passerelle. Canal de l’équipage : officiers.
+- Mobilisation : choisissez les groupes, le motif, un point de rendez-vous. Réservé aux urgences réelles, noté au journal. Les réponses « J’arrive » s’affichent en direct.`],
+["Réserves et soute", `L’inventaire est automatique : toutes les 30 s, le mod compte les coffres et réservoirs des pièces du vaisseau.
+- Vivres, médical et pièces : comptés dans les coffres. Le comptage peut dériver : un magasinier ou le chef de soute fait un recompte (page Réserves et soute) pour corriger l’écart.
+- Eau, ergols, oxygène et antimatière : jaugés dans les réservoirs, sans erreur possible.`],
 ["Niveaux et permissions", `- 0 non assigné, 1 colon, 2 travailleur, 3 technicien ou militaire, 4 officier, 5 chef de service, 6 second, 7 capitaine.
 - Chaque action de la console exige un niveau minimum, réglable sur la page Structure.
 - On ne peut pas donner un niveau égal ou supérieur au sien, ni modifier un supérieur.`],
@@ -2466,7 +2741,9 @@ const BRAND_SERVICES = [
   ["recherche", "Recherche", "RCH", "#a88dff"],
   ["intendance", "Intendance", "INT", "#e0a060"],
   ["communications", "Communications", "COM", "#e8d24a"],
-  ["administration", "Administration", "ADM", "#9fb3c8"]
+  ["administration", "Administration", "ADM", "#9fb3c8"],
+  ["secours", "Secours et incendie", "SOS", "#ef5a2a"],
+  ["travaux", "Travaux et extraction", "TRV", "#e8b13a"]
 ];
 function serviceIcon(k, c) {
   switch (k) {
@@ -2484,6 +2761,8 @@ function serviceIcon(k, c) {
     case "recherche": return `<circle cx="56" cy="58" r="15" fill="none" stroke="${c}" stroke-width="4"/><path d="M66 69 L82 86" stroke="${c}" stroke-width="6" stroke-linecap="round"/><circle cx="56" cy="58" r="5" fill="${c}"/>`;
     case "intendance": return `<path d="M44 40 V60 M38 40 V54 Q38 60 44 60 Q50 60 50 54 V40 M44 60 V86" stroke="${c}" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M74 40 Q84 52 76 64 V86" stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
     case "communications": return `<path d="M60 86 L52 58 H68 Z" fill="${c}"/><circle cx="60" cy="52" r="5" fill="${c}"/><path d="M48 40 Q40 52 48 64 M72 40 Q80 52 72 64 M40 34 Q28 52 40 70 M80 34 Q92 52 80 70" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    case "secours": return `<path d="M60 36 Q74 52 70 64 Q78 58 78 50 Q88 64 80 78 Q72 90 60 90 Q48 90 40 78 Q32 64 42 50 Q42 58 50 64 Q46 50 60 36Z" fill="${c}"/><path d="M55 64h10v8h8v10h-8v8H55v-8h-8V72h8z" fill="${BRAND_PAL.navy}"/>`;
+    case "travaux": return `<path d="M38 50 Q60 32 82 50 L78 54 Q60 42 42 54Z" fill="${c}"/><path d="M58 46 H62 L66 88 H54Z" fill="${c}"/><path d="M36 86 H84" stroke="${c}" stroke-width="3"/>`;
     case "administration": return `<path d="M40 38 H70 L80 48 V86 H40 Z" fill="none" stroke="${c}" stroke-width="3.5"/><path d="M48 56 H72 M48 66 H72 M48 76 H64" stroke="${c}" stroke-width="3"/>`;
   }
   return "";
@@ -2806,7 +3085,7 @@ function render() {
   <div class="brand">MERIDIAN<small>CONSOLE DE BORD${term ? " · " + esc(term.name.toUpperCase()) : V.me.ws ? " · " + esc(MC.WS_NAMES[V.me.ws].toUpperCase()) : ""}</small></div>
   <div class="hsep"></div>${MINDOWS ? `<button class="b sm ghost" data-fn="toDesk" title="Revenir au bureau Mindows">◂ Bureau</button>` : ""}${shipChip}${linkChip}
   <span class="sp"></span>
-  <div class="clock" data-clock>${fmtT(now())}<small>QUART DE ${hh >= 8 && hh < 20 ? "JOUR" : "NUIT"}</small></div>
+  <div class="clock" data-clock>${fmtT(now())}<small>${esc(MC.phaseNow(V, now()).name.toUpperCase())}</small></div>
   <div class="hsep"></div>
   <div class="who"><div><b>${esc(V.me.name)}</b><span>${esc(V.me.admin ? "Poste admin · toutes permissions" : (V.me.job || V.me.role || "Non assigné") + (V.me.group ? " · " + V.me.group : ""))}</span></div><div class="lvl" title="Niveau d’accès">${V.me.admin ? "A" : V.me.level}</div></div>
 </header>
@@ -3139,7 +3418,7 @@ ${panel("Équipage", "BIO.SCAN", perm("crew.vitals") ? `<div class="tiles"><div 
   const right = `
 ${panel("Alarmes actives", "ALR." + String(alerts.length).padStart(2, "0"), alerts.length ? alerts.slice(0, 8).map(alertRow).join("") + (alerts.length > 8 ? `<p class="note">${alerts.length - 8} de plus dans le journal.</p>` : "") : `<p class="empty">Aucune alarme.</p>`)}
 ${panel("Procédures", "PRC", procs.length ? procs.map(p => procMini(p)).join("") : `<p class="empty">Aucune procédure en cours.</p>`)}
-${panel("Réserves du bord", "STK", [["Carburant", "fuel"], ["Eau", "water"], ["Vivres", "food"], ["Oxygène en cuves", "o2"], ["Pièces de rechange", "parts"]].map(([l, k]) => { const v = +V.stocks[k] || 0; return `<div class="kv" style="border:0;padding:2px 0"><span>${l}</span><b>${n0(v)} %</b></div>${bar(v, v < 25 ? "crit" : v < 50 ? "warn" : "")}`; }).join(""))}`;
+${panel("Réserves du bord", "STK", stockBars())}`;
   return `<div class="grid g-ov"><div class="stack">${left}</div><div class="center">${panel("Plan général · " + V.ship.name, "MAP.OV", `<div class="svgw">${schematic()}</div><div class="row" style="justify-content:center;gap:16px;margin-top:8px">${Object.entries(ST).map(([k, l]) => `<span class="st ${k}">${l}</span>`).join("")}</div><p class="note" style="text-align:center;margin-inline:auto">${HULL ? `Forme scannée ${esc(new Date(HULL.at || Date.now()).toLocaleDateString("fr-FR"))} (1 case = ${HULL.r} bloc${HULL.r > 1 ? "s" : ""}). Les points signalent les pièces en alerte. Cliquez un pont sur le profil pour ouvrir son plan.` : `Au centre, les ponts de la coque. Autour, de l’intérieur vers l’extérieur : ${V.decks.filter(d => d.kind === "ring").map(d => esc(d.name)).join(" · ") || "aucun anneau"}. Cliquez pour ouvrir un plan. Pour la forme réelle : /meridian coque scan.`}</p>`)}</div><div class="stack">${right}</div></div>`;
 };
 function alertRow(a) {
@@ -4544,7 +4823,7 @@ const APP_ICON = {
   abysse: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#05140c"/><path d="M16 6c-5 6-5 14 0 20M16 6c5 6 5 14 0 20M5 16h22" fill="none" stroke="#3cff8f" stroke-width="1.3"/><circle cx="16" cy="16" r="3" fill="#3cff8f"/></svg>`,
   demineur: `<svg viewBox="0 0 32 32"><rect x="4" y="4" width="24" height="24" fill="#3a434b"/><circle cx="16" cy="17" r="6" fill="#111"/><path d="M16 7v4M16 23v4M7 17h4M21 17h4" stroke="#111" stroke-width="2"/><circle cx="14" cy="15" r="1.5" fill="#fff"/></svg>`,
   serpent: `<svg viewBox="0 0 32 32"><rect x="4" y="4" width="24" height="24" fill="#0a1e14"/><path d="M8 22h6v-6h6v-6h4" fill="none" stroke="#43d9a8" stroke-width="4" stroke-linejoin="round"/><rect x="22" y="20" width="3" height="3" fill="#ff5266"/></svg>`,
-  blochub: `<svg viewBox="0 0 32 32"><rect x="3" y="8" width="26" height="16" rx="3" fill="#111"/><text x="6" y="20" font-size="8" font-weight="700" fill="#fff" font-family="Arial">Bloc</text><text x="19" y="20" font-size="7" font-weight="700" font-style="italic" fill="#b6f23a" font-family="Arial">Hub</text></svg>`
+  blochub: `<svg viewBox="0 0 32 32"><rect x="3" y="8" width="26" height="16" rx="3" fill="#111"/><text x="4.5" y="19.5" font-size="7.5" font-weight="700" fill="#fff" font-family="Arial">Bloc</text><rect x="18" y="12.5" width="10" height="9" rx="1.6" fill="#ff9000"/><text x="18.8" y="19.5" font-size="6.6" font-weight="700" fill="#000" font-family="Arial">Hub</text></svg>`
 };
 function appIcon(id) { return APP_ICON[id] || APP_ICON.store; }
 
@@ -4552,6 +4831,7 @@ function appIcon(id) { return APP_ICON[id] || APP_ICON.store; }
 if (!ui.wins) ui.wins = [];
 let winZ = 10;
 function openApp(id) {
+  if (bhForcedPop(id)) return render();
   if (id === "meridian") { ui.app = "meridian"; return render(); }
   let w = ui.wins.find(x => x.app === id);
   if (!w) {
@@ -4599,7 +4879,7 @@ function renderDesktop() {
   morph(app, `<div class="mw">
     <div class="mw-desk">${icons}</div>
     <div class="mw-logo"><b>Mindows</b><span>Édition Meridian · poste ${esc(PC_KEY)}</span></div>
-    ${wins}${menu}
+    ${wins}${menu}${ui.bhForced ? `<div class="bh-m bh-forced" role="dialog" aria-label="BlocHub"><div><b class="bh-logo">Bloc<i>Hub</i></b><p>${esc(ui.bhForced)}</p><div class="btns"><button class="bh-btn" data-fn="bhForcedOpen">Voir</button><button class="b sm ghost" data-fn="bhForcedClose">Fermer</button></div></div></div>` : ""}
     <div class="mw-bar"><button class="mw-go" data-fn="startMenu" aria-label="Démarrer"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="#62e6f2" stroke-width="2"/><path d="M6 13V7l4 4 4-4v6" fill="none" stroke="#62e6f2" stroke-width="1.8" stroke-linejoin="round"/></svg></button>${tasks}<span class="sp"></span><span class="mw-clock">${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}</span></div>
   </div>`);
   if (ui.wins.some(w => w.app === "serpent" && !w.min)) queueMicrotask(snakeDraw);
@@ -4771,7 +5051,18 @@ function blockThumb(k) {
   return BH_THUMB[k] = c.toDataURL();
 }
 let bhTimer = 0;
-function bhNames() { const me = V.people && V.me && V.people[V.me.id]; const k = me && me.vitals && me.vitals.known; return k && k.length ? k : null; }
+/* Popup imposée par un animateur : s’affiche à la prochaine ouverture d’une application, puis est acquittée. */
+function bhForcedPop(next) {
+  const p = V.bh && V.bh.pop && V.bh.pop.find(x => !(ui.bhSeen || []).includes(x.t)); if (!p || ui.bhForced || next === "blochub") return false;
+  ui.bhSeen = (ui.bhSeen || []).concat(p.t); ui.bhNext = next;
+  const names = bhNames() || ["Quelqu’un de votre pont"], who = p.name || names[Math.floor(Math.random() * names.length)], v = BH[Math.floor(Math.random() * BH.length)];
+  ui.bhForced = p.text || `${who} vous a envoyé « ${v[0]} » sur BlocHub. Ouvrir maintenant ?`;
+  act({ type: "bh.ack" });
+  return true;
+}
+FN.bhForcedClose = () => { ui.bhForced = null; const n = ui.bhNext; ui.bhNext = null; if (n) openApp(n); else render(); };
+FN.bhForcedOpen = () => { ui.bhForced = null; ui.bhNext = null; if (!myPc().apps.includes("blochub")) return render(); openApp("blochub"); };
+function bhNames() { const me = V.people && V.me && V.people[V.me.id]; const k = (me && me.vitals && me.vitals.known) || [], f = (V.bh && V.bh.names) || []; const all = f.concat(f, f, k); return all.length ? all : null; }
 function blochubStart() {
   clearInterval(bhTimer);
   bhTimer = setInterval(() => {
@@ -4794,6 +5085,53 @@ FN.bhAge = () => { ui.bhAge = true; render(); };
 FN.bhOpen = (el) => { ui.bhSel = +el.dataset.arg; render(); };
 FN.bhClose = () => { ui.bhSel = null; render(); };
 FN.bhSub = () => { ui.bhSel = null; ui.bhPop = "Paiement refusé : votre puce n’est pas autorisée pour ce type d’achat. L’intendance a peut-être été prévenue."; render(); setTimeout(() => { ui.bhPop = null; render(); }, 5000); };
+
+
+/* ----------------------------------------------------------------- Réserves (inventaire automatique) */
+function stockBars() {
+  const rows = V.inv ? [["Antimatière", "am"], ["Ergols", "fuel"], ["Eau", "water"], ["Oxygène en cuves", "o2"], ["Vivres", "food"], ["Médical", "meds"], ["Pièces de rechange", "parts"]]
+    : [["Carburant", "fuel"], ["Eau", "water"], ["Vivres", "food"], ["Oxygène en cuves", "o2"], ["Pièces de rechange", "parts"]];
+  return rows.map(([l, k]) => { const v = +V.stocks[k] || 0; return `<div class="kv" style="border:0;padding:2px 0"><span>${l}</span><b>${n0(v)} %</b></div>${bar(v, v < 25 ? "crit" : v < 50 ? "warn" : "")}`; }).join("");
+}
+PAGE.stocks = () => {
+  const I = V.inv;
+  if (!I) return `<div class="stack">${panel("Réserves et soute", "STK", `<p class="empty">Pas encore d’inventaire : il arrive avec la télémétrie du mod (un balayage toutes les 30 s).</p>${stockBars()}`)}</div>`;
+  const c = I.counted, adm = !!V.me.admin;
+  const rows = Object.entries(MC.INV_RES).map(([k, [label, unit, items]]) => {
+    const cap = k === "water" || k === "fuel" || k === "am" ? c.cap[k] : I.ref[k];
+    const pct = +V.stocks[k] || 0, err = adm && I.err && I.err[k];
+    return `<div class="vrow" style="align-items:center"><span style="flex:1;min-width:0"><b>${esc(label)}</b> <span class="mu">${items ? "· comptage des coffres" : "· jauge des réservoirs"}</span>${bar(pct, pct < 25 ? "crit" : pct < 50 ? "warn" : "")}</span>
+<span class="m" style="min-width:150px;text-align:right">${n0(c[k])} ${esc(unit)}${cap ? ` <span class="mu">/ ${n0(cap)}</span>` : ""}${err ? `<br><span class="st warn">écart caché · réel ${n0(I.real[k])}</span>` : ""}</span>
+${items ? btn("Recompter", { type: "stock.recount", res: k }, { cls: "sm ghost", disabled: !I.recount, title: I.recount ? "Recompte manuel (corrige un éventuel écart)" : "Réservé au magasinier et au chef de soute" }) : `<span style="min-width:96px"></span>`}</div>`;
+  }).join("");
+  const refs = adm ? panel("Références (100 %)", "STK.REF", `<div class="f2">${Object.entries(MC.INV_RES).filter(([k]) => !["water", "fuel", "am"].includes(k)).map(([k, [l, u]]) => `<label class="f">${esc(l)} (${esc(u)})<input type="number" min="1" id="ref-${k}" value="${n0(I.ref[k])}"></label>`).join("")}</div><div class="btns">${btn("Enregistrer", null, { fn: "stockRef", cls: "sm" })}</div><p class="note">Eau, ergols et antimatière se rapportent à la capacité réelle des réservoirs.</p>`) : "";
+  return `<div class="stack">${panel("Inventaire automatique", "STK.AUTO", `<p class="note">${c.containers} stockage(s) et ${n0(c.rations)} ration(s) recensés dans les pièces du vaisseau · dernier balayage ${new Date(I.t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. Les comptages de coffres peuvent dériver : un magasinier ou le chef de soute les recompte.</p>${rows}`)}${refs}</div>`;
+};
+FN.stockRef = () => { const ref = {}; for (const k of Object.keys(MC.INV_RES)) { const e = document.getElementById("ref-" + k); if (e) ref[k] = +e.value; } act({ type: "stock.ref", ref }, "Références enregistrées."); };
+
+/* ----------------------------------------------------------------- Vie de bord : déroulé, canaux, mobilisation */
+function hhmm(m) { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); }
+PAGE.bord = () => {
+  const ph = MC.phaseNow(V, now()), sc = V.schedule || MC.scheduleDefault(), B = V.bord || { general: [], crew: [], mob: [] };
+  const timeline = sc.slots.map(([k, t], i) => { const nx = sc.slots[(i + 1) % sc.slots.length][1]; return `<div class="vrow"${ph.key === k ? ` style="background:color-mix(in srgb, ${MC.PHASES[k][1]} 14%, transparent)"` : ""}><span><span class="dot" style="background:${MC.PHASES[k][1]};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px"></span><b>${esc(MC.PHASES[k][0])}</b></span><span class="m">${esc(t)} → ${esc(nx)}</span></div>`; }).join("");
+  const edit = perm("schedule.edit") ? `<div class="f2" style="margin-top:10px">${sc.slots.map(([k, t], i) => `<label class="f">${esc(MC.PHASES[k][0])}<input type="time" id="sl-${i}" data-k="${k}" value="${esc(t)}"></label>`).join("")}<label class="f">Durée d’un cycle (min)<input type="number" id="sl-cycle" min="5" max="120" value="${sc.cycle || 30}"></label></div>
+<div class="btns">${btn("Enregistrer le déroulé", null, { fn: "schedSave", cls: "sm" })}</div>
+<div class="lbl" style="margin-top:12px">Imposer une ambiance lumineuse</div><div class="btns">${Object.entries(MC.PHASES).map(([k, [l]]) => btn(l, { type: "schedule.set", force: k }, { cls: "sm " + (sc.force === k ? "" : "ghost") })).join("")}${sc.force ? btn("Revenir à l’horaire", { type: "schedule.set", force: null }, { cls: "sm amb" }) : ""}</div>` : "";
+  const msgs = (list, ch) => list.slice().reverse().map(m => `<div class="vrow"><span style="min-width:0"><b>${esc(m.from)}</b> <span class="mu">${new Date(m.t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span><br>${esc(m.text)}</span>${perm(ch === "crew" ? "info.crew" : "info.general") ? `<button class="b sm ghost" data-cmd="${enc({ type: "info.delete", channel: ch, t: m.t })}" aria-label="Retirer">✕</button>` : ""}</div>`).join("") || `<p class="empty">Aucun message.</p>`;
+  const post = (ch, pk) => perm(pk) ? `<div class="row" style="margin-top:8px"><input type="text" id="ip-${ch}" maxlength="280" placeholder="Message diffusé sur les puces…" style="flex:1">${btn("Publier", null, { fn: "infoPost", arg: ch, cls: "sm" })}</div>` : `<p class="note">${ch === "general" ? "Seule la passerelle publie ici." : "Publication réservée aux officiers."}</p>`;
+  const roomsOpt = Object.values(V.rooms).filter(r => r.kind !== "corridor").sort((a, b) => a.name.localeCompare(b.name)).map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join("");
+  const mobs = B.mob.filter(m => m.active).map(m => `<div class="vrow"><span style="min-width:0"><span class="st fire">MOBILISATION</span> <b>${esc(m.text)}</b><br><span class="mu">${m.groups.map(g => MC.MOB_GROUPS[g]).join(", ")}${m.room && V.rooms[m.room] ? " · rendez-vous " + esc(V.rooms[m.room].name) : ""} · par ${esc(m.by)} · ${(m.acks || []).length} réponse(s)${(m.acks || []).length ? " : " + m.acks.map(id => esc((V.people[id] || {}).name || "?")).join(", ") : ""}</span></span>${btn("Lever", { type: "mob.end", id: m.id }, { perm: "mobilize", cls: "sm" })}</div>`).join("") || `<p class="empty">Aucune mobilisation en cours.</p>`;
+  const mobForm = perm("mobilize") ? `<div class="lbl" style="margin-top:12px">Nouvelle mobilisation (urgence réelle, notée au journal)</div><div class="row" style="flex-wrap:wrap;gap:10px">${Object.entries(MC.MOB_GROUPS).map(([g, l]) => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="mobg" value="${esc(g)}"${g === "Équipage" ? " checked" : ""}>${esc(l)}</label>`).join("")}</div><div class="row" style="margin-top:8px"><input type="text" id="mob-t" maxlength="200" placeholder="Motif : brèche au pont 2, renfort demandé" style="flex:1"><select id="mob-r"><option value="">Sans rendez-vous</option>${roomsOpt}</select>${btn("Mobiliser", null, { fn: "mobStart", cls: "red sm" })}</div><p class="note">Les colons ne sont appelés que s’ils se sont déclarés volontaires.</p>` : "";
+  const vol = V.me && V.me.group === "Colons" ? `<div class="vrow"><span>Volontaire pour les mobilisations</span><button class="sw" role="switch" aria-checked="${!!B.volunteer}" data-cmd="${enc({ type: "mob.volunteer", on: !B.volunteer })}" aria-label="Volontaire"></button></div>` : "";
+  const left = panel("Horloge de bord", "CLK", `<div class="big" style="font-size:40px;letter-spacing:.06em">${hhmm(ph.minute)}</div><p style="margin:4px 0 10px"><span class="dot" style="background:${ph.color};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px"></span><b>${esc(ph.name)}</b>${ph.forced ? ` <span class="pill amb">imposée</span>` : ` · encore ${ph.left} min`}</p>${timeline}${edit}`)
+    + panel("Mobilisation", "MOB", mobs + mobForm + vol);
+  const right = panel("Canal général", "INF.GEN", msgs(B.general, "general") + post("general", "info.general"))
+    + (V.me.admin || V.me.group === "Équipage" ? panel("Canal de l’équipage", "INF.EQP", msgs(B.crew, "crew") + post("crew", "info.crew")) : "");
+  return `<div class="grid g-2b"><div class="stack">${left}</div><div class="stack">${right}</div></div>`;
+};
+FN.infoPost = (el) => { const ch = el.dataset.arg, t = val("ip-" + ch); if (!t.trim()) return toast("Message vide.", "err"); act({ type: "info.post", channel: ch, text: t }, "Publié sur les puces."); };
+FN.mobStart = () => { const groups = [...document.querySelectorAll(".mobg:checked")].map(x => x.value); act({ type: "mob.start", groups, text: val("mob-t"), room: val("mob-r") || null }, "Mobilisation lancée."); };
+FN.schedSave = () => { const slots = [...document.querySelectorAll("[id^=sl-]")].filter(x => x.dataset.k).map(x => [x.dataset.k, x.value]); act({ type: "schedule.set", slots, cycle: +val("sl-cycle") }, "Déroulé enregistré."); };
 
 PAGE.alerts = () => {
   const alerts = V.alerts.filter(a => !a.ack), crit = alerts.filter(a => a.lvl === "crit"), lvl = V.ship.alert;
