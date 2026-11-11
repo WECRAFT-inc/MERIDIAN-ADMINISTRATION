@@ -64,6 +64,19 @@ nav a[aria-current=page]{color:var(--cy);border-left-color:var(--cy);background:
 nav a .n{font:500 10.5px var(--f-mono);color:var(--dim);width:18px}
 nav a .bad{margin-left:auto;font:600 11px var(--f-mono);background:var(--red);color:var(--bg);padding:1px 6px}
 nav .navsep{margin:14px 18px 6px;font-size:10px;letter-spacing:.2em;color:var(--dim)}
+nav .navq{padding:0 14px 10px}
+nav .navq input{width:100%;font-size:13px;padding:8px 10px}
+nav .nsec{margin-top:4px}
+nav .nsec-h{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;background:none;border:0;border-top:1px solid var(--ln);padding:10px 18px 6px;font:600 10.5px var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);cursor:pointer;text-align:left}
+nav .nsec-h:hover{color:var(--tx)}
+nav .nsec.mine .nsec-h{color:var(--cy)}
+nav .nsec-h i{font-style:normal;font-size:13px}
+nav .navres a{align-items:flex-start;padding:7px 14px;gap:8px}
+nav .navres a.first{background:rgba(98,230,242,.06)}
+nav .navres .k{flex:none;width:64px;font:500 10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-top:2px}
+nav .navres .t{display:flex;flex-direction:column;min-width:0;color:var(--tx);letter-spacing:.02em}
+nav .navres small{font-size:11px;color:var(--mu);font-weight:400}
+nav .navnone{padding:6px 18px;color:var(--mu);font-size:13px}
 
 main{overflow:auto;padding-block:16px 24px;padding-left:16px;padding-right:max(18px,env(safe-area-inset-right,0px));min-width:0}
 footer{grid-column:1/-1;border-top:1px solid var(--ln);background:rgba(6,18,26,.92);font:12px var(--f-mono);color:var(--mu);display:flex;overflow:hidden;white-space:nowrap;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -118,6 +131,7 @@ footer .tk span{margin-right:42px}
   nav a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:10px 14px}
   nav a[aria-current=page]{border-bottom-color:var(--cy)}
   nav .navsep,nav a .n{display:none}
+  nav .nsec,nav .navres{display:contents}nav .nsec-h{display:none}nav .navq{padding:6px 8px;flex:none;min-width:170px}
   main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
   .g-ov,.g-2,.g-2b{grid-template-columns:1fr}
   .brand{font-size:22px}.hsep{display:none}}
@@ -464,6 +478,36 @@ const WS_PRESETS = {
   communications: ["overview", "bord", "pa", "alerts", "starmap", "log"],
   agronome: ["overview", "atmos", "networks", "log"]
 };
+/* Postes du bord : une section de la console par poste, avec les pages qui lui servent. « commun » = tout le monde. */
+const POSTES = [
+  ["commun", "Pour tous", ["overview", "alerts", "plan", "chat", "procs", "bord", "log"]],
+  ["commandement", "Commandement", ["crew", "pa", "avaries", "stocks", "doors", "galaxy", "energy", "structure"]],
+  ["ingenieur", "Ingénierie", ["energy", "networks", "atmos", "avaries", "vue3d", "stocks"]],
+  ["medecin", "Médical", ["medical", "crew", "atmos"]],
+  ["pilote", "Pilotage et navigation", ["galaxy", "starmap", "vue3d"]],
+  ["securite", "Sécurité", ["cameras", "doors", "crew", "avaries"]],
+  ["chercheur", "Recherche", ["medical", "starmap", "galaxy"]],
+  ["logistique", "Logistique", ["stocks", "networks", "energy"]],
+  ["communications", "Communications", ["pa", "bord", "starmap"]],
+  ["agronome", "Agronomie", ["atmos", "networks", "stocks"]],
+  ["admin", "Poste admin", ["admin", "screens", "craft", "branding", "diseases", "structure"]]
+];
+/* Poste d'une personne : le poste de travail utilisé, sinon son métier, son rôle ou son groupe. */
+function posteOf(me) {
+  if (!me) return "commun";
+  if (me.ws && WS_PRESETS[me.ws]) return me.ws;
+  const s = ((me.job || "") + " " + (me.role || "") + " " + (me.group || "")).toLowerCase();
+  if (/ing[ée]n|tech|m[ée]can|maintenance|[ée]lectric/.test(s)) return "ingenieur";
+  if (/m[ée]dec|infirm|soin|chirurg|sant/.test(s)) return "medecin";
+  if (/pilot|navig|timon/.test(s)) return "pilote";
+  if (/s[ée]curit|milit|soldat|garde|police/.test(s)) return "securite";
+  if (/cherch|scien|labo|biolog|g[ée]olog|explor/.test(s)) return "chercheur";
+  if (/logist|intend|soute|stock|quartier/.test(s)) return "logistique";
+  if (/communic|radio|transm|presse/.test(s)) return "communications";
+  if (/agro|serre|hydropon|cultiv|agricult/.test(s)) return "agronome";
+  if (/capit|command|officier|amiral|second/.test(s) || (me.level | 0) >= 5) return "commandement";
+  return "commun";
+}
 const WS_NAMES = { ingenieur: "Poste ingénierie", medecin: "Poste médical", pilote: "Poste de pilotage", securite: "Poste de sécurité", chercheur: "Poste de recherche",
   commandement: "Poste de commandement", logistique: "Poste logistique", communications: "Poste communications", agronome: "Poste agronomie" };
 function wsJob(term) { const m = /^WS-([a-z]+)-/.exec(term || ""); return m && WS_PRESETS[m[1]] ? m[1] : null; }
@@ -2376,7 +2420,7 @@ function seedDemo(now = Date.now()) {
   return s;
 }
 
-return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, PC_APPS, KB_CATS, KB_PRIVATE, pcOf, kbState, dwState, dwAlias, kbCanRead, WS_PRESETS, WS_NAMES, wsJob, termPages, SYMPTOMS, diseasesDefault, netState, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyBlocHub, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, INV_RES, INV_REF, invState, invCounted, applyInventory, POSTS, postOf, canRecount, PHASES, scheduleDefault, scheduleOf, phaseNow, MOB_GROUPS, SERVICES, bordState, applyChipMsg, compileChip, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
+return { PROTOCOL_VERSION, EJECT_COUNTDOWN_MS, LOG_MAX, LEVELS, GROUPS, TEAMS, PAGES, ADMIN_PAGES, ACTIONS, PC_APPS, KB_CATS, KB_PRIVATE, pcOf, kbState, dwState, dwAlias, kbCanRead, WS_PRESETS, POSTES, posteOf, WS_NAMES, wsJob, termPages, SYMPTOMS, diseasesDefault, netState, defaultPerms, FAULTS, FAULT_INDEX, envDefault, emptyShip, NAV_DEFAULT, PLANET_STYLES, RETHIUM_DIM, JUMP_INTRO_MS, navEmpty, navSeconds, navMigrate, navSystem, navDistance, navReach, applyBlocHub, applyNav, SCREEN_TYPES, SCREEN_MODES, screensEmpty, cleanScreenCfg, applyScreens, screenEffective, displayView, PA_LEVELS, PA_SOUNDS, paEmpty, applySpeakers, paTargets, paTargetLabel, CRAFT_MODES, craftEmpty, cleanCraftRule, craftAudience, craftLabel, compileCraft, paStateCmd, log, levelOf, can, effectiveRule, clauseMatch, canOpenDoor, ruleText, compileAcl, roomStatus, computeAlerts, UNIFORM_TEMPLATES, UNIFORM_LOOK, ARMOR_TIERS, GRADE_CATEGORIES, INSIGNIA_KINDS, gradesDefault, gradesOf, compileUniforms, INV_RES, INV_REF, invState, invCounted, applyInventory, POSTS, postOf, canRecount, PHASES, scheduleDefault, scheduleOf, phaseNow, MOB_GROUPS, SERVICES, bordState, applyChipMsg, compileChip, FIREWALL, securityOf, intrusionStart, intrusionCheck, intrusionEnd, hackDump, mergeStructure, registerPlayer, resetPerson, applyTelemetry, apply, simulate, tick, needsTick, viewFor, seedDemo };
 })();
 /* Manuel de bord du Meridian III : explications des systèmes, par rôle.
    Mise en forme : « # » titre, « - » puce, « 1. » étape, « ! » danger, « > » note, « [[schema:id]] » schéma. */
@@ -2483,9 +2527,10 @@ colon: [
 - Niveau 5 : zone sécurisée la plus proche, lifepack à la ceinture.
 > Suivez les ordres de l’équipage : ils voient le vaisseau entier sur la console.`],
 ["Les consoles", `Les terminaux ouvrent la console de bord avec vos droits. Un terminal n’affiche que les pages prévues pour son poste.
-- Plan du vaisseau : où vous êtes, l’état des pièces.
-- Discussion : écrire à l’ordinateur de bord.
-- Les pages que vous ne pouvez pas voir n’apparaissent pas.`],
+- À gauche, les pages sont rangées par poste : « Mon poste » en premier (selon votre métier ou le poste de travail utilisé), puis « Pour tous », puis les autres postes, repliés.
+- La case Rechercher (touche /) trouve une page, une action (« couper le courant »), une pièce, une personne ou un article du manuel. Entrée ouvre le premier résultat.
+- La recherche ne montre que ce que votre puce peut voir et faire.
+- Plan du vaisseau : où vous êtes, l’état des pièces. Discussion : écrire à A.T.L.A.S.`],
 ],
 ingenieur: [
 ["Réseau électrique et compteurs", `La salle des machines produit, tout le reste consomme : lumières, portes, établis, écrans, machines.
@@ -3139,7 +3184,73 @@ function vitalState(p) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["cameras", "23"], ["avaries", "24"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"]];
+const NAV = [["overview", "01"], ["alerts", "02"], ["plan", "03"], ["vue3d", "04"], ["atmos", "05"], ["energy", "06"], ["networks", "07"], ["doors", "08"], ["cameras", "23"], ["avaries", "24"], ["crew", "09"], ["medical", "10"], ["procs", "11"], ["pa", "12"], ["chat", "13"], ["starmap", "14"], ["galaxy", "15"], ["log", "16"], ["structure", "17"], ["screens", "18"], ["craft", "19"], ["branding", "20"], ["diseases", "21"], ["admin", "22"], ["bord", "25"], ["stocks", "26"]];
+
+/* ---------------------------------------------------------------- Navigation par poste et recherche */
+const NAVN = Object.fromEntries(NAV);
+/* Mots que les gens tapent pour trouver chaque page (sans accents, en minuscules). */
+const PAGE_WORDS = {
+  overview: "accueil resume etat general tableau de bord", alerts: "alarme alerte urgence probleme", plan: "plan carte ponts pieces salles ou",
+  vue3d: "3d maquette vaisseau", atmos: "air oxygene pression co2 pressuriser vider extinction azote vanne temperature",
+  energy: "electricite courant plomb compteur delestage batterie reacteur production watt eteindre appareil rearmer",
+  networks: "reseau cable electricite aeration grille gaine gaz conduite chaleur respirabilite couper courant air piece",
+  doors: "porte acces badge verrouiller sceller sas confinement", cameras: "camera video surveillance image flux",
+  avaries: "panne avarie reparation fissure fuite eva panneau trousse pieces", crew: "equipage personnel personne grade affectation puce vitaux sante",
+  medical: "medical dossier malade blessure soin traitement analyse", procs: "procedure manuel aide ejection urgence mode d emploi",
+  pa: "diffusion annonce haut-parleur alerte generale signal quart", chat: "discussion message atlas ordinateur parler",
+  starmap: "carte stellaire planete navette liaison com systeme", galaxy: "saut hyperespace interstellaire voyage antimatiere carburant",
+  log: "journal historique evenement", structure: "structure ponts pieces sections noms niveaux permissions terminaux",
+  bord: "vie de bord canaux mobilisation", stocks: "reserve soute stock eau rations medicaments pieces carburant inventaire",
+  screens: "ecran affichage relais", craft: "fabrication recette craft", branding: "identite visuelle logo", admin: "ordinateur de bord admin avarie declencher", diseases: "maladie pathogene"
+};
+const fold = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, " ");
+function navLink(k, alerts, label) {
+  const badge = k === "log" && alerts.length ? `<span class="bad">${alerts.length}</span>` : k === "chat" && V.me.admin && Object.values(V.chatUnread || {}).some(Boolean) ? `<span class="bad">${Object.values(V.chatUnread).filter(Boolean).length}</span>` : k === "crew" && perm("crew.assign") && people().some(p => !p.level) ? `<span class="bad">${people().filter(p => !p.level).length}</span>` : "";
+  return `<a data-go="${k}" ${ui.page === k ? 'aria-current="page"' : ""} tabindex="0"><span class="n">${NAVN[k] || "··"}</span>${esc(label || MC.PAGES[k])}${badge}</a>`;
+}
+/* Sections : mon poste d'abord (ouvert), « Pour tous », puis les autres postes repliés. Une page peut servir à plusieurs postes. */
+function navHtml(alerts) {
+  const vis = new Set(V.me.pages);
+  const mine = V.me.admin ? "admin" : MC.posteOf(Object.assign({}, V.people[V.me.id] || {}, { ws: V.me.ws, level: V.me.level, job: V.me.job, role: V.me.role, group: V.me.group }));
+  const order = MC.POSTES.slice().sort((a, b) => (b[0] === mine) - (a[0] === mine) || (b[0] === "commun") - (a[0] === "commun"));
+  if (!ui.navOpen) ui.navOpen = { [mine]: true, commun: true };
+  const search = `<div class="navq"><input id="navq" type="search" data-fn="navQ" placeholder="Rechercher…  ( / )" value="${esc(ui.navQ || "")}" aria-label="Rechercher dans la console" autocomplete="off"></div>`;
+  if (ui.navQ && ui.navQ.trim()) return search + navResults();
+  let h = "", shown = new Set();
+  for (const [id, name, pages] of order) {
+    const list = pages.filter(k => vis.has(k));
+    if (!list.length) continue;
+    list.forEach(k => shown.add(k));
+    const open = !!ui.navOpen[id] || ui.navOpen[id] === undefined && id === mine;
+    h += `<div class="nsec${id === mine ? " mine" : ""}"><button class="nsec-h" data-fn="navSec" data-arg="${id}" aria-expanded="${open}"><span>${esc(id === mine && id !== "commun" ? "Mon poste · " + name : name)}</span><i>${open ? "−" : "+"}</i></button>${open ? list.map(k => navLink(k, alerts)).join("") : ""}</div>`;
+  }
+  const rest = V.me.pages.filter(k => !shown.has(k) && MC.PAGES[k]);
+  if (rest.length) h += `<div class="nsec"><button class="nsec-h" data-fn="navSec" data-arg="autres" aria-expanded="${!!ui.navOpen.autres}"><span>Autres pages</span><i>${ui.navOpen.autres ? "−" : "+"}</i></button>${ui.navOpen.autres ? rest.map(k => navLink(k, alerts)).join("") : ""}</div>`;
+  return search + h;
+}
+/* Recherche : pages visibles, actions permises, articles du manuel, pièces, personnes (selon les droits). */
+function navIndex() {
+  const out = [], vis = new Set(V.me.pages);
+  for (const k of V.me.pages) if (MC.PAGES[k]) out.push({ kind: "Page", label: MC.PAGES[k], hay: fold(MC.PAGES[k] + " " + (PAGE_WORDS[k] || "")), attrs: `data-go="${k}"` });
+  for (const [k, [label, , page]] of Object.entries(MC.ACTIONS)) if (vis.has(page) && perm(k)) out.push({ kind: "Action", label, sub: MC.PAGES[page], hay: fold(label + " " + MC.PAGES[page]), attrs: `data-go="${page}"` });
+  if (vis.has("procs")) for (const [role, rl] of MANUAL_ROLES) (MANUAL[role] || []).forEach(([t, body], i) => out.push({ kind: "Manuel", label: t, sub: rl, hay: fold(t + " " + body.slice(0, 400)), attrs: `data-fn="manGo" data-arg="${role}|${i}"` }));
+  if (vis.has("plan")) for (const r of Object.values(V.rooms || {})) if (r.name) out.push({ kind: "Pièce", label: r.name, sub: deckName(r.deck), hay: fold(r.name + " " + r.id + " " + (deckName(r.deck) || "")), attrs: `data-room="${esc(r.id)}" data-go="plan"` });
+  if (vis.has("crew")) for (const p of people()) if (p.name) out.push({ kind: "Personne", label: p.name, sub: p.job || p.role || "", hay: fold(p.name + " " + (p.job || "") + " " + (p.role || "")), attrs: `data-person="${esc(p.id)}" data-go="crew"` });
+  return out;
+}
+function navMatches(q) {
+  const toks = fold(q).split(/\s+/).filter(Boolean);
+  if (!toks.length) return [];
+  const rank = { Page: 0, Action: 1, Pièce: 2, Personne: 3, Manuel: 4 };
+  return navIndex().filter(e => toks.every(t => e.hay.includes(t)))
+    .map(e => ({ e, sc: (fold(e.label).startsWith(toks[0]) ? 0 : fold(e.label).includes(toks[0]) ? 1 : 2) * 10 + rank[e.kind] }))
+    .sort((a, b) => a.sc - b.sc).slice(0, 30).map(x => x.e);
+}
+function navResults() {
+  const res = navMatches(ui.navQ);
+  if (!res.length) return `<p class="navnone">Rien trouvé pour « ${esc(ui.navQ)} » parmi ce que votre puce peut voir.</p>`;
+  return `<div class="navres" role="listbox">` + res.map((e, i) => `<a ${e.attrs} tabindex="0" class="${i === 0 ? "first" : ""}"><span class="k">${esc(e.kind)}</span><span class="t">${esc(e.label)}${e.sub ? `<small>${esc(e.sub)}</small>` : ""}</span></a>`).join("") + `</div>`;
+}
 
 function renderChrome() {
   const app = document.getElementById("app");
@@ -3164,10 +3275,7 @@ function render() {
   const d = new Date(now()), hh = d.getHours();
   const demoBar = DEMO ? `<div class="demo"><b>MODE DÉMO</b><label class="mu" for="demo-who">Puce</label><select id="demo-who" data-fn="demoWho">${Object.values(DEMO.S.people).map(p => `<option value="${esc(p.id)}"${p.id === DEMO.actor ? " selected" : ""}>${esc(p.name)} · niv. ${p.admin ? "admin" : p.level}</option>`).join("")}</select><label class="mu" for="demo-term">Terminal</label><select id="demo-term" data-fn="demoTerm"><option value="">Aucun (toutes pages)</option>${Object.values(DEMO.S.terminals).map(t => `<option value="${esc(t.id)}"${t.id === DEMO.term ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select><span class="mu">Changez de puce pour tester les niveaux d’accès et les doubles codes.</span><a class="cy" href="?mindows" style="margin-left:auto">Bureau Mindows →</a><a class="cy" href="?connexion">Connexion admin →</a></div>` : "";
   const soloBar = !DEMO && V.me.realAdmin ? `<div class="demo"><b>TEST SOLO</b><label class="mu" for="solo-as">Incarner</label><select id="solo-as" data-fn="soloAs"><option value="">Poste admin · toutes permissions</option>${(V.me.roster || []).map(([id, n, lv]) => `<option value="${esc(id)}"${V.me.as === id ? " selected" : ""}>${esc(n)} · niv. ${lv}</option>`).join("")}</select><span class="mu">${V.me.as ? "Vous voyez et agissez exactement comme cette personne." : "Choisissez une personne pour tester ses droits, ou saisir le second code d’une éjection."}</span></div>` : "";
-  const navItems = NAV.filter(([k]) => V.me.pages.includes(k)).map(([k, n]) => {
-    const badge = k === "log" && alerts.length ? `<span class="bad">${alerts.length}</span>` : k === "chat" && V.me.admin && Object.values(V.chatUnread || {}).some(Boolean) ? `<span class="bad">${Object.values(V.chatUnread).filter(Boolean).length}</span>` : k === "crew" && perm("crew.assign") && people().some(p => !p.level) ? `<span class="bad">${people().filter(p => !p.level).length}</span>` : "";
-    return `${k === "structure" ? '<div class="navsep">CONFIGURATION</div>' : ""}<a data-go="${k}" ${ui.page === k ? 'aria-current="page"' : ""} tabindex="0"><span class="n">${n}</span>${esc(MC.PAGES[k])}${badge}</a>`;
-  }).join("");
+  const navItems = navHtml(alerts);
   const banners = (V.computer && V.computer.refuse ? `<div class="banner red">Ordinateur de bord · ${esc(V.computer.message || "les commandes de l’équipage sont refusées")}</div>` : "") +
     (V.ship.demo && LINK !== "demo" ? `<div class="banner amb">Vaisseau de démonstration · en attente de la structure envoyée par le mod</div>` : "");
   const tick = V.log.slice(0, 14).map(l => `<span>${fmtT(l.t)} · ${esc(l.who)} : ${esc(l.text)}</span>`).join("");
@@ -4739,6 +4847,9 @@ PAGE.energy = () => {
     : `<p class="empty">Aucune machine en panne.</p>`;
   return `<div class="stack">${panel("Réseau électrique", "PWR." + (T.mode || "").toUpperCase().slice(0, 4), head + resetAll)}${panel("Schéma du réseau", "BUS." + Object.keys(B).length, powerDiagram(T) + help)}<div class="grid g-2"><div class="stack">${side}</div><div class="stack">${panel("Machines en panne", "DMG." + DMG.length, dmg, DMG.some(d => d.kind === "short") ? "crit" : "")}${panel("Événements", "PWR.LOG", ev)}</div></div></div>`;
 };
+FN.navQ = (el) => { ui.navQ = el.value; render(); };
+FN.navSec = (el) => { const k = el.dataset.arg; ui.navOpen[k] = !ui.navOpen[k]; render(); };
+FN.manGo = (el) => { const [r, i] = el.dataset.arg.split("|"); ui.manRole = r; ui.manArt = +i; ui.procTab = "manuel"; ui.page = "procs"; ui.navQ = ""; render(); };
 FN.brkSel = (el) => { ui.brk = el.dataset.arg; render(); };
 
 /* =====================================================================
@@ -5718,7 +5829,7 @@ document.addEventListener("click", (e) => {
   else if (el.dataset.sec) { ui.sec = el.dataset.sec; ui.room = null; ui.door = null; if (V.sections[ui.sec] && V.sections[ui.sec].ring) ui.deck = V.sections[ui.sec].ring; if (ui.page !== "plan" && ui.page !== "vue3d") ui.page = "plan"; }
   else if (el.dataset.deck) { if (ui.deck !== el.dataset.deck || ui.sec) { ui.room = null; ui.door = null; } ui.sec = null; ui.deck = el.dataset.deck; if (ui.page !== "plan" && ui.page !== "vue3d") ui.page = "plan"; }
   if (el.dataset.person) ui.person = el.dataset.person;
-  if (el.dataset.go) ui.page = el.dataset.go;
+  if (el.dataset.go) { ui.page = el.dataset.go; if (el.closest(".navres")) ui.navQ = ""; }
   else if (el.dataset.room && ui.page === "overview") ui.page = "plan";
   render();
 });
@@ -5730,9 +5841,15 @@ document.addEventListener("change", (e) => {
   if (el.dataset.fn && FN[el.dataset.fn] && (el.tagName === "SELECT" || el.type === "range" || el.type === "checkbox" || el.type === "file")) FN[el.dataset.fn](el);
 });
 let qTimer = null;
-document.addEventListener("input", (e) => { const el = e.target; if (el.dataset.fn === "q" || el.dataset.fn === "kbQ") { clearTimeout(qTimer); qTimer = setTimeout(() => FN[el.dataset.fn](el), 220); } });
+document.addEventListener("input", (e) => { const el = e.target; if (el.dataset.fn === "navQ") { clearTimeout(qTimer); qTimer = setTimeout(() => FN.navQ(el), 90); return; } if (el.dataset.fn === "q" || el.dataset.fn === "kbQ") { clearTimeout(qTimer); qTimer = setTimeout(() => FN[el.dataset.fn](el), 220); } });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !document.getElementById("modal").hidden) closeModal();
+  if (e.target.id === "navq") {
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(qTimer); ui.navQ = e.target.value; const f = navMatches(ui.navQ)[0]; if (f) { render(); const a = document.querySelector("nav .navres a.first"); if (a) { a.click(); ui.navQ = ""; render(); } } }
+    else if (e.key === "Escape") { ui.navQ = ""; e.target.value = ""; render(); }
+    return;
+  }
+  if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "") && document.getElementById("navq")) { e.preventDefault(); document.getElementById("navq").focus(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("nav a,tbody tr,svg .hit,.al,[data-go]:not(button)")) { e.preventDefault(); e.target.click(); }
 });
 
